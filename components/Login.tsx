@@ -13,6 +13,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -24,8 +25,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
     const user = users.find(
       u => u.username.toLowerCase() === username.trim().toLowerCase() &&
            u.password === password
@@ -39,6 +41,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     } else {
       setError('Usuario o contraseña incorrectos');
     }
+    setLoading(false);
   };
 
   return (
