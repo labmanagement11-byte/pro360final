@@ -1,11 +1,48 @@
+  // Editar usuario en Supabase
+  const editUser = async (idx: number, user: User) => {
+    const userToEdit = users[idx];
+    if (!userToEdit || !userToEdit.id) {
+      alert('No se puede editar: falta id');
+      return;
+    }
+    const { data, error } = await supabase.from('users').update(user).eq('id', userToEdit.id).select();
+    if (!error && data && data.length > 0) {
+      setUsers(prev => prev.map((u, i) => i === idx ? data[0] : u));
+    } else if (error) {
+      alert('Error al editar usuario: ' + error.message);
+    }
+  };
+
+  // Eliminar usuario en Supabase
+  const deleteUser = async (idx: number) => {
+    const userToDelete = users[idx];
+    if (!userToDelete || !userToDelete.id) {
+      alert('No se puede eliminar: falta id');
+      return;
+    }
+    const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+    if (!error) {
+      setUsers(prev => prev.filter((_, i) => i !== idx));
+    } else {
+      alert('Error al eliminar usuario: ' + error.message);
+    }
+  };
 'use client';
 import React, { useState, useEffect } from 'react';
+
 import Dashboard, { User } from './Dashboard';
 import Login from './Login';
-import Users from './Users';
+import { supabase } from '../utils/supabaseClient';
+  // Función para agregar usuario a Supabase y refrescar lista
+  const addUser = async (user: User) => {
+    const { data, error } = await supabase.from('users').insert([user]).select();
+    if (!error && data && data.length > 0) {
+      setUsers(prev => [...prev, data[0]]);
+    } else if (error) {
+      alert('Error al agregar usuario: ' + error.message);
+    }
+  };
 
-const OWNER = { username: 'galindo123@email.com', password: 'galindo123', role: 'dueno', house: '' };
-const USERS_KEY = 'dashboard_users';
 const SESSION_KEY = 'dashboard_session_user';
 const App = () => {
   const [userState, setUserState] = useState<User | null>(() => {
@@ -17,13 +54,7 @@ const App = () => {
   });
   // Wrapper para compatibilidad exacta de tipos
   const setUser = (user: User | null) => setUserState(user);
-  const [users, setUsers] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(USERS_KEY);
-      if (saved) return JSON.parse(saved);
-    }
-    return [OWNER];
-  });
+  const [users, setUsers] = useState<User[]>([]);
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -40,24 +71,19 @@ const App = () => {
     }
   }, [userState]);
 
-  // Persist users in localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      window.dashboardUsers = users;
-    }
-  }, [users]);
 
-  // Only owner can add/edit/delete users
-  const addUser = (newUser: { username: string; password: string; role: string; house?: string }) => {
-    setUsers([...users, { ...newUser, password: newUser.password || '', house: newUser.house || '' }]);
-  };
-  const editUser = (idx: number, updated: { username: string; password: string; role: string; house?: string }) => {
-    setUsers(users.map((u: { username: string; password: string; role: string; house?: string }, i: number) => i === idx ? { ...u, ...updated, password: updated.password || '', house: updated.house || '' } : u));
-  };
-  const deleteUser = (idx: number) => {
-    setUsers(users.filter((user: { username: string; password: string; role: string; house?: string }, i: number) => i !== idx));
-  };
+  // Cargar usuarios desde Supabase al iniciar la app
+  useEffect(() => {
+    async function fetchUsers() {
+      const { data, error } = await supabase.from('users').select('*');
+      if (data) setUsers(data);
+      // Si quieres manejar errores, puedes agregar un setError aquí
+    }
+    fetchUsers();
+  }, []);
+
+  // Si necesitas agregar/editar/borrar usuarios, deberías hacerlo vía Supabase, no local
+  // Puedes implementar funciones aquí para interactuar con la base de datos si lo deseas
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(SESSION_KEY);

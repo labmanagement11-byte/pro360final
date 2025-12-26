@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 
 const TASKS_KEY = 'dashboard_tasks';
 
@@ -27,14 +28,8 @@ interface TasksProps {
 }
 
 const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTasks: setExternalTasks }) => {
-  const [tasks, setTasksState] = useState<Task[]>(() => {
-    if (externalTasks) return externalTasks;
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(TASKS_KEY);
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
+  const [tasks, setTasksState] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Sync with external tasks if provided
   useEffect(() => {
@@ -59,45 +54,101 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     return [{ name: 'EPIC D1' }];
   });
 
+  // Cargar tareas desde Supabase
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+    const fetchTasks = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('house', user.house || 'EPIC D1');
+      if (!error && data) {
+        setTasksState(data);
+      } else {
+        setTasksState([]);
+      }
+      setLoading(false);
+    };
+    fetchTasks();
+  }, [user.house]);
+
+  // Agregar tarea a Supabase
+  const addTask = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const newTask = { ...form, complete: false, house: form.house || user.house || 'EPIC D1' };
+    const { data, error } = await supabase.from('tasks').insert([newTask]).select();
+    if (!error && data && data.length > 0) {
+      setTasksState([...tasks, data[0]]);
+      setForm({ task: '', employee: '', date: '', time: '', house: '' });
     }
-  }, [tasks]);
-
-  // Agregar tarea
-  const addTask = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setTasksState([...tasks, { ...form, complete: false }]);
-    setForm({ task: '', employee: '', date: '', time: '', house: '' });
   };
 
-  // Editar tarea
-  const saveEdit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Editar tarea en Supabase
+  const saveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setTasksState(tasks.map((t, idx) => idx === editIdx ? { ...editForm, complete: t.complete } : t));
-    setEditIdx(null);
-    setEditForm({ task: '', employee: '', date: '', time: '', house: '' });
+    if (editIdx === null) return;
+    const taskToEdit = tasks[editIdx];
+    const updatedTask = { ...taskToEdit, ...editForm };
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ task: updatedTask.task, employee: updatedTask.employee, date: updatedTask.date, time: updatedTask.time, house: updatedTask.house })
+      .eq('id', taskToEdit.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setTasksState(tasks.map((t, idx) => idx === editIdx ? data[0] : t));
+      setEditIdx(null);
+      setEditForm({ task: '', employee: '', date: '', time: '', house: '' });
+    }
   };
 
-  // Eliminar tarea
-  const deleteTask = (idx: number) => {
-    setTasksState(tasks.filter((_, i) => i !== idx));
+  // Eliminar tarea en Supabase
+  const deleteTask = async (idx: number) => {
+    const task = tasks[idx];
+    if (!task || !task.id) return;
+    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (!error) {
+      setTasksState(tasks.filter((_, i) => i !== idx));
+    }
   };
 
   // Marcar como completa/incompleta (empleado)
-  const toggleComplete = (idx: number) => {
-    setTasksState(tasks.map((t, i) => i === idx ? { ...t, complete: !t.complete } : t));
+  const toggleComplete = async (idx: number) => {
+    const task = tasks[idx];
+    if (!task || !task.id) return;
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ complete: !task.complete })
+      .eq('id', task.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setTasksState(tasks.map((t, i) => i === idx ? data[0] : t));
+    }
   };
 
   // Set reason for incomplete task
-  const setReason = (idx: number, value: string) => {
-    setTasksState(tasks.map((t, i) => i === idx ? { ...t, reason: value } : t));
+  const setReason = async (idx: number, value: string) => {
+    const task = tasks[idx];
+    if (!task || !task.id) return;
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ reason: value })
+      .eq('id', task.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setTasksState(tasks.map((t, i) => i === idx ? data[0] : t));
+    }
   };
 
   // Reiniciar tareas (manager/dueno)
-  const resetTasks = () => {
-    setTasksState(tasks.map(t => ({ ...t, complete: false })));
+  const resetTasks = async () => {
+    const ids = tasks.map(t => t.id);
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ complete: false })
+      .in('id', ids);
+    if (!error) {
+      setTasksState(tasks.map(t => ({ ...t, complete: false })));
+    }
   };
 
   // Filtrar tareas según rol y casa
@@ -109,7 +160,8 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     <div>
       <h2>Asignación de Tareas</h2>
       <p>Aquí podrás asignar y ver tareas de los empleados.</p>
-      {(user.role === 'dueno' || user.role === 'manager') && (
+      {loading && <p>Cargando tareas...</p>}
+      {!loading && (user.role === 'dueno' || user.role === 'manager') && (
         <form onSubmit={editIdx !== null ? saveEdit : addTask} className="tasks-form">
           <input
             type="text"
@@ -153,7 +205,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
         </form>
       )}
       <ul className="tasks-list">
-        {visibleTasks.length === 0 && <li>No hay tareas asignadas.</li>}
+        {!loading && visibleTasks.length === 0 && <li>No hay tareas asignadas.</li>}
         {visibleTasks.map((t, idx) => (
           <li key={idx} className="tasks-list-item">
             <span className="tasks-task-text">{t.task} <span className="tasks-employee">({t.employee})</span> <span className="tasks-date">{t.date} {t.time}</span> <span className="tasks-house">[{t.house}]</span></span>

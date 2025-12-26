@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import { FaBoxOpen, FaChair, FaBed, FaBath, FaUtensils, FaCouch, FaSwimmer, FaBroom, FaTshirt, FaQuestion } from 'react-icons/fa';
 
 const ROOMS = [
   'Cocina', 'Terraza', 'Piscina', 'BBQ', 'Pasillo', 'Baños', 'Habitación 1', 'Habitación 2', 'Habitación 3', 'Lavandería'
 ];
-const INVENTORY_KEY = 'dashboard_inventory';
+const INVENTORY_KEY = 'dashboard_inventory'; // legacy, no longer used
 
 const roomIcons: { [key: string]: React.ReactElement } = {
   'Cocina': <FaUtensils style={{color:'#3182ce'}} />,
@@ -130,26 +131,29 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     { name: 'Linterna', room: 'Pasillo', quantity: 1 },
     { name: 'Manual de la casa', room: 'Pasillo', quantity: 1 },
   ];
-  const [items, setItemsState] = useState<InventoryItem[]>(() => {
-    if (externalInventory) return externalInventory;
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(INVENTORY_KEY);
-      if (saved) return JSON.parse(saved);
-      localStorage.setItem(INVENTORY_KEY, JSON.stringify(airbnbExample));
-      return airbnbExample;
-    }
-    return airbnbExample;
-  });
+  const [items, setItemsState] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Cargar inventario desde Supabase
+  useEffect(() => {
+    const fetchInventory = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('house', 'EPIC D1');
+      if (!error && data) {
+        setItemsState(data);
+      } else {
+        setItemsState([]);
+      }
+      setLoading(false);
+    };
+    fetchInventory();
+  }, []);
 
   // Sync with external inventory if provided
-  useEffect(() => {
-    if (externalInventory) setItemsState(externalInventory);
-  }, [externalInventory]);
-
-  // Update parent if setInventory provided
-  useEffect(() => {
-    if (setExternalInventory) setExternalInventory(items);
-  }, [items]);
+  // No externalInventory ni setInventory: todo es cloud
   const [form, setForm] = useState({
     name: '',
     room: ROOMS[0],
@@ -158,49 +162,105 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(INVENTORY_KEY, JSON.stringify(items));
+  // No localStorage: todo es cloud
+
+  // Agregar item a Supabase
+  const addItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const newItem = { ...form, complete: false, missing: 0, house: 'EPIC D1' };
+    const { data, error } = await supabase.from('inventory').insert([newItem]).select();
+    if (!error && data && data.length > 0) {
+      setItemsState([...items, data[0]]);
+      setForm({ name: '', room: ROOMS[0], quantity: 1 });
     }
-  }, [items]);
-
-  // Agregar item
-  const addItem = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setItemsState([...items, { ...form, complete: false, missing: 0 }]);
-    setForm({ name: '', room: ROOMS[0], quantity: 1 });
   };
 
-  // Editar item
-  const saveEdit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Editar item en Supabase
+  const saveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setItemsState(items.map((it, idx) => idx === editIdx ? { ...editForm, complete: it.complete, missing: it.missing } : it));
-    setEditIdx(null);
-    setEditForm({ name: '', room: ROOMS[0], quantity: 1 });
+    if (editIdx === null) return;
+    const itemToEdit = items[editIdx];
+    const updatedItem = { ...itemToEdit, ...editForm };
+    const { data, error } = await supabase
+      .from('inventory')
+      .update({ name: updatedItem.name, room: updatedItem.room, quantity: updatedItem.quantity })
+      .eq('id', itemToEdit.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setItemsState(items.map((it, idx) => idx === editIdx ? data[0] : it));
+      setEditIdx(null);
+      setEditForm({ name: '', room: ROOMS[0], quantity: 1 });
+    }
   };
 
-  // Eliminar item
-  const deleteItem = (idx: number) => {
-    setItemsState(items.filter((_, i) => i !== idx));
+  // Eliminar item en Supabase
+  const deleteItem = async (idx: number) => {
+    const item = items[idx];
+    if (!item || !item.id) return;
+    const { error } = await supabase.from('inventory').delete().eq('id', item.id);
+    if (!error) {
+      setItemsState(items.filter((_, i) => i !== idx));
+    }
   };
 
   // Marcar como completo/incompleto y reportar faltantes (empleado)
-  const toggleComplete = (idx: number) => {
-    setItemsState(items.map((it, i) => i === idx ? { ...it, complete: !it.complete } : it));
+  const toggleComplete = async (idx: number) => {
+    const item = items[idx];
+    if (!item || !item.id) return;
+    const { data, error } = await supabase
+      .from('inventory')
+      .update({ complete: !item.complete })
+      .eq('id', item.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setItemsState(items.map((it, i) => i === idx ? data[0] : it));
+    }
   };
-  const setMissing = (idx: number, value: number) => {
-    setItemsState(items.map((it, i) => i === idx ? { ...it, missing: value } : it));
+  const setMissing = async (idx: number, value: number) => {
+    const item = items[idx];
+    if (!item || !item.id) return;
+    const { data, error } = await supabase
+      .from('inventory')
+      .update({ missing: value })
+      .eq('id', item.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setItemsState(items.map((it, i) => i === idx ? data[0] : it));
+    }
   };
 
   // Set reason for incomplete item
-  const setReason = (idx: number, value: string) => {
-    setItemsState(items.map((it, i) => i === idx ? { ...it, reason: value } : it));
+  const setReason = async (idx: number, value: string) => {
+    const item = items[idx];
+    if (!item || !item.id) return;
+    const { data, error } = await supabase
+      .from('inventory')
+      .update({ reason: value })
+      .eq('id', item.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setItemsState(items.map((it, i) => i === idx ? data[0] : it));
+    }
   };
 
   // Reiniciar inventario (manager/dueno)
-  const resetInventory = () => {
-    setItemsState(items.map(it => ({ ...it, complete: false, missing: 0 })));
+  const resetInventory = async () => {
+    // Actualizar todos los items en Supabase
+    const ids = items.map(it => it.id);
+    const { data, error } = await supabase
+      .from('inventory')
+      .update({ complete: false, missing: 0 })
+      .in('id', ids);
+    if (!error) {
+      setItemsState(items.map(it => ({ ...it, complete: false, missing: 0 })));
+    }
   };
+
+  // Agrupar por habitación
+  const grouped = ROOMS.map(room => ({
+    room,
+    items: items.filter(it => it.room === room)
+  })).filter(g => g.items.length > 0);
 
   // Agrupar por habitación
   const grouped = ROOMS.map(room => ({
@@ -211,7 +271,8 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   return (
     <div className="inventory-list ultra-checklist">
       <h2 className="ultra-checklist-title">Inventario EPIC D1</h2>
-      {(user.role === 'dueno' || user.role === 'manager') && (
+      {loading && <p className="ultra-task-text" style={{textAlign:'center'}}>Cargando inventario...</p>}
+      {!loading && (user.role === 'dueno' || user.role === 'manager') && (
         <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}>
           <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text" style={{minWidth:'120px'}} />
           <select id="inv-room-select" value={editIdx !== null ? editForm.room : form.room} onChange={e => editIdx !== null ? setEditForm({ ...editForm, room: e.target.value }) : setForm({ ...form, room: e.target.value })} title="Selecciona la habitación" className="ultra-task-text">
@@ -222,7 +283,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
           {editIdx !== null && <button type="button" className="ultra-reset-btn" style={{background:'#aaa',color:'#fff',padding:'0.5rem 1.2rem', fontSize:'1rem'}} onClick={() => setEditIdx(null)}>Cancelar</button>}
         </form>
       )}
-      {grouped.length === 0 && <p className="ultra-task-text" style={{textAlign:'center'}}>No hay artículos en el inventario.</p>}
+      {!loading && grouped.length === 0 && <p className="ultra-task-text" style={{textAlign:'center'}}>No hay artículos en el inventario.</p>}
       <div className="ultra-tasks-grid">
         {grouped.map(g => (
           <div key={g.room} className="ultra-task-card" style={{flexDirection:'column', alignItems:'flex-start', minHeight:'unset'}}>
@@ -262,7 +323,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
           </div>
         ))}
       </div>
-      {(user.role === 'dueno' || user.role === 'manager') && grouped.length > 0 && (
+      {!loading && (user.role === 'dueno' || user.role === 'manager') && grouped.length > 0 && (
         <button onClick={resetInventory} className="ultra-reset-btn" style={{marginTop:'2rem'}}>Reiniciar Inventario</button>
       )}
     </div>

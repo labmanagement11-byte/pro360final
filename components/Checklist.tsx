@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
 
 const cleaningTasks = [
@@ -62,75 +63,148 @@ const maintenanceTasks = [
 ];
 
 
-const CHECKLIST_KEY = 'dashboard_checklist';
+const CHECKLIST_KEY = 'dashboard_checklist'; // legacy, no longer usado
+
 
 const Checklist = ({ user }: { user: User }) => {
-  const [cleaning, setCleaning] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(CHECKLIST_KEY + '_cleaning');
-      return saved ? JSON.parse(saved) : cleaningTasks.map(task => ({ task, done: false }));
-    }
-    return cleaningTasks.map(task => ({ task, done: false }));
-  });
-  const [maintenance, setMaintenance] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(CHECKLIST_KEY + '_maintenance');
-      return saved ? JSON.parse(saved) : maintenanceTasks.map(task => ({ task, done: false }));
-    }
-    return maintenanceTasks.map(task => ({ task, done: false }));
-  });
+  const [cleaning, setCleaning] = useState<{ id?: number; item: string; room?: string; complete: boolean; reason?: string }[]>([]);
+  const [maintenance, setMaintenance] = useState<{ id?: number; item: string; room?: string; complete: boolean; reason?: string }[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Cargar checklist desde Supabase
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(CHECKLIST_KEY + '_cleaning', JSON.stringify(cleaning));
-      localStorage.setItem(CHECKLIST_KEY + '_maintenance', JSON.stringify(maintenance));
+    const fetchChecklist = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('checklist')
+        .select('*')
+        .eq('house', 'EPIC D1');
+      if (!error && data) {
+        setCleaning(data.filter(i => !i.room || i.room === 'Limpieza'));
+        setMaintenance(data.filter(i => i.room === 'Mantenimiento'));
+      } else {
+        setCleaning([]);
+        setMaintenance([]);
+      }
+      setLoading(false);
+    };
+    fetchChecklist();
+  }, []);
+
+  // Agrupar tareas de limpieza por zona
+  const cleaningZones = [
+    { key: 'habitaciones', label: 'Habitaciones' },
+    { key: 'cocina', label: 'Cocina' },
+    { key: 'banos', label: 'Baños' },
+    { key: 'sala', label: 'Sala' },
+    { key: 'comedor', label: 'Comedor' },
+    { key: 'terraza', label: 'Terraza' },
+    { key: 'bbq', label: 'Área BBQ' },
+    { key: 'piscina', label: 'Piscina' },
+    { key: 'lavanderia', label: 'Lavandería' },
+    { key: 'otros', label: 'Otros' },
+  ];
+
+  // Mapear cada tarea a una zona (esto puede mejorarse si tienes el campo room en la base de datos)
+  const getZone = (item: string) => {
+    if (/habita/i.test(item) || /cama/i.test(item) || /tapete/i.test(item) || /cajon/i.test(item)) return 'habitaciones';
+    if (/cocina|microondas|nevera|filtro de agua|gabinete|cafetera|jab[oó]n|toalla de cocina/i.test(item)) return 'cocina';
+    if (/ba.n|sanitario|lavamanos|papel hig[ií]enico|toalla de mano|ducha|espejo|tapete de ba.n/i.test(item)) return 'banos';
+    if (/sala|coj[ií]n/i.test(item)) return 'sala';
+    if (/comedor/i.test(item)) return 'comedor';
+    if (/terraza/i.test(item)) return 'terraza';
+    if (/bbq|parrilla|carb[oó]n|mini nevera/i.test(item)) return 'bbq';
+    if (/piscina/i.test(item)) return 'piscina';
+    if (/lavadora|lavadero|ganchos|cuarto de lavado/i.test(item)) return 'lavanderia';
+    return 'otros';
+  };
+
+  const cleaningByZone: Record<string, typeof cleaning> = {};
+  cleaningZones.forEach(z => { cleaningByZone[z.key] = []; });
+  cleaning.forEach(i => {
+    const zone = getZone(i.item);
+    cleaningByZone[zone].push(i);
+  });
+
+  // Marcar/desmarcar ítem de limpieza
+  const toggleCleaning = async (idx: number) => {
+    const item = cleaning[idx];
+    if (!item || !item.id) return;
+    const { data, error } = await supabase
+      .from('checklist')
+      .update({ complete: !item.complete })
+      .eq('id', item.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setCleaning(cleaning.map((i, iidx) => iidx === idx ? data[0] : i));
     }
-  }, [cleaning, maintenance]);
-
-  const toggleCleaning = (idx: number) => {
-    setCleaning(cleaning.map((i: { task: string; done: boolean }, iidx: number) => iidx === idx ? { ...i, done: !i.done } : i));
   };
-  const toggleMaintenance = (idx: number) => {
-    setMaintenance(maintenance.map((i: { task: string; done: boolean }, iidx: number) => iidx === idx ? { ...i, done: !i.done } : i));
+  // Marcar/desmarcar ítem de mantenimiento
+  const toggleMaintenance = async (idx: number) => {
+    const item = maintenance[idx];
+    if (!item || !item.id) return;
+    const { data, error } = await supabase
+      .from('checklist')
+      .update({ complete: !item.complete })
+      .eq('id', item.id)
+      .select();
+    if (!error && data && data.length > 0) {
+      setMaintenance(maintenance.map((i, iidx) => iidx === idx ? data[0] : i));
+    }
   };
 
-  const resetChecklist = () => {
-    setCleaning(cleaningTasks.map(task => ({ task, done: false })));
-    setMaintenance(maintenanceTasks.map(task => ({ task, done: false })));
+  // Reiniciar checklist (manager/dueno)
+  const resetChecklist = async () => {
+    const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
+    const { data, error } = await supabase
+      .from('checklist')
+      .update({ complete: false })
+      .in('id', allIds);
+    if (!error) {
+      setCleaning(cleaning.map(i => ({ ...i, complete: false })));
+      setMaintenance(maintenance.map(i => ({ ...i, complete: false })));
+    }
   };
 
   return (
     <div className="checklist-list ultra-checklist">
       <h2 className="ultra-checklist-title">Checklist EPIC D1</h2>
-      <div className="ultra-checklist-section">
-        <h3 className="ultra-section-title">Limpieza</h3>
-        <div className="ultra-tasks-grid">
-          {cleaning.map((i: { task: string; done: boolean }, idx: number) => (
-            <div key={idx} className={`ultra-task-card${i.done ? ' done' : ''}`}> 
-              <label className="ultra-checkbox">
-                <input type="checkbox" checked={i.done} onChange={() => toggleCleaning(idx)} disabled={user.role !== 'empleado'} title={i.task} />
-                <span className="ultra-task-icon">{i.done ? '✔️' : '🧹'}</span>
-                <span className="ultra-task-text">{i.task}</span>
-              </label>
+      {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
+      {!loading && <>
+      {cleaningZones.map(zone => (
+        cleaningByZone[zone.key].length > 0 && (
+          <div className="ultra-checklist-section" key={zone.key}>
+            <h3 className="ultra-section-title">{zone.label}</h3>
+            <div className="ultra-tasks-grid">
+              {cleaningByZone[zone.key].map((i, idx) => (
+                <div key={i.id || idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
+                  <label className="ultra-checkbox">
+                    <input type="checkbox" checked={!!i.complete} onChange={() => toggleCleaning(cleaning.findIndex(c => c.id === i.id))} disabled={user.role !== 'empleado'} title={i.item} />
+                    <span className="ultra-task-icon">{i.complete ? '✔️' : '🧹'}</span>
+                    <span className="ultra-task-text">{i.item}</span>
+                  </label>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        )
+      ))}
       <div className="ultra-checklist-section">
         <h3 className="ultra-section-title">Mantenimiento</h3>
         <div className="ultra-tasks-grid">
-          {maintenance.map((i: { task: string; done: boolean }, idx: number) => (
-            <div key={idx} className={`ultra-task-card${i.done ? ' done' : ''}`}> 
+          {maintenance.map((i, idx) => (
+            <div key={idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
               <label className="ultra-checkbox">
-                <input type="checkbox" checked={i.done} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.task} />
-                <span className="ultra-task-icon">{i.done ? '🔧' : '🛠️'}</span>
-                <span className="ultra-task-text">{i.task}</span>
+                <input type="checkbox" checked={!!i.complete} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.item} />
+                <span className="ultra-task-icon">{i.complete ? '🔧' : '🛠️'}</span>
+                <span className="ultra-task-text">{i.item}</span>
               </label>
             </div>
           ))}
         </div>
       </div>
-      {(user.role === 'dueno' || user.role === 'manager') && (
+      </>}
+      {!loading && (user.role === 'dueno' || user.role === 'manager') && (
         <button onClick={resetChecklist} className="ultra-reset-btn">Reiniciar Checklist</button>
       )}
     </div>

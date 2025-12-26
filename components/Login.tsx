@@ -26,7 +26,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const user = users.find(u => u.username === username && u.password === password);
+    const user = users.find(
+      u => u.username.toLowerCase() === username.trim().toLowerCase() &&
+           u.password === password
+    );
     if (user) {
       setError('');
       if (remember && typeof window !== 'undefined') {
@@ -76,7 +79,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           />
           Recordar sesión
         </label>
-        <button type="submit">Entrar</button>
+        <button type="submit" disabled={loading}> {loading ? 'Ingresando...' : 'Entrar'} </button>
       </form>
       {error && <p className="login-error-msg">{error}</p>}
     </div>
