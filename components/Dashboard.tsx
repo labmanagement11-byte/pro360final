@@ -42,6 +42,7 @@ const REMINDERS_KEY = 'dashboard_reminders';
 
 
 export interface User {
+  id?: number; // ID de Supabase (opcional)
   role: string;
   username: string;
   password: string;
