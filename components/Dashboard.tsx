@@ -313,7 +313,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   <li key={idx} style={{ marginBottom: 8 }}>
                     <strong>{new Date(h.date).toLocaleString()}</strong>
                     <ul style={{ marginLeft: 16 }}>
-                      {h.items.map((item, i) => (
+                      {h.items.map((item: { name: string; qty: number }, i: number) => (
                         <li key={i}>{item.name} x{item.qty}</li>
                       ))}
                     </ul>
