@@ -177,11 +177,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         tasks={houses[allowedHouseIdx]?.tasks || []}
         setTasks={(tasks: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks } : h))}
       />}
-      {view === 'inventory' && <Inventory
-        user={user}
-        inventory={houses[allowedHouseIdx]?.inventory || []}
-        setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
-      />}
+      {view === 'inventory' && (
+        <Inventory
+          user={user}
+          inventory={houses[allowedHouseIdx]?.inventory || []}
+          setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
+        />
+      )}
       {view === 'calendar' && <Calendar users={users as any} user={user as any} />}
       {view === 'checklist' && <Checklist user={user} />}
       {view === 'reminders' && (
