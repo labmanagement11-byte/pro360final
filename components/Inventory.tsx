@@ -210,7 +210,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
 
   return (
     <div className="inventory-list ultra-checklist">
-      <h2 className="ultra-checklist-title">Inventario tipo Airbnb</h2>
+      <h2 className="ultra-checklist-title">Inventario EPIC D1</h2>
       {(user.role === 'dueno' || user.role === 'manager') && (
         <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}>
           <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text" style={{minWidth:'120px'}} />
