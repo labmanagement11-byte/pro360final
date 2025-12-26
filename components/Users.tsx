@@ -65,7 +65,7 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
     if (editData.username && editData.role) {
       editUser(editIdx, { ...editData, password: editData.password || '' });
       setEditIdx(-1);
-      setEditData({ username: '', password: '', role: 'empleado' });
+      setEditData({ username: '', password: '', role: 'empleado', house: '' });
     }
   };
 
