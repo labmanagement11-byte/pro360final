@@ -188,10 +188,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             setReminders([...reminders, { name, due, bank, account }]);
             form.reset();
           }}>
-            <input name="name" type="text" placeholder="Nombre del pago" required />
-            <input name="due" type="date" required placeholder="Fecha de pago" title="Fecha de pago" />
-            <input name="bank" type="text" placeholder="Banco" required />
-            <input name="account" type="text" placeholder="N° de cuenta" required />
+            <label htmlFor="reminder-name">Nombre del pago</label>
+            <input id="reminder-name" name="name" type="text" placeholder="Nombre del pago" required />
+            <label htmlFor="reminder-due">Fecha de pago</label>
+            <input id="reminder-due" name="due" type="date" required placeholder="Fecha de pago" title="Fecha de pago" />
+            <label htmlFor="reminder-bank">Banco</label>
+            <input id="reminder-bank" name="bank" type="text" placeholder="Banco" required />
+            <label htmlFor="reminder-account">N° de cuenta</label>
+            <input id="reminder-account" name="account" type="text" placeholder="N° de cuenta" required />
             <button type="submit" className="dashboard-btn main">Agregar</button>
           </form>
           <ul className="dashboard-reminders-list">
@@ -208,10 +212,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     setReminders(reminders.map((rem, i) => i === idx ? { name, due, bank, account } : rem));
                     setEditIdx(-1);
                   }}>
-                    <input name="name" type="text" defaultValue={r.name} required />
-                    <input name="due" type="date" defaultValue={r.due} required placeholder="Fecha de pago" title="Fecha de pago" />
-                    <input name="bank" type="text" defaultValue={r.bank} required />
-                    <input name="account" type="text" defaultValue={r.account} required />
+                    <label htmlFor={`edit-reminder-name-${idx}`}>Nombre del pago</label>
+                    <input id={`edit-reminder-name-${idx}`} name="name" type="text" defaultValue={r.name} required />
+                    <label htmlFor={`edit-reminder-due-${idx}`}>Fecha de pago</label>
+                    <input id={`edit-reminder-due-${idx}`} name="due" type="date" defaultValue={r.due} required placeholder="Fecha de pago" title="Fecha de pago" />
+                    <label htmlFor={`edit-reminder-bank-${idx}`}>Banco</label>
+                    <input id={`edit-reminder-bank-${idx}`} name="bank" type="text" defaultValue={r.bank} required />
+                    <label htmlFor={`edit-reminder-account-${idx}`}>N° de cuenta</label>
+                    <input id={`edit-reminder-account-${idx}`} name="account" type="text" defaultValue={r.account} required />
                     <button type="submit" className="dashboard-btn main">Guardar</button>
                     <button type="button" className="dashboard-btn danger" onClick={() => setEditIdx(-1)}>Cancelar</button>
                   </form>

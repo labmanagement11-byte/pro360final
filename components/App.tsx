@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import Dashboard from './Dashboard';
+import Dashboard, { User } from './Dashboard';
 import Login from './Login';
 import Users from './Users';
 
@@ -8,7 +8,15 @@ const OWNER = { username: 'galindo123@email.com', password: 'galindo123', role: 
 const USERS_KEY = 'dashboard_users';
 const SESSION_KEY = 'dashboard_session_user';
 const App = () => {
-  const [user, setUser] = useState(null);
+  const [userState, setUserState] = useState<User | null>(null);
+  // Wrapper para compatibilidad exacta de tipos
+  const setUser = (user: User | null) => setUserState(user);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SESSION_KEY);
+      if (saved) return JSON.parse(saved);
+    }
+    return null;
+  });
   const [users, setUsers] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(USERS_KEY);
@@ -24,13 +32,13 @@ const App = () => {
 
   // Auto-login from session
   useEffect(() => {
-    if (!user && typeof window !== 'undefined') {
+    if (!userState && typeof window !== 'undefined') {
       const saved = localStorage.getItem(SESSION_KEY);
       if (saved) {
         setUser(JSON.parse(saved));
       }
     }
-  }, [user]);
+  }, [userState]);
 
   // Persist users in localStorage
   useEffect(() => {
@@ -71,11 +79,11 @@ const App = () => {
           <span className="theme-label">{theme === 'light' ? 'Modo Oscuro' : 'Modo Claro'}</span>
         </button>
       </div>
-      {!user ? (
+      {!userState ? (
         <Login onLogin={setUser} users={users} />
       ) : (
         <Dashboard
-          user={user}
+          user={userState}
           users={users}
           addUser={addUser}
           editUser={editUser}
