@@ -36,6 +36,7 @@ export interface User {
   role: string;
   username: string;
   password: string;
+  house?: string; // Casa asignada (opcional para compatibilidad)
 }
 
 declare global {
@@ -70,10 +71,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [houses, setHouses] = useState<any[]>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
     return saved ? JSON.parse(saved) : [
-      { name: 'Casa Principal', tasks: [], inventory: [] }
+      { name: 'EPIC D1', tasks: [], inventory: [] }
     ];
   });
-  const [selectedHouseIdx, setSelectedHouseIdx] = useState(0);
+  // Si el usuario es empleado, forzar la casa asignada
+  const employeeHouseIdx = user.role === 'empleado' && user.house
+    ? houses.findIndex(h => h.name === user.house)
+    : 0;
+  const [selectedHouseIdx, setSelectedHouseIdx] = useState(employeeHouseIdx >= 0 ? employeeHouseIdx : 0);
+    // Si es empleado, solo puede ver su casa y no puede cambiarla
+    const isEmployee = user.role === 'empleado';
+    const allowedHouseIdx = isEmployee ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
   const [newHouseName, setNewHouseName] = useState('');
 
   // Guardar casas en localStorage
@@ -165,13 +173,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {view === 'tasks' && <Tasks
         user={user}
         users={users}
-        tasks={houses[selectedHouseIdx]?.tasks || []}
-        setTasks={(tasks: any[]) => setHouses(houses.map((h, i) => i === selectedHouseIdx ? { ...h, tasks } : h))}
+        tasks={houses[allowedHouseIdx]?.tasks || []}
+        setTasks={(tasks: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks } : h))}
       />}
       {view === 'inventory' && <Inventory
         user={user}
-        inventory={houses[selectedHouseIdx]?.inventory || []}
-        setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === selectedHouseIdx ? { ...h, inventory } : h))}
+        inventory={houses[allowedHouseIdx]?.inventory || []}
+        setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
       />}
       {view === 'calendar' && <Calendar users={users as any} user={user as any} />}
       {view === 'checklist' && <Checklist user={user} />}
@@ -242,7 +250,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           </ul>
         </div>
       )}
-      {view === 'house' && (
+      {view === 'house' && !isEmployee && (
         <div className="house-selector">
           <h2 className="house-title">Seleccionar Casa</h2>
           <div className="house-cards">

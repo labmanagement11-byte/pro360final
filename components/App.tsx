@@ -4,7 +4,7 @@ import Dashboard, { User } from './Dashboard';
 import Login from './Login';
 import Users from './Users';
 
-const OWNER = { username: 'galindo123@email.com', password: 'galindo123', role: 'dueno' };
+const OWNER = { username: 'galindo123@email.com', password: 'galindo123', role: 'dueno', house: '' };
 const USERS_KEY = 'dashboard_users';
 const SESSION_KEY = 'dashboard_session_user';
 const App = () => {
@@ -49,14 +49,14 @@ const App = () => {
   }, [users]);
 
   // Only owner can add/edit/delete users
-  const addUser = (newUser: { username: string; password: string; role: string }) => {
-    setUsers([...users, { ...newUser, password: newUser.password || '' }]);
+  const addUser = (newUser: { username: string; password: string; role: string; house?: string }) => {
+    setUsers([...users, { ...newUser, password: newUser.password || '', house: newUser.house || '' }]);
   };
-  const editUser = (idx: number, updated: { username: string; password: string; role: string }) => {
-    setUsers(users.map((u: { username: string; password: string; role: string }, i: number) => i === idx ? { ...u, ...updated, password: updated.password || '' } : u));
+  const editUser = (idx: number, updated: { username: string; password: string; role: string; house?: string }) => {
+    setUsers(users.map((u: { username: string; password: string; role: string; house?: string }, i: number) => i === idx ? { ...u, ...updated, password: updated.password || '', house: updated.house || '' } : u));
   };
   const deleteUser = (idx: number) => {
-    setUsers(users.filter((user: { username: string; password: string; role: string }, i: number) => i !== idx));
+    setUsers(users.filter((user: { username: string; password: string; role: string; house?: string }, i: number) => i !== idx));
   };
   const handleLogout = () => {
     if (typeof window !== 'undefined') {

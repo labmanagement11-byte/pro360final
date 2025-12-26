@@ -10,12 +10,23 @@ interface UsersProps {
   deleteUser: (idx: number) => void;
 }
 
+
 const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUser }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
+  const [house, setHouse] = useState('');
   const [editIdx, setEditIdx] = useState(-1);
-  const [editData, setEditData] = useState({ username: '', password: '', role: 'empleado' });
+  const [editData, setEditData] = useState({ username: '', password: '', role: 'empleado', house: '' });
+
+  // Obtener casas desde localStorage (igual que Dashboard)
+  const [houses, setHouses] = useState<{ name: string }[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboard_houses');
+      if (saved) return JSON.parse(saved);
+    }
+    return [{ name: 'EPIC D1' }];
+  });
 
   if (!user || user.role !== 'dueno') {
     return (
@@ -40,11 +51,12 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
 
   const handleAddUser = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (username && role) {
-      addUser({ username, password: password || '', role });
+    if (username && role && house) {
+      addUser({ username, password: password || '', role, house });
       setUsername('');
       setPassword('');
       setRole('empleado');
+      setHouse('');
     }
   };
 
@@ -79,6 +91,13 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
         <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="manager">Manager</option>
           <option value="empleado">Empleado</option>
+        </select>
+        <label htmlFor="house-select" className="users-label">Casa asignada:</label>
+        <select id="house-select" value={house} onChange={e => setHouse(e.target.value)} required>
+          <option value="" disabled>Selecciona una casa</option>
+          {houses.map((h, idx) => (
+            <option key={idx} value={h.name}>{h.name}</option>
+          ))}
         </select>
         <button type="submit">Agregar Usuario</button>
       </form>

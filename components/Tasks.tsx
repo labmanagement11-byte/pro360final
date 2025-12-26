@@ -6,6 +6,9 @@ const TASKS_KEY = 'dashboard_tasks';
 interface Task {
   task: string;
   employee: string;
+  date?: string;
+  time?: string;
+  house?: string;
   complete?: boolean;
 }
 
@@ -41,9 +44,18 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     if (setExternalTasks) setExternalTasks(tasks);
   }, [tasks]);
   // ...existing code...
-  const [form, setForm] = useState({ task: '', employee: '' });
+  const [form, setForm] = useState({ task: '', employee: '', date: '', time: '', house: '' });
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ task: '', employee: '' });
+  const [editForm, setEditForm] = useState({ task: '', employee: '', date: '', time: '', house: '' });
+
+  // Obtener casas desde localStorage (igual que Dashboard)
+  const [houses, setHouses] = useState<{ name: string }[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboard_houses');
+      if (saved) return JSON.parse(saved);
+    }
+    return [{ name: 'EPIC D1' }];
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -55,7 +67,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   const addTask = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setTasksState([...tasks, { ...form, complete: false }]);
-    setForm({ task: '', employee: '' });
+    setForm({ task: '', employee: '', date: '', time: '', house: '' });
   };
 
   // Editar tarea
@@ -63,7 +75,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     e.preventDefault();
     setTasksState(tasks.map((t, idx) => idx === editIdx ? { ...editForm, complete: t.complete } : t));
     setEditIdx(null);
-    setEditForm({ task: '', employee: '' });
+    setEditForm({ task: '', employee: '', date: '', time: '', house: '' });
   };
 
   // Eliminar tarea
@@ -81,8 +93,10 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     setTasksState(tasks.map(t => ({ ...t, complete: false })));
   };
 
-  // Filtrar tareas según rol
-  const visibleTasks = user.role === 'empleado' ? tasks.filter(t => t.employee === user.username) : tasks;
+  // Filtrar tareas según rol y casa
+  const visibleTasks = user.role === 'empleado'
+    ? tasks.filter(t => t.employee === user.username && t.house === user.house)
+    : tasks;
 
   return (
     <div>
@@ -105,6 +119,28 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
             <option value="">Empleado</option>
             {users.filter(u => u.role === 'empleado').map(u => <option key={u.username} value={u.username}>{u.username}</option>)}
           </select>
+          <select title="Casa asignada"
+            value={editIdx !== null ? editForm.house : form.house}
+            onChange={e => editIdx !== null ? setEditForm({ ...editForm, house: e.target.value }) : setForm({ ...form, house: e.target.value })}
+            required
+          >
+            <option value="">Casa</option>
+            {houses.map((h, idx) => <option key={idx} value={h.name}>{h.name}</option>)}
+          </select>
+          <input
+            type="date"
+            placeholder="Fecha"
+            value={editIdx !== null ? editForm.date : form.date}
+            onChange={e => editIdx !== null ? setEditForm({ ...editForm, date: e.target.value }) : setForm({ ...form, date: e.target.value })}
+            required
+          />
+          <input
+            type="time"
+            placeholder="Hora"
+            value={editIdx !== null ? editForm.time : form.time}
+            onChange={e => editIdx !== null ? setEditForm({ ...editForm, time: e.target.value }) : setForm({ ...form, time: e.target.value })}
+            required
+          />
           <button type="submit">{editIdx !== null ? 'Guardar' : 'Agregar Tarea'}</button>
           {editIdx !== null && <button type="button" onClick={() => setEditIdx(null)}>Cancelar</button>}
         </form>
@@ -113,7 +149,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
         {visibleTasks.length === 0 && <li>No hay tareas asignadas.</li>}
         {visibleTasks.map((t, idx) => (
           <li key={idx} className="tasks-list-item">
-            <span className="tasks-task-text">{t.task} <span className="tasks-employee">({t.employee})</span></span>
+            <span className="tasks-task-text">{t.task} <span className="tasks-employee">({t.employee})</span> <span className="tasks-date">{t.date} {t.time}</span> <span className="tasks-house">[{t.house}]</span></span>
             {(user.role === 'dueno' || user.role === 'manager') && (
               <>
                 <button onClick={() => { setEditIdx(tasks.indexOf(t)); setEditForm({ task: t.task, employee: t.employee }); }}>Editar</button>
