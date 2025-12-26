@@ -22,6 +22,14 @@ const cardStyles = {
   transition: 'transform 0.2s',
 };
 
+
+// Usuarios por defecto para la casa EPIC D1
+const defaultUsers: User[] = [
+  { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'EPIC D1' },
+  { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'EPIC D1' },
+  { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'EPIC D1' },
+];
+
 const defaultReminders = [
   { name: 'Luz', due: '2025-12-25' },
   { name: 'Agua', due: '2025-12-28' },
@@ -67,11 +75,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   const showReminders = user.role === 'dueno' || user.role === 'manager';
 
-  // Estado para casas dinámicas
+  // Estado para casas dinámicas y usuarios sincronizados
   const [houses, setHouses] = useState<any[]>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
     return saved ? JSON.parse(saved) : [
-      { name: 'EPIC D1', tasks: [], inventory: [] }
+      { name: 'EPIC D1', tasks: [], inventory: [], users: defaultUsers }
     ];
   });
   // Si el usuario es empleado, forzar la casa asignada
@@ -308,18 +316,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           {(user.role === 'dueno' || user.role === 'manager') && shoppingHistory.length > 0 && (
             <div className="dashboard-inventory-history">
               <h3>Historial de compras</h3>
-              <ul>
+              <div className="dashboard-inventory-list">
                 {shoppingHistory.map((h, idx) => (
-                  <li key={idx} style={{ marginBottom: 8 }}>
-                    <strong>{new Date(h.date).toLocaleString()}</strong>
-                    <ul style={{ marginLeft: 16 }}>
+                  <div className="dashboard-inventory-card" key={idx}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <span style={{ fontWeight: 600, color: '#2563eb', fontSize: '1.05rem' }}>{new Date(h.date).toLocaleString()}</span>
+                      <button className="dashboard-btn danger" style={{ fontSize: '0.95rem', padding: '0.2rem 0.7rem' }} onClick={() => setShoppingHistory(shoppingHistory.filter((_, i) => i !== idx))}>Eliminar</button>
+                    </div>
+                    <ul style={{ margin: '0.5rem 0 0 0.5rem', padding: 0 }}>
                       {h.items.map((item: { name: string; qty: number }, i: number) => (
-                        <li key={i}>{item.name} x{item.qty}</li>
+                        <li key={i} style={{ fontSize: '0.98rem', color: '#23272f' }}>{item.name} x{item.qty}</li>
                       ))}
                     </ul>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
         </div>
