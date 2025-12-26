@@ -100,26 +100,36 @@ const Checklist = ({ user }: { user: User }) => {
   };
 
   return (
-    <div className="checklist-list">
-      <h2>Checklist EPIC D1</h2>
-      <h3>Limpieza</h3>
-      <ul>
-        {cleaning.map((i: { task: string; done: boolean }, idx: number) => (
-          <li key={idx} className={i.done ? 'disabled' : ''}>
-            <input type="checkbox" checked={i.done} onChange={() => toggleCleaning(idx)} disabled={user.role !== 'empleado'} title={i.task} /> <span>{i.task}</span>
-          </li>
-        ))}
-      </ul>
-      <h3 className="checklist-maintenance-title">Mantenimiento</h3>
-      <ul>
-        {maintenance.map((i: { task: string; done: boolean }, idx: number) => (
-          <li key={idx} className={i.done ? 'disabled' : ''}>
-            <input type="checkbox" checked={i.done} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.task} /> <span>{i.task}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="checklist-list redesigned-checklist">
+      <h2 className="checklist-title redesigned-checklist-title">Checklist EPIC D1</h2>
+      <div className="checklist-section redesigned-checklist-section">
+        <h3 className="checklist-section-title redesigned-section-title">Limpieza</h3>
+        <ul className="checklist-tasks redesigned-tasks">
+          {cleaning.map((i: { task: string; done: boolean }, idx: number) => (
+            <li key={idx} className={`checklist-task redesigned-task${i.done ? ' disabled' : ''}`}> 
+              <label className="checklist-checkbox redesigned-checkbox">
+                <input type="checkbox" checked={i.done} onChange={() => toggleCleaning(idx)} disabled={user.role !== 'empleado'} title={i.task} />
+                <span className="checklist-task-text redesigned-task-text">{i.task}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="checklist-section redesigned-checklist-section">
+        <h3 className="checklist-section-title checklist-maintenance-title redesigned-section-title">Mantenimiento</h3>
+        <ul className="checklist-tasks redesigned-tasks">
+          {maintenance.map((i: { task: string; done: boolean }, idx: number) => (
+            <li key={idx} className={`checklist-task redesigned-task${i.done ? ' disabled' : ''}`}> 
+              <label className="checklist-checkbox redesigned-checkbox">
+                <input type="checkbox" checked={i.done} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.task} />
+                <span className="checklist-task-text redesigned-task-text">{i.task}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
       {(user.role === 'dueno' || user.role === 'manager') && (
-        <button onClick={resetChecklist} className="checklist-reset-btn">Reiniciar Checklist</button>
+        <button onClick={resetChecklist} className="checklist-reset-btn redesigned-reset-btn">Reiniciar Checklist</button>
       )}
     </div>
   );
