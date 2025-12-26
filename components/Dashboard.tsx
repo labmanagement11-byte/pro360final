@@ -184,9 +184,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {view === 'calendar' && <Calendar users={users as any} user={user as any} />}
       {view === 'checklist' && <Checklist user={user} />}
       {view === 'reminders' && (
-        <div className="dashboard-reminders">
-          <h2 className="dashboard-reminders-title">Recordatorios</h2>
-          <form className="dashboard-reminders-form" onSubmit={e => {
+        <div className="dashboard-reminders redesigned-reminders">
+          <h2 className="dashboard-reminders-title redesigned-reminders-title">Recordatorios</h2>
+          <form className="dashboard-reminders-form redesigned-reminders-form" onSubmit={e => {
             e.preventDefault();
             const form = e.target as HTMLFormElement;
             const name = (form.elements.namedItem('name') as HTMLInputElement).value;
@@ -196,21 +196,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             setReminders([...reminders, { name, due, bank, account }]);
             form.reset();
           }}>
-            <label htmlFor="reminder-name">Nombre del pago</label>
-            <input id="reminder-name" name="name" type="text" placeholder="Nombre del pago" required />
-            <label htmlFor="reminder-due">Fecha de pago</label>
-            <input id="reminder-due" name="due" type="date" required placeholder="Fecha de pago" title="Fecha de pago" />
-            <label htmlFor="reminder-bank">Banco</label>
-            <input id="reminder-bank" name="bank" type="text" placeholder="Banco" required />
-            <label htmlFor="reminder-account">N° de cuenta</label>
-            <input id="reminder-account" name="account" type="text" placeholder="N° de cuenta" required />
-            <button type="submit" className="dashboard-btn main">Agregar</button>
+            <div className="reminders-form-row">
+              <label htmlFor="reminder-name">Nombre del pago</label>
+              <input id="reminder-name" name="name" type="text" placeholder="Nombre del pago" required />
+              <label htmlFor="reminder-due">Fecha de pago</label>
+              <input id="reminder-due" name="due" type="date" required placeholder="Fecha de pago" title="Fecha de pago" />
+              <label htmlFor="reminder-bank">Banco</label>
+              <input id="reminder-bank" name="bank" type="text" placeholder="Banco" required />
+              <label htmlFor="reminder-account">N° de cuenta</label>
+              <input id="reminder-account" name="account" type="text" placeholder="N° de cuenta" required />
+              <button type="submit" className="dashboard-btn main">Agregar</button>
+            </div>
           </form>
-          <ul className="dashboard-reminders-list">
+          <ul className="dashboard-reminders-list redesigned-reminders-list">
             {reminders.map((r, idx) => (
-              <li key={idx} className="dashboard-reminder-item">
+              <li key={idx} className="dashboard-reminder-item redesigned-reminder-item">
                 {editIdx === idx ? (
-                  <form className="dashboard-reminders-edit-form" onSubmit={e => {
+                  <form className="dashboard-reminders-edit-form redesigned-reminders-edit-form" onSubmit={e => {
                     e.preventDefault();
                     const form = e.target as HTMLFormElement;
                     const name = (form.elements.namedItem('name') as HTMLInputElement).value;
@@ -232,18 +234,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     <button type="button" className="dashboard-btn danger" onClick={() => setEditIdx(-1)}>Cancelar</button>
                   </form>
                 ) : (
-                  <>
-                    <div>
-                      <span className="dashboard-reminder-name">{r.name}</span> | 
-                      <span className="dashboard-reminder-due">{r.due}</span> | 
-                      <span className="dashboard-reminder-bank">{r.bank}</span> | 
+                  <div className="reminder-card">
+                    <div className="reminder-card-main">
+                      <span className="dashboard-reminder-name">{r.name}</span>
+                      <span className="dashboard-reminder-due">{r.due}</span>
+                      <span className="dashboard-reminder-bank">{r.bank}</span>
                       <span className="dashboard-reminder-account">{r.account}</span>
                     </div>
-                    <div>
+                    <div className="reminder-card-actions">
                       <button className="dashboard-btn" onClick={() => setEditIdx(idx)}>Editar</button>
                       <button className="dashboard-btn danger" onClick={() => setReminders(reminders.filter((_, i) => i !== idx))}>Eliminar</button>
                     </div>
-                  </>
+                  </div>
                 )}
               </li>
             ))}
