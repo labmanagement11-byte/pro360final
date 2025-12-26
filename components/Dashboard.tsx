@@ -35,7 +35,7 @@ const REMINDERS_KEY = 'dashboard_reminders';
 export interface User {
   role: string;
   username: string;
-  password?: string;
+  password: string;
 }
 
 declare global {

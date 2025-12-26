@@ -42,10 +42,10 @@ const App = () => {
 
   // Only owner can add/edit/delete users
   const addUser = (newUser: { username: string; password: string; role: string }) => {
-    setUsers([...users, newUser]);
+    setUsers([...users, { ...newUser, password: newUser.password || '' }]);
   };
   const editUser = (idx: number, updated: { username: string; password: string; role: string }) => {
-    setUsers(users.map((u: { username: string; password: string; role: string }, i: number) => i === idx ? { ...u, ...updated } : u));
+    setUsers(users.map((u: { username: string; password: string; role: string }, i: number) => i === idx ? { ...u, ...updated, password: updated.password || '' } : u));
   };
   const deleteUser = (idx: number) => {
     setUsers(users.filter((_user: any, i: number) => i !== idx));

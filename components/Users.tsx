@@ -32,8 +32,8 @@ const Users = ({ user, users, addUser, editUser, deleteUser }) => {
 
   const handleAddUser = (e) => {
     e.preventDefault();
-    if (username && password && role) {
-      addUser({ username, password, role });
+    if (username && role) {
+      addUser({ username, password: password || '', role });
       setUsername('');
       setPassword('');
       setRole('empleado');
@@ -43,7 +43,7 @@ const Users = ({ user, users, addUser, editUser, deleteUser }) => {
   const handleEditUser = (e) => {
     e.preventDefault();
     if (editData.username && editData.role) {
-      editUser(editIdx, editData);
+      editUser(editIdx, { ...editData, password: editData.password || '' });
       setEditIdx(-1);
       setEditData({ username: '', password: '', role: 'empleado' });
     }
