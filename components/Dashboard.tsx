@@ -128,11 +128,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
       show: user.role === 'dueno' || user.role === 'manager',
     },
+    // Solo mostrar la tarjeta de seleccionar casa si NO es empleado
     {
       key: 'house',
       title: 'Seleccionar Casa',
       desc: 'Elige y administra la casa actual.',
-      show: true,
+      show: user.role !== 'empleado',
     },
     {
       key: 'users',
