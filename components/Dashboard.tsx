@@ -117,6 +117,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       show: true,
     },
     {
+      key: 'shopping',
+      title: 'Lista de Compras',
+      desc: 'Agrega productos por comprar y gestiona compras realizadas.',
+      show: user.role === 'dueno' || user.role === 'manager' || user.role === 'empleado',
+    },
+    {
       key: 'calendar',
       title: 'Calendario',
       desc: 'Gestiona eventos y tareas programadas.',
@@ -142,6 +148,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       show: user.role === 'dueno',
     },
   ];
+
+  // --- Shopping List State ---
+  const SHOPPING_KEY = 'dashboard_shopping_list';
+  const SHOPPING_HISTORY_KEY = 'dashboard_shopping_history';
+  const [shoppingList, setShoppingList] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SHOPPING_KEY);
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+  const [shoppingHistory, setShoppingHistory] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SHOPPING_HISTORY_KEY);
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingList));
+    }
+  }, [shoppingList]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SHOPPING_HISTORY_KEY, JSON.stringify(shoppingHistory));
+    }
+  }, [shoppingHistory]);
+  const [editShoppingIdx, setEditShoppingIdx] = useState(-1);
+  const [newProduct, setNewProduct] = useState({ name: '', qty: 1 });
+
+  // --- END Shopping List State ---
 
   return (
     <div className="dashboard-container">
@@ -171,6 +209,120 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           </div>
           <p className="dashboard-home-desc">Haz clic en una tarjeta para ver el módulo correspondiente.</p>
         </>
+      )}
+      {view === 'shopping' && (
+        <div className="dashboard-inventory-container">
+          <h2 className="dashboard-inventory-title">Lista de Compras</h2>
+          <div className="dashboard-inventory-list">
+            {shoppingList.length === 0 && (
+              <div className="dashboard-inventory-empty">No hay productos por comprar.</div>
+            )}
+            {shoppingList.map((item, idx) => (
+              <div className="dashboard-inventory-card" key={idx}>
+                {editShoppingIdx === idx ? (
+                  <form className="dashboard-inventory-edit-form" onSubmit={e => {
+                    e.preventDefault();
+                    setShoppingList(shoppingList.map((prod, i) => i === idx ? { ...prod, ...newProduct } : prod));
+                    setEditShoppingIdx(-1);
+                  }}>
+                    <input
+                      type="text"
+                      value={newProduct.name}
+                      onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                      placeholder="Producto"
+                      required
+                      className="dashboard-inventory-input"
+                    />
+                    <input
+                      type="number"
+                      value={newProduct.qty}
+                      min={1}
+                      onChange={e => setNewProduct({ ...newProduct, qty: Number(e.target.value) })}
+                      className="dashboard-inventory-input"
+                      style={{ width: 60 }}
+                    />
+                    <button type="submit" className="dashboard-btn main">Guardar</button>
+                    <button type="button" className="dashboard-btn danger" onClick={() => setEditShoppingIdx(-1)}>Cancelar</button>
+                  </form>
+                ) : (
+                  <>
+                    <span className="dashboard-inventory-name">{item.name}</span>
+                    <span className="dashboard-inventory-qty">x{item.qty}</span>
+                    <div className="dashboard-inventory-actions">
+                      {(user.role === 'dueno' || user.role === 'manager') && (
+                        <>
+                          <button className="dashboard-btn" onClick={() => { setEditShoppingIdx(idx); setNewProduct({ name: item.name, qty: item.qty }); }}>Editar</button>
+                          <button className="dashboard-btn danger" onClick={() => setShoppingList(shoppingList.filter((_, i) => i !== idx))}>Eliminar</button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="dashboard-inventory-add-row">
+            {(user.role === 'empleado' || user.role === 'dueno' || user.role === 'manager') && (
+              <form className="dashboard-inventory-add-form" onSubmit={e => {
+                e.preventDefault();
+                if (newProduct.name.trim() && newProduct.qty > 0) {
+                  setShoppingList([...shoppingList, { ...newProduct }]);
+                  setNewProduct({ name: '', qty: 1 });
+                }
+              }}>
+                <input
+                  type="text"
+                  value={newProduct.name}
+                  onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                  placeholder="Producto por comprar"
+                  required
+                  className="dashboard-inventory-input"
+                />
+                <input
+                  type="number"
+                  value={newProduct.qty}
+                  min={1}
+                  onChange={e => setNewProduct({ ...newProduct, qty: Number(e.target.value) })}
+                  className="dashboard-inventory-input"
+                  style={{ width: 60 }}
+                />
+                <button type="submit" className="dashboard-btn main">Agregar</button>
+              </form>
+            )}
+          </div>
+          {(user.role === 'dueno' || user.role === 'manager') && shoppingList.length > 0 && (
+            <button
+              className="dashboard-btn main"
+              style={{ marginTop: 16 }}
+              onClick={() => {
+                setShoppingHistory([
+                  { items: shoppingList, date: new Date().toISOString() },
+                  ...shoppingHistory,
+                ]);
+                setShoppingList([]);
+              }}
+            >
+              Marcar compra como completada
+            </button>
+          )}
+          {(user.role === 'dueno' || user.role === 'manager') && shoppingHistory.length > 0 && (
+            <div className="dashboard-inventory-history">
+              <h3>Historial de compras</h3>
+              <ul>
+                {shoppingHistory.map((h, idx) => (
+                  <li key={idx} style={{ marginBottom: 8 }}>
+                    <strong>{new Date(h.date).toLocaleString()}</strong>
+                    <ul style={{ marginLeft: 16 }}>
+                      {h.items.map((item, i) => (
+                        <li key={i}>{item.name} x{item.qty}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
       {view === 'tasks' && <Tasks
         user={user}
@@ -317,3 +469,4 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 };
 
 export default Dashboard;
+
