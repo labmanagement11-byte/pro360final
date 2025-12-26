@@ -104,7 +104,7 @@ const Checklist = ({ user }: { user: User }) => {
       <h2>Checklist EPIC D1</h2>
       <h3>Limpieza</h3>
       <ul>
-        {cleaning.map((i, idx) => (
+        {cleaning.map((i: { task: string; done: boolean }, idx: number) => (
           <li key={idx} className={i.done ? 'disabled' : ''}>
             <input type="checkbox" checked={i.done} onChange={() => toggleCleaning(idx)} disabled={user.role !== 'empleado'} title={i.task} /> <span>{i.task}</span>
           </li>
@@ -112,7 +112,7 @@ const Checklist = ({ user }: { user: User }) => {
       </ul>
       <h3 className="checklist-maintenance-title">Mantenimiento</h3>
       <ul>
-        {maintenance.map((i, idx) => (
+        {maintenance.map((i: { task: string; done: boolean }, idx: number) => (
           <li key={idx} className={i.done ? 'disabled' : ''}>
             <input type="checkbox" checked={i.done} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.task} /> <span>{i.task}</span>
           </li>
