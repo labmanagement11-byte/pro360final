@@ -15,6 +15,7 @@ interface Task {
 interface User {
   username: string;
   role: string;
+  house?: string;
 }
 
 interface TasksProps {
