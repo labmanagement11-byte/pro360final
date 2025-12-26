@@ -1,3 +1,20 @@
+/* Logo branding styles for both light and dark themes */
+.logo360pro {
+  height: 60px;
+  width: auto;
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.08);
+  background: var(--background-secondary, #fff);
+  padding: 0.2rem;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo360pro {
+    background: var(--background-secondary-dark, #23272f);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.25), 0 1px 6px rgba(0,0,0,0.18);
+  }
+}
 
 
 @import './modern-theme.css';

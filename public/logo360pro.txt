@@ -1,0 +1,2 @@
+// Coloca aquí el logo 'logo360pro.png' (debe ser la imagen proporcionada)
+// Este archivo es solo un marcador de posición para referencia en el código.

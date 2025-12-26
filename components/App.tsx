@@ -67,6 +67,9 @@ const App = () => {
 
   return (
     <div>
+      <div style={{display:'flex',justifyContent:'center',alignItems:'center',margin:'2.5rem 0 1.5rem 0'}}>
+        <img src="/logo360pro.png" alt="Limpieza 360Pro Logo" className="logo360pro" style={{height:'70px'}} />
+      </div>
       <div className="theme-switcher">
         <button
           className={`theme-btn${theme === 'dark' ? ' dark' : ''}`}

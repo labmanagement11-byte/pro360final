@@ -145,6 +145,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   return (
     <div className="dashboard-container">
+      <div style={{display:'flex',justifyContent:'center',alignItems:'center',margin:'1.5rem 0 1.2rem 0'}}>
+        <img src="/logo360pro.png" alt="Limpieza 360Pro Logo" className="logo360pro" />
+      </div>
       <div className="dashboard-header-row">
         <h1>Dashboard</h1>
         {onLogout && (
