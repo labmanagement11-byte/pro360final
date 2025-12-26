@@ -1,3 +1,14 @@
+/* Remember label style */
+.login-remember-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.login-error-msg {
+  color: red;
+}
 .login-container {
   max-width: 350px;
   margin: 4rem auto;

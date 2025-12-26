@@ -41,13 +41,13 @@ const App = () => {
   }, [users]);
 
   // Only owner can add/edit/delete users
-  const addUser = (newUser) => {
+  const addUser = (newUser: { username: string; password: string; role: string }) => {
     setUsers([...users, newUser]);
   };
-  const editUser = (idx, updated) => {
-    setUsers(users.map((u, i) => i === idx ? { ...u, ...updated } : u));
+  const editUser = (idx: number, updated: { username: string; password: string; role: string }) => {
+    setUsers(users.map((u: { username: string; password: string; role: string }, i: number) => i === idx ? { ...u, ...updated } : u));
   };
-  const deleteUser = (idx) => {
+  const deleteUser = (idx: number) => {
     setUsers(users.filter((_, i) => i !== idx));
   };
   const handleLogout = () => {

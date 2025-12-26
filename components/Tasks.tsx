@@ -3,16 +3,46 @@ import React, { useState, useEffect } from 'react';
 
 const TASKS_KEY = 'dashboard_tasks';
 
-const Tasks = ({ user, users }) => {
-  const [tasks, setTasks] = useState(() => {
+interface Task {
+  task: string;
+  employee: string;
+  complete?: boolean;
+}
+
+interface User {
+  username: string;
+  role: string;
+}
+
+interface TasksProps {
+  user: User;
+  users: User[];
+  tasks?: Task[];
+  setTasks?: (tasks: Task[]) => void;
+}
+
+const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTasks: setExternalTasks }) => {
+  const [tasks, setTasksState] = useState<Task[]>(() => {
+    if (externalTasks) return externalTasks;
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(TASKS_KEY);
       return saved ? JSON.parse(saved) : [];
     }
     return [];
   });
+
+  // Sync with external tasks if provided
+  useEffect(() => {
+    if (externalTasks) setTasksState(externalTasks);
+  }, [externalTasks]);
+
+  // Update parent if setTasks provided
+  useEffect(() => {
+    if (setExternalTasks) setExternalTasks(tasks);
+  }, [tasks]);
+  // ...existing code...
   const [form, setForm] = useState({ task: '', employee: '' });
-  const [editIdx, setEditIdx] = useState(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ task: '', employee: '' });
 
   useEffect(() => {
@@ -22,33 +52,33 @@ const Tasks = ({ user, users }) => {
   }, [tasks]);
 
   // Agregar tarea
-  const addTask = (e) => {
+  const addTask = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setTasks([...tasks, { ...form, complete: false }]);
+    setTasksState([...tasks, { ...form, complete: false }]);
     setForm({ task: '', employee: '' });
   };
 
   // Editar tarea
-  const saveEdit = (e) => {
+  const saveEdit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setTasks(tasks.map((t, idx) => idx === editIdx ? { ...editForm, complete: t.complete } : t));
+    setTasksState(tasks.map((t, idx) => idx === editIdx ? { ...editForm, complete: t.complete } : t));
     setEditIdx(null);
     setEditForm({ task: '', employee: '' });
   };
 
   // Eliminar tarea
-  const deleteTask = (idx) => {
-    setTasks(tasks.filter((_, i) => i !== idx));
+  const deleteTask = (idx: number) => {
+    setTasksState(tasks.filter((_, i) => i !== idx));
   };
 
   // Marcar como completa/incompleta (empleado)
-  const toggleComplete = (idx) => {
-    setTasks(tasks.map((t, i) => i === idx ? { ...t, complete: !t.complete } : t));
+  const toggleComplete = (idx: number) => {
+    setTasksState(tasks.map((t, i) => i === idx ? { ...t, complete: !t.complete } : t));
   };
 
   // Reiniciar tareas (manager/dueno)
   const resetTasks = () => {
-    setTasks(tasks.map(t => ({ ...t, complete: false })));
+    setTasksState(tasks.map(t => ({ ...t, complete: false })));
   };
 
   // Filtrar tareas según rol

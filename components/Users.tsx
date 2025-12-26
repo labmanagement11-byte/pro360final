@@ -52,7 +52,7 @@ const Users = ({ user, users, addUser, editUser, deleteUser }) => {
   return (
     <div className="users-container">
       <h2>Gestión de Usuarios</h2>
-      <form onSubmit={handleAddUser} style={{ marginBottom: 16 }}>
+      <form onSubmit={handleAddUser} className="users-add-form">
         <input
           type="text"
           placeholder="Correo del usuario"
@@ -85,6 +85,8 @@ const Users = ({ user, users, addUser, editUser, deleteUser }) => {
                     value={editData.username}
                     onChange={e => setEditData({ ...editData, username: e.target.value })}
                     required
+                    placeholder="Correo del usuario"
+                    title="Correo del usuario"
                   />
                   <input
                     type="password"
@@ -92,7 +94,7 @@ const Users = ({ user, users, addUser, editUser, deleteUser }) => {
                     onChange={e => setEditData({ ...editData, password: e.target.value })}
                     placeholder="Nueva contraseña (opcional)"
                   />
-                  <select value={editData.role} onChange={e => setEditData({ ...editData, role: e.target.value })}>
+                  <select value={editData.role} onChange={e => setEditData({ ...editData, role: e.target.value })} title="Rol del usuario">
                     <option value="manager">Manager</option>
                     <option value="empleado">Empleado</option>
                   </select>

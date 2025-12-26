@@ -20,8 +20,27 @@ const roomIcons = {
   'Lavandería': <FaTshirt style={{color:'#38bdf8'}} />,
 };
 
-const Inventory = ({ user }) => {
-  const airbnbExample = [
+interface InventoryItem {
+  name: string;
+  room: string;
+  quantity: number;
+  complete?: boolean;
+  missing?: number;
+}
+
+interface User {
+  username: string;
+  role: string;
+}
+
+interface InventoryProps {
+  user: User;
+  inventory?: InventoryItem[];
+  setInventory?: (inventory: InventoryItem[]) => void;
+}
+
+const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventory, setInventory: setExternalInventory }) => {
+  const airbnbExample: InventoryItem[] = [
     { name: 'Cucharas', room: 'Cocina', quantity: 12, complete: false, missing: 0 },
     { name: 'Tenedores', room: 'Cocina', quantity: 12, complete: false, missing: 0 },
     { name: 'Cuchillos', room: 'Cocina', quantity: 12, complete: false, missing: 0 },
@@ -52,7 +71,8 @@ const Inventory = ({ user }) => {
     { name: 'Cestos de basura', room: 'Cocina', quantity: 1, complete: false, missing: 0 },
     { name: 'Cestos de basura', room: 'Terraza', quantity: 1, complete: false, missing: 0 },
   ];
-  const [items, setItems] = useState(() => {
+  const [items, setItemsState] = useState<InventoryItem[]>(() => {
+    if (externalInventory) return externalInventory;
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(INVENTORY_KEY);
       if (saved) return JSON.parse(saved);
@@ -61,6 +81,16 @@ const Inventory = ({ user }) => {
     }
     return airbnbExample;
   });
+
+  // Sync with external inventory if provided
+  useEffect(() => {
+    if (externalInventory) setItemsState(externalInventory);
+  }, [externalInventory]);
+
+  // Update parent if setInventory provided
+  useEffect(() => {
+    if (setExternalInventory) setExternalInventory(items);
+  }, [items]);
   const [form, setForm] = useState({
     name: '',
     room: ROOMS[0],
@@ -76,36 +106,36 @@ const Inventory = ({ user }) => {
   }, [items]);
 
   // Agregar item
-  const addItem = (e) => {
+  const addItem = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setItems([...items, { ...form, complete: false, missing: 0 }]);
+    setItemsState([...items, { ...form, complete: false, missing: 0 }]);
     setForm({ name: '', room: ROOMS[0], quantity: 1 });
   };
 
   // Editar item
-  const saveEdit = (e) => {
+  const saveEdit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setItems(items.map((it, idx) => idx === editIdx ? { ...editForm, complete: it.complete, missing: it.missing } : it));
+    setItemsState(items.map((it, idx) => idx === editIdx ? { ...editForm, complete: it.complete, missing: it.missing } : it));
     setEditIdx(null);
     setEditForm({ name: '', room: ROOMS[0], quantity: 1 });
   };
 
   // Eliminar item
-  const deleteItem = (idx) => {
-    setItems(items.filter((_, i) => i !== idx));
+  const deleteItem = (idx: number) => {
+    setItemsState(items.filter((_, i) => i !== idx));
   };
 
   // Marcar como completo/incompleto y reportar faltantes (empleado)
-  const toggleComplete = (idx) => {
-    setItems(items.map((it, i) => i === idx ? { ...it, complete: !it.complete } : it));
+  const toggleComplete = (idx: number) => {
+    setItemsState(items.map((it, i) => i === idx ? { ...it, complete: !it.complete } : it));
   };
-  const setMissing = (idx, value) => {
-    setItems(items.map((it, i) => i === idx ? { ...it, missing: value } : it));
+  const setMissing = (idx: number, value: number) => {
+    setItemsState(items.map((it, i) => i === idx ? { ...it, missing: value } : it));
   };
 
   // Reiniciar inventario (manager/dueno)
   const resetInventory = () => {
-    setItems(items.map(it => ({ ...it, complete: false, missing: 0 })));
+    setItemsState(items.map(it => ({ ...it, complete: false, missing: 0 })));
   };
 
   // Agrupar por habitación

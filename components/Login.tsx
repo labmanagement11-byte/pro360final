@@ -50,7 +50,7 @@ const Login = ({ onLogin, users }) => {
           onChange={e => setPassword(e.target.value)}
           required
         />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '8px 0' }}>
+        <label className="login-remember-label">
           <input
             type="checkbox"
             checked={remember}
@@ -60,7 +60,7 @@ const Login = ({ onLogin, users }) => {
         </label>
         <button type="submit">Entrar</button>
       </form>
-      {error && <p style={{color: 'red'}}>{error}</p>}
+      {error && <p className="login-error-msg">{error}</p>}
     </div>
   );
 };

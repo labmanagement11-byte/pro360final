@@ -1,3 +1,7 @@
+/* Add form margin for users */
+.users-add-form {
+  margin-bottom: 16px;
+}
 .users-container {
   max-width: 400px;
   margin: 2rem auto;

@@ -31,9 +31,11 @@ const defaultReminders = [
 
 const REMINDERS_KEY = 'dashboard_reminders';
 
-interface User {
+
+export interface User {
   role: string;
-  username?: string;
+  username: string;
+  password?: string;
 }
 
 declare global {
@@ -45,19 +47,19 @@ declare global {
 interface DashboardProps {
   user: User;
   users: User[];
-  addUser: (user: any) => void;
-  editUser: (idx: number, user: any) => void;
+  addUser: (user: User) => void;
+  editUser: (idx: number, user: User) => void;
   deleteUser: (idx: number) => void;
-  setUser: (user: any) => void;
+  setUser: (user: User | null) => void;
   onLogout?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, deleteUser, setUser, onLogout }) => {
 
     // Estado para edición de recordatorio
     const [editIdx, setEditIdx] = useState(-1);
   const [view, setView] = useState('home');
-  const [reminders, setReminders] = useState(() => {
+  const [reminders, setReminders] = useState<any[]>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(REMINDERS_KEY) : null;
     return saved ? JSON.parse(saved) : defaultReminders;
   });
@@ -65,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const showReminders = user.role === 'dueno' || user.role === 'manager';
 
   // Estado para casas dinámicas
-  const [houses, setHouses] = useState(() => {
+  const [houses, setHouses] = useState<any[]>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
     return saved ? JSON.parse(saved) : [
       { name: 'Casa Principal', tasks: [], inventory: [] }
@@ -80,6 +82,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       localStorage.setItem('dashboard_houses', JSON.stringify(houses));
     }
   }, [houses]);
+  // Ensure all users have a username string
+  useEffect(() => {
+    if (users) {
+      users.forEach(u => { if (!u.username) u.username = ''; });
+    }
+  }, [users]);
+
   const cards = [
     {
       key: 'tasks',
@@ -127,10 +136,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   return (
     <div className="dashboard-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="dashboard-header-row">
         <h1>Dashboard</h1>
         {onLogout && (
-          <button className="dashboard-btn danger" onClick={onLogout} style={{ marginLeft: 16 }}>
+          <button className="dashboard-btn danger dashboard-logout-btn" onClick={onLogout}>
             Cerrar sesión
           </button>
         )}
@@ -155,16 +164,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       )}
       {view === 'tasks' && <Tasks
         user={user}
-        users={window?.dashboardUsers || []}
+        users={users}
         tasks={houses[selectedHouseIdx]?.tasks || []}
-        setTasks={tasks => setHouses(houses.map((h, i) => i === selectedHouseIdx ? { ...h, tasks } : h))}
+        setTasks={(tasks: any[]) => setHouses(houses.map((h, i) => i === selectedHouseIdx ? { ...h, tasks } : h))}
       />}
       {view === 'inventory' && <Inventory
         user={user}
         inventory={houses[selectedHouseIdx]?.inventory || []}
-        setInventory={inventory => setHouses(houses.map((h, i) => i === selectedHouseIdx ? { ...h, inventory } : h))}
+        setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === selectedHouseIdx ? { ...h, inventory } : h))}
       />}
-      {view === 'calendar' && <Calendar users={window?.dashboardUsers || []} user={user} />}
+      {view === 'calendar' && <Calendar users={users as any} user={user as any} />}
       {view === 'checklist' && <Checklist user={user} />}
       {view === 'reminders' && (
         <div className="dashboard-reminders">
@@ -180,7 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             form.reset();
           }}>
             <input name="name" type="text" placeholder="Nombre del pago" required />
-            <input name="due" type="date" required />
+            <input name="due" type="date" required placeholder="Fecha de pago" title="Fecha de pago" />
             <input name="bank" type="text" placeholder="Banco" required />
             <input name="account" type="text" placeholder="N° de cuenta" required />
             <button type="submit" className="dashboard-btn main">Agregar</button>
@@ -200,7 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                     setEditIdx(-1);
                   }}>
                     <input name="name" type="text" defaultValue={r.name} required />
-                    <input name="due" type="date" defaultValue={r.due} required />
+                    <input name="due" type="date" defaultValue={r.due} required placeholder="Fecha de pago" title="Fecha de pago" />
                     <input name="bank" type="text" defaultValue={r.bank} required />
                     <input name="account" type="text" defaultValue={r.account} required />
                     <button type="submit" className="dashboard-btn main">Guardar</button>
@@ -225,7 +234,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </ul>
         </div>
       )}
-        )}
       {view === 'house' && (
         <div className="house-selector">
           <h2 className="house-title">Seleccionar Casa</h2>
@@ -235,7 +243,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 key={idx}
                 className={`house-card${selectedHouseIdx === idx ? ' selected' : ''}`}
                 onClick={() => setSelectedHouseIdx(idx)}
-                style={{ cursor: 'pointer' }}
               >
                 <span className="house-icon">🏠</span>
                 <span className="house-name">{house.name}</span>
@@ -243,28 +250,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             ))}
             <div className="house-card add">
               <span className="house-icon">➕</span>
-              <form onSubmit={e => {
+              <form className="dashboard-add-house-form" onSubmit={e => {
                 e.preventDefault();
                 if (newHouseName.trim()) {
                   setHouses([...houses, { name: newHouseName.trim(), tasks: [], inventory: [] }]);
                   setNewHouseName('');
                 }
-              }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              }}>
                 <input
                   type="text"
                   value={newHouseName}
                   onChange={e => setNewHouseName(e.target.value)}
                   placeholder="Nombre de la casa"
-                  style={{ marginBottom: 4, borderRadius: 6, border: '1px solid #ccc', padding: '0.3rem 0.7rem', fontSize: '1rem' }}
+                  title="Nombre de la casa"
+                  className="dashboard-add-house-input"
                   required
                 />
-                <button type="submit" className="dashboard-btn main" style={{ padding: '0.2rem 0.7rem', fontSize: '0.98rem' }}>Agregar</button>
+                <button type="submit" className="dashboard-btn main dashboard-add-house-btn">Agregar</button>
               </form>
             </div>
           </div>
-          <div style={{ marginTop: 24, textAlign: 'center', color: 'var(--text-main)' }}>
+          <div className="dashboard-selected-house-info">
             <strong>Casa seleccionada:</strong> {houses[selectedHouseIdx]?.name}
-            <div style={{ fontSize: '0.95rem', marginTop: 6 }}>
+            <div className="dashboard-selected-house-desc">
               Cada casa tiene su propia lista de tareas e inventario.
             </div>
           </div>
