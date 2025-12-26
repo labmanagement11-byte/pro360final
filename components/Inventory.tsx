@@ -22,6 +22,7 @@ const roomIcons: { [key: string]: React.ReactElement } = {
 };
 
 interface InventoryItem {
+  id?: number; // ID de Supabase (opcional)
   name: string;
   room: string;
   quantity: number;
