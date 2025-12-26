@@ -1,7 +1,6 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+
+
+@import './modern-theme.css';
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -17,7 +16,7 @@ body {
 }
 
 body {
-  color: var(--foreground);
+  color: var(--text-primary);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;

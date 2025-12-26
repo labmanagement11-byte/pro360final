@@ -1,0 +1,161 @@
+:root {
+  --color-bg-light: #f7fafc;
+  --color-bg-dark: #18181b;
+  --color-card-light: #fff;
+  --color-card-dark: #23232a;
+  --color-primary: #3182ce;
+  --color-primary-dark: #90cdf4;
+  --color-text-light: #2d3748;
+  --color-text-dark: #e2e8f0;
+  --color-desc-light: #4a5568;
+  --color-desc-dark: #cbd5e1;
+  --color-shadow-light: rgba(49,130,206,0.13);
+  --color-shadow-dark: rgba(49,130,206,0.22);
+}
+
+body[data-theme="dark"] .dashboard-container {
+  background: var(--color-bg-dark);
+}
+body[data-theme="light"] .dashboard-container {
+  background: var(--color-bg-light);
+}
+.dashboard-container {
+  padding: 3rem 1rem 2rem 1rem;
+  min-height: 100vh;
+  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  transition: background 0.2s;
+}
+.dashboard-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+.dashboard-card {
+  background: var(--color-card-light);
+  border-radius: 22px;
+  box-shadow: 0 8px 32px var(--color-shadow-light), 0 1.5px 6px rgba(0,0,0,0.04);
+  padding: 3rem 2.5rem 2.5rem 2.5rem;
+  min-width: 340px;
+  min-height: 200px;
+  max-width: 420px;
+  flex: 1 1 340px;
+  text-align: center;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: box-shadow 0.25s, transform 0.18s, background 0.18s;
+  position: relative;
+  overflow: hidden;
+  color: var(--color-text-light);
+}
+body[data-theme="dark"] .dashboard-card {
+  background: var(--color-card-dark);
+  color: var(--color-text-dark);
+  box-shadow: 0 8px 32px var(--color-shadow-dark), 0 1.5px 6px rgba(0,0,0,0.18);
+}
+.dashboard-card:hover {
+  box-shadow: 0 12px 40px var(--color-shadow-light), 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(-4px) scale(1.045);
+}
+body[data-theme="dark"] .dashboard-card:hover {
+  box-shadow: 0 12px 40px var(--color-shadow-dark), 0 2px 8px rgba(0,0,0,0.18);
+}
+.dashboard-card h2 {
+  margin-bottom: 1.2rem;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--color-text-light);
+}
+body[data-theme="dark"] .dashboard-card h2 {
+  color: var(--color-text-dark);
+}
+.dashboard-card p {
+  color: var(--color-desc-light);
+  font-size: 1.18rem;
+  margin-bottom: 0;
+}
+body[data-theme="dark"] .dashboard-card p {
+  color: var(--color-desc-dark);
+}
+.dashboard-card::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  bottom: -40px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, #a3bffa33 0%, transparent 70%);
+  z-index: 0;
+}
+.dashboard-card > * {
+  z-index: 1;
+}
+
+/* Mejorar recordatorios */
+.dashboard-container .reminders-box {
+  background: #fffbe6;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(255,193,7,0.10);
+  padding: 1.5rem 2rem;
+  max-width: 600px;
+  margin: 0 auto 2rem auto;
+  border-left: 6px solid #f6ad55;
+  color: #2d3748;
+}
+body[data-theme="dark"] .dashboard-container .reminders-box {
+  background: #23232a;
+  color: #e2e8f0;
+  border-left: 6px solid #f6ad55;
+}
+.dashboard-container .reminders-box h2 {
+  color: #d97706;
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+.dashboard-container .reminders-box ul {
+  list-style: none;
+  padding: 0;
+  font-size: 1.13rem;
+}
+.dashboard-container .reminders-box li {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dashboard-container .reminders-box input[type="text"],
+.dashboard-container .reminders-box input[type="date"] {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  padding: 0.3rem 0.6rem;
+  font-size: 1rem;
+  background: #fff;
+  color: #2d3748;
+}
+body[data-theme="dark"] .dashboard-container .reminders-box input[type="text"],
+body[data-theme="dark"] .dashboard-container .reminders-box input[type="date"] {
+  background: #18181b;
+  color: #e2e8f0;
+  border: 1px solid #444;
+}
+.dashboard-container .reminders-box button {
+  background: #f6ad55;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.8rem;
+  margin-left: 0.3rem;
+  font-size: 0.98rem;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.dashboard-container .reminders-box button:hover {
+  background: #dd6b20;
+}

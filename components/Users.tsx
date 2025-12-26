@@ -1,0 +1,127 @@
+import React, { useState } from 'react';
+import './Users.css';
+
+
+const Users = ({ user, users, addUser, editUser, deleteUser }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('empleado');
+  const [editIdx, setEditIdx] = useState(-1);
+  const [editData, setEditData] = useState({ username: '', password: '', role: 'empleado' });
+
+  if (!user || user.role !== 'dueno') {
+    return (
+      <div className="users-container">
+        <h2>Gestión de Usuarios</h2>
+        <p>Solo el dueño puede gestionar usuarios.</p>
+        <ul className="users-list">
+          {users && users.length > 0 ? (
+            users.map((u, idx) => (
+              <li key={idx}>
+                <span>{u.username}</span>
+                <strong>{u.role}</strong>
+              </li>
+            ))
+          ) : (
+            <li className="users-list-empty">No hay usuarios registrados.</li>
+          )}
+        </ul>
+      </div>
+    );
+  }
+
+  const handleAddUser = (e) => {
+    e.preventDefault();
+    if (username && password && role) {
+      addUser({ username, password, role });
+      setUsername('');
+      setPassword('');
+      setRole('empleado');
+    }
+  };
+
+  const handleEditUser = (e) => {
+    e.preventDefault();
+    if (editData.username && editData.role) {
+      editUser(editIdx, editData);
+      setEditIdx(-1);
+      setEditData({ username: '', password: '', role: 'empleado' });
+    }
+  };
+
+  return (
+    <div className="users-container">
+      <h2>Gestión de Usuarios</h2>
+      <form onSubmit={handleAddUser} style={{ marginBottom: 16 }}>
+        <input
+          type="text"
+          placeholder="Correo del usuario"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Contraseña"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <label htmlFor="role-select" className="users-label">Rol:</label>
+        <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="manager">Manager</option>
+          <option value="empleado">Empleado</option>
+        </select>
+        <button type="submit">Agregar Usuario</button>
+      </form>
+      <ul className="users-list">
+        {users && users.length > 0 ? (
+          users.map((u, idx) => (
+            <li key={idx}>
+              {editIdx === idx ? (
+                <form onSubmit={handleEditUser} className="users-edit-form">
+                  <input
+                    type="text"
+                    value={editData.username}
+                    onChange={e => setEditData({ ...editData, username: e.target.value })}
+                    required
+                  />
+                  <input
+                    type="password"
+                    value={editData.password}
+                    onChange={e => setEditData({ ...editData, password: e.target.value })}
+                    placeholder="Nueva contraseña (opcional)"
+                  />
+                  <select value={editData.role} onChange={e => setEditData({ ...editData, role: e.target.value })}>
+                    <option value="manager">Manager</option>
+                    <option value="empleado">Empleado</option>
+                  </select>
+                  <button type="submit">Guardar</button>
+                  <button type="button" onClick={() => setEditIdx(-1)}>Cancelar</button>
+                </form>
+              ) : (
+                <>
+                  <span>{u.username}</span>
+                  <strong>{u.role}</strong>
+                  {u.role !== 'dueno' && (
+                    <>
+                      <button onClick={() => {
+                        setEditIdx(idx);
+                        setEditData({ username: u.username, password: u.password || '', role: u.role });
+                      }}>Editar</button>
+                      <button onClick={() => deleteUser(idx)} className="users-delete-btn">Eliminar</button>
+                    </>
+                  )}
+                </>
+              )}
+            </li>
+          ))
+        ) : (
+          <li className="users-list-empty">No hay usuarios registrados.</li>
+        )}
+      </ul>
+    </div>
+  );
+};
+
+export default Users;
