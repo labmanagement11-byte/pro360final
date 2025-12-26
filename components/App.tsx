@@ -1,3 +1,25 @@
+// ...existing code...
+import React, { useState, useEffect } from 'react';
+
+import Dashboard, { User } from './Dashboard';
+import Login from './Login';
+import { supabase } from '../utils/supabaseClient';
+
+
+const SESSION_KEY = 'dashboard_session_user';
+const App = () => {
+  const [userState, setUserState] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SESSION_KEY);
+      if (saved) return JSON.parse(saved);
+    }
+    return null;
+  });
+  // Wrapper para compatibilidad exacta de tipos
+  const setUser = (user: User | null) => setUserState(user);
+  const [users, setUsers] = useState<User[]>([]);
+  const [theme, setTheme] = useState('light');
+
   // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {
     const userToEdit = users[idx];
@@ -27,12 +49,7 @@
       alert('Error al eliminar usuario: ' + error.message);
     }
   };
-'use client';
-import React, { useState, useEffect } from 'react';
 
-import Dashboard, { User } from './Dashboard';
-import Login from './Login';
-import { supabase } from '../utils/supabaseClient';
   // Función para agregar usuario a Supabase y refrescar lista
   const addUser = async (user: User) => {
     const { data, error } = await supabase.from('users').insert([user]).select();
@@ -42,20 +59,6 @@ import { supabase } from '../utils/supabaseClient';
       alert('Error al agregar usuario: ' + error.message);
     }
   };
-
-const SESSION_KEY = 'dashboard_session_user';
-const App = () => {
-  const [userState, setUserState] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(SESSION_KEY);
-      if (saved) return JSON.parse(saved);
-    }
-    return null;
-  });
-  // Wrapper para compatibilidad exacta de tipos
-  const setUser = (user: User | null) => setUserState(user);
-  const [users, setUsers] = useState<User[]>([]);
-  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
@@ -72,14 +75,30 @@ const App = () => {
   }, [userState]);
 
 
-  // Cargar usuarios desde Supabase al iniciar la app
+  // Cargar usuarios desde Supabase al iniciar la app y agregar empleados reales si no existen
   useEffect(() => {
-    async function fetchUsers() {
+    async function fetchAndSeedUsers() {
       const { data, error } = await supabase.from('users').select('*');
-      if (data) setUsers(data);
+      if (data) {
+        setUsers(data);
+        // Empleados reales a insertar si no existen
+        const realEmployees = [
+          { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'EPIC D1' },
+          { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'EPIC D1' },
+          { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'EPIC D1' },
+        ];
+        // Verificar si ya existen por username y casa
+        const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
+        if (missing.length > 0) {
+          const { data: inserted, error: insertError } = await supabase.from('users').insert(missing).select();
+          if (!insertError && inserted) {
+            setUsers(prev => [...prev, ...inserted]);
+          }
+        }
+      }
       // Si quieres manejar errores, puedes agregar un setError aquí
     }
-    fetchUsers();
+    fetchAndSeedUsers();
   }, []);
 
   // Si necesitas agregar/editar/borrar usuarios, deberías hacerlo vía Supabase, no local

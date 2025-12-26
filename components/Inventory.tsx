@@ -257,10 +257,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   };
 
   // Agrupar por habitación
-  const grouped = ROOMS.map(room => ({
-    room,
-    items: items.filter(it => it.room === room)
-  })).filter(g => g.items.length > 0);
+  // ...existing code...
 
   // Agrupar por habitación
   const grouped = ROOMS.map(room => ({
