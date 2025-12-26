@@ -96,7 +96,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     room: ROOMS[0],
     quantity: 1,
   });
-  const [editIdx, setEditIdx] = useState(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
 
   useEffect(() => {
