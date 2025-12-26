@@ -136,7 +136,7 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
                     <>
                       <button onClick={() => {
                         setEditIdx(idx);
-                        setEditData({ username: u.username, password: u.password || '', role: u.role });
+                        setEditData({ username: u.username, password: u.password || '', role: u.role, house: u.house || '' });
                       }}>Editar</button>
                       <button onClick={() => deleteUser(idx)} className="users-delete-btn">Eliminar</button>
                     </>
