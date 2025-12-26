@@ -10,6 +10,7 @@ interface Task {
   time?: string;
   house?: string;
   complete?: boolean;
+  reason?: string;
 }
 
 interface User {
@@ -89,6 +90,11 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     setTasksState(tasks.map((t, i) => i === idx ? { ...t, complete: !t.complete } : t));
   };
 
+  // Set reason for incomplete task
+  const setReason = (idx: number, value: string) => {
+    setTasksState(tasks.map((t, i) => i === idx ? { ...t, reason: value } : t));
+  };
+
   // Reiniciar tareas (manager/dueno)
   const resetTasks = () => {
     setTasksState(tasks.map(t => ({ ...t, complete: false })));
@@ -158,9 +164,21 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
               </>
             )}
             {user.role === 'empleado' && (
-              <label className="tasks-complete-label">
-                <input type="checkbox" checked={!!t.complete} onChange={() => toggleComplete(tasks.indexOf(t))} /> Completada
-              </label>
+              <>
+                <label className="tasks-complete-label">
+                  <input type="checkbox" checked={!!t.complete} onChange={() => toggleComplete(tasks.indexOf(t))} /> Completada
+                </label>
+                {!t.complete && (
+                  <input
+                    type="text"
+                    placeholder="Motivo si no completa"
+                    value={t.reason || ''}
+                    onChange={e => setReason(tasks.indexOf(t), e.target.value)}
+                    className="tasks-reason"
+                    title="Motivo de no completar"
+                  />
+                )}
+              </>
             )}
             {(user.role === 'dueno' || user.role === 'manager') && t.complete && (
               <span className="tasks-completed-label">Completada</span>

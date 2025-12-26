@@ -26,6 +26,7 @@ interface InventoryItem {
   quantity: number;
   complete?: boolean;
   missing?: number;
+  reason?: string;
 }
 
 interface User {
@@ -133,6 +134,11 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     setItemsState(items.map((it, i) => i === idx ? { ...it, missing: value } : it));
   };
 
+  // Set reason for incomplete item
+  const setReason = (idx: number, value: string) => {
+    setItemsState(items.map((it, i) => i === idx ? { ...it, reason: value } : it));
+  };
+
   // Reiniciar inventario (manager/dueno)
   const resetInventory = () => {
     setItemsState(items.map(it => ({ ...it, complete: false, missing: 0 })));
@@ -220,6 +226,16 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
                           className="inv-missing"
                           title="Cantidad faltante"
                         />
+                        {!it.complete && (
+                          <input
+                            type="text"
+                            placeholder="Motivo si no completo"
+                            value={it.reason || ''}
+                            onChange={e => setReason(items.indexOf(it), e.target.value)}
+                            className="inv-reason"
+                            title="Motivo de no completar"
+                          />
+                        )}
                       </>
                     )}
                     {(user.role === 'dueno' || user.role === 'manager') && (it.missing ?? 0) > 0 && (
