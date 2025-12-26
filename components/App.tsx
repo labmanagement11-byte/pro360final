@@ -1,3 +1,23 @@
+use client;
+import React, { useState, useEffect } from 'react';
+import Dashboard, { User } from './Dashboard';
+import Login from './Login';
+import { supabase } from '../utils/supabaseClient';
+
+const SESSION_KEY = 'dashboard_session_user';
+const App = () => {
+  const [userState, setUserState] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SESSION_KEY);
+      if (saved) return JSON.parse(saved);
+    }
+    return null;
+  });
+  // Wrapper para compatibilidad exacta de tipos
+  const setUser = (user: User | null) => setUserState(user);
+  const [users, setUsers] = useState<User[]>([]);
+  const [theme, setTheme] = useState('light');
+
   // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {
     const userToEdit = users[idx];
@@ -27,12 +47,7 @@
       alert('Error al eliminar usuario: ' + error.message);
     }
   };
-'use client';
-import React, { useState, useEffect } from 'react';
 
-import Dashboard, { User } from './Dashboard';
-import Login from './Login';
-import { supabase } from '../utils/supabaseClient';
   // Función para agregar usuario a Supabase y refrescar lista
   const addUser = async (user: User) => {
     const { data, error } = await supabase.from('users').insert([user]).select();

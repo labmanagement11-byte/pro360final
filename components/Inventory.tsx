@@ -256,66 +256,63 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     }
   };
 
-  // Agrupar por habitación
+  // Agrupar por habitación (eliminada la declaración duplicada)
   const grouped = ROOMS.map(room => ({
     room,
     items: items.filter(it => it.room === room)
   })).filter(g => g.items.length > 0);
 
   // Agrupar por habitación
-  const grouped = ROOMS.map(room => ({
-    room,
-    items: items.filter(it => it.room === room)
-  })).filter(g => g.items.length > 0);
+  // ...existing code...
 
   return (
     <div className="inventory-list ultra-checklist">
       <h2 className="ultra-checklist-title">Inventario EPIC D1</h2>
-      {loading && <p className="ultra-task-text" style={{textAlign:'center'}}>Cargando inventario...</p>}
+      {loading && <p className="ultra-task-text ultra-task-loading">Cargando inventario...</p>}
       {!loading && (user.role === 'dueno' || user.role === 'manager') && (
-        <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}>
-          <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text" style={{minWidth:'120px'}} />
+        <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row ultra-inv-form-row">
+          <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text ultra-inv-minwidth" />
           <select id="inv-room-select" value={editIdx !== null ? editForm.room : form.room} onChange={e => editIdx !== null ? setEditForm({ ...editForm, room: e.target.value }) : setForm({ ...form, room: e.target.value })} title="Selecciona la habitación" className="ultra-task-text">
             {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
-          <input id="inv-qty" type="number" min={1} value={editIdx !== null ? editForm.quantity : form.quantity} onChange={e => editIdx !== null ? setEditForm({ ...editForm, quantity: Number(e.target.value) }) : setForm({ ...form, quantity: Number(e.target.value) })} required title="Cantidad del artículo" className="ultra-task-text" style={{width:'70px'}} />
-          <button type="submit" className="ultra-reset-btn" style={{padding:'0.5rem 1.2rem', fontSize:'1rem'}}>{editIdx !== null ? 'Guardar' : 'Agregar'}</button>
-          {editIdx !== null && <button type="button" className="ultra-reset-btn" style={{background:'#aaa',color:'#fff',padding:'0.5rem 1.2rem', fontSize:'1rem'}} onClick={() => setEditIdx(null)}>Cancelar</button>}
+          <input id="inv-qty" type="number" min={1} value={editIdx !== null ? editForm.quantity : form.quantity} onChange={e => editIdx !== null ? setEditForm({ ...editForm, quantity: Number(e.target.value) }) : setForm({ ...form, quantity: Number(e.target.value) })} required title="Cantidad del artículo" className="ultra-task-text ultra-inv-qty" />
+          <button type="submit" className="ultra-reset-btn ultra-inv-btn-main">{editIdx !== null ? 'Guardar' : 'Agregar'}</button>
+          {editIdx !== null && <button type="button" className="ultra-reset-btn ultra-inv-btn-cancel" onClick={() => setEditIdx(null)}>Cancelar</button>}
         </form>
       )}
-      {!loading && grouped.length === 0 && <p className="ultra-task-text" style={{textAlign:'center'}}>No hay artículos en el inventario.</p>}
+      {!loading && grouped.length === 0 && <p className="ultra-task-text ultra-task-loading">No hay artículos en el inventario.</p>}
       <div className="ultra-tasks-grid">
         {grouped.map(g => (
-          <div key={g.room} className="ultra-task-card" style={{flexDirection:'column', alignItems:'flex-start', minHeight:'unset'}}>
-            <div style={{display:'flex',alignItems:'center',marginBottom:'0.7rem'}}>
+          <div key={g.room} className="ultra-task-card ultra-inv-room-card">
+            <div className="ultra-inv-room-header">
               <span className="ultra-task-icon">{roomIcons[g.room] || <FaQuestion />}</span>
-              <span className="ultra-section-title" style={{margin:0}}>{g.room}</span>
+              <span className="ultra-section-title ultra-inv-room-title">{g.room}</span>
             </div>
-            <div style={{width:'100%'}}>
+            <div className="ultra-inv-items-list">
               {g.items.map((it, idx) => (
-                <div key={idx} className={`ultra-task-card${it.complete ? ' done' : ''}`} style={{marginBottom:'0.5rem',background:'#fff',color:'#23272f',padding:'0.7rem 1rem',boxShadow:'0 1px 6px #0001',display:'flex',alignItems:'center',gap:'0.7rem'}}>
+                <div key={idx} className={`ultra-task-card${it.complete ? ' done' : ''} ultra-inv-item-card`}>
                   <span className="ultra-task-icon">📦</span>
-                  <span className="ultra-task-text" style={{flex:1}}>{it.name} <span style={{opacity:0.7}}>({it.quantity})</span></span>
+                  <span className="ultra-task-text ultra-inv-item-name">{it.name} <span className="ultra-inv-item-qty">({it.quantity})</span></span>
                   {(user.role === 'dueno' || user.role === 'manager') && (
                     <>
-                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
-                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>
+                      <button className="ultra-reset-btn ultra-inv-btn-edit" onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
+                      <button className="ultra-reset-btn ultra-inv-btn-delete" onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>
                     </>
                   )}
                   {user.role === 'empleado' && (
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                      <label className="ultra-checkbox" style={{margin:0}}>
+                    <div className="ultra-inv-emp-row">
+                      <label className="ultra-checkbox ultra-inv-checkbox">
                         <input type="checkbox" checked={!!it.complete} onChange={() => toggleComplete(items.indexOf(it))} />
-                        <span style={{marginLeft:'0.2rem'}}>Completo</span>
+                        <span className="ultra-inv-checkbox-label">Completo</span>
                       </label>
-                      <input type="number" min={0} max={it.quantity} value={it.missing || 0} onChange={e => setMissing(items.indexOf(it), Number(e.target.value))} className="ultra-task-text" style={{width:'55px',fontSize:'0.95rem'}} title="Cantidad faltante" />
+                      <input type="number" min={0} max={it.quantity} value={it.missing || 0} onChange={e => setMissing(items.indexOf(it), Number(e.target.value))} className="ultra-task-text ultra-inv-missing" title="Cantidad faltante" />
                       {!it.complete && (
-                        <input type="text" placeholder="Motivo si no completo" value={it.reason || ''} onChange={e => setReason(items.indexOf(it), e.target.value)} className="ultra-task-text" style={{fontSize:'0.95rem',width:'120px'}} title="Motivo de no completar" />
+                        <input type="text" placeholder="Motivo si no completo" value={it.reason || ''} onChange={e => setReason(items.indexOf(it), e.target.value)} className="ultra-task-text ultra-inv-reason" title="Motivo de no completar" />
                       )}
                     </div>
                   )}
                   {(user.role === 'dueno' || user.role === 'manager') && (it.missing ?? 0) > 0 && (
-                    <span className="ultra-task-text" style={{color:'#e11d48',marginLeft:'0.7rem'}}>Reportado: Faltan {it.missing ?? 0}</span>
+                    <span className="ultra-task-text ultra-inv-reported">Reportado: Faltan {it.missing ?? 0}</span>
                   )}
                 </div>
               ))}
@@ -324,7 +321,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
         ))}
       </div>
       {!loading && (user.role === 'dueno' || user.role === 'manager') && grouped.length > 0 && (
-        <button onClick={resetInventory} className="ultra-reset-btn" style={{marginTop:'2rem'}}>Reiniciar Inventario</button>
+        <button onClick={resetInventory} className="ultra-reset-btn ultra-inv-btn-reset">Reiniciar Inventario</button>
       )}
     </div>
   );

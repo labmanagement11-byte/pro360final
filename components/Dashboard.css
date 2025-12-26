@@ -1,3 +1,41 @@
+/* INVENTARIO: estilos para reemplazar los inline styles eliminados de Inventory.tsx */
+.ultra-inv-form-row {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+  justify-content: center;
+}
+.ultra-inv-minwidth { min-width: 120px; }
+.ultra-inv-qty { width: 70px; }
+.ultra-inv-btn-main { padding: 0.5rem 1.2rem; font-size: 1rem; }
+.ultra-inv-btn-cancel { background: #aaa; color: #fff; padding: 0.5rem 1.2rem; font-size: 1rem; }
+.ultra-inv-room-card { flex-direction: column; align-items: flex-start; min-height: unset; }
+.ultra-inv-room-header { display: flex; align-items: center; margin-bottom: 0.7rem; }
+.ultra-inv-room-title { margin: 0; }
+.ultra-inv-items-list { width: 100%; }
+.ultra-inv-item-card {
+  margin-bottom: 0.5rem;
+  background: #fff;
+  color: #23272f;
+  padding: 0.7rem 1rem;
+  box-shadow: 0 1px 6px #0001;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.ultra-inv-item-name { flex: 1; }
+.ultra-inv-item-qty { opacity: 0.7; }
+.ultra-inv-btn-edit { padding: 0.2rem 0.8rem; font-size: 0.95rem; margin-right: 0.3rem; background: #2563eb; color: #fff; }
+.ultra-inv-btn-delete { padding: 0.2rem 0.8rem; font-size: 0.95rem; background: #e11d48; color: #fff; }
+.ultra-inv-emp-row { display: flex; align-items: center; gap: 0.5rem; }
+.ultra-inv-checkbox { margin: 0; }
+.ultra-inv-checkbox-label { margin-left: 0.2rem; }
+.ultra-inv-missing { width: 55px; font-size: 0.95rem; }
+.ultra-inv-reason { font-size: 0.95rem; width: 120px; }
+.ultra-inv-reported { color: #e11d48; margin-left: 0.7rem; }
+.ultra-inv-btn-reset { margin-top: 2rem; }
 /* Centrado para el mensaje de carga del checklist */
 .ultra-task-loading {
   text-align: center;
