@@ -1,4 +1,4 @@
-// ...existing code...
+"use client";
 import React, { useState, useEffect } from 'react';
 
 import Dashboard, { User } from './Dashboard';
