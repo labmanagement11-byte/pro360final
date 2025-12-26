@@ -8,15 +8,15 @@ const OWNER = { username: 'galindo123@email.com', password: 'galindo123', role: 
 const USERS_KEY = 'dashboard_users';
 const SESSION_KEY = 'dashboard_session_user';
 const App = () => {
-  const [userState, setUserState] = useState<User | null>(null);
-  // Wrapper para compatibilidad exacta de tipos
-  const setUser = (user: User | null) => setUserState(user);
+  const [userState, setUserState] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(SESSION_KEY);
       if (saved) return JSON.parse(saved);
     }
     return null;
   });
+  // Wrapper para compatibilidad exacta de tipos
+  const setUser = (user: User | null) => setUserState(user);
   const [users, setUsers] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(USERS_KEY);
