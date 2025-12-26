@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import type { User } from './Dashboard';
 
 const cleaningTasks = [
   'Barrer y trapear toda la casa.',
@@ -63,7 +64,7 @@ const maintenanceTasks = [
 
 const CHECKLIST_KEY = 'dashboard_checklist';
 
-const Checklist = ({ user }) => {
+const Checklist = ({ user }: { user: User }) => {
   const [cleaning, setCleaning] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(CHECKLIST_KEY + '_cleaning');
