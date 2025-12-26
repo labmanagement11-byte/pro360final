@@ -48,7 +48,7 @@ const App = () => {
     setUsers(users.map((u: { username: string; password: string; role: string }, i: number) => i === idx ? { ...u, ...updated, password: updated.password || '' } : u));
   };
   const deleteUser = (idx: number) => {
-    setUsers(users.filter((_user: any, i: number) => i !== idx));
+    setUsers(users.filter((user: { username: string; password: string; role: string }, i: number) => i !== idx));
   };
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
