@@ -87,10 +87,10 @@ const Checklist = ({ user }: { user: User }) => {
     }
   }, [cleaning, maintenance]);
 
-  const toggleCleaning = idx => {
+  const toggleCleaning = (idx: number) => {
     setCleaning(cleaning.map((i, iidx) => iidx === idx ? { ...i, done: !i.done } : i));
   };
-  const toggleMaintenance = idx => {
+  const toggleMaintenance = (idx: number) => {
     setMaintenance(maintenance.map((i, iidx) => iidx === idx ? { ...i, done: !i.done } : i));
   };
 
