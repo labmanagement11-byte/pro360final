@@ -38,7 +38,7 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
     );
   }
 
-  const handleAddUser = (e) => {
+  const handleAddUser = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (username && role) {
       addUser({ username, password: password || '', role });
