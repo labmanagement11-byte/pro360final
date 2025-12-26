@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import './Users.css';
+import type { User } from './Dashboard';
 
+interface UsersProps {
+  user: User;
+  users: User[];
+  addUser: (user: User) => void;
+  editUser: (idx: number, user: User) => void;
+  deleteUser: (idx: number) => void;
+}
 
-const Users = ({ user, users, addUser, editUser, deleteUser }) => {
+const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUser }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
