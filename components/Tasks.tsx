@@ -5,6 +5,7 @@ import { supabase } from '../utils/supabaseClient';
 const TASKS_KEY = 'dashboard_tasks';
 
 interface Task {
+  id?: number; // ID de Supabase (opcional)
   task: string;
   employee: string;
   date?: string;
