@@ -222,8 +222,8 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
                         />
                       </>
                     )}
-                    {(user.role === 'dueno' || user.role === 'manager') && it.missing > 0 && (
-                      <span className="inv-missing-label inv-missing">Reportado: Faltan {it.missing}</span>
+                    {(user.role === 'dueno' || user.role === 'manager') && (it.missing ?? 0) > 0 && (
+                      <span className="inv-missing-label inv-missing">Reportado: Faltan {it.missing ?? 0}</span>
                     )}
                   </div>
                 </div>
