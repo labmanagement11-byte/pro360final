@@ -7,7 +7,7 @@ const ROOMS = [
 ];
 const INVENTORY_KEY = 'dashboard_inventory';
 
-const roomIcons = {
+const roomIcons: { [key: string]: JSX.Element } = {
   'Cocina': <FaUtensils style={{color:'#3182ce'}} />,
   'Terraza': <FaChair style={{color:'#fbbf24'}} />,
   'Piscina': <FaSwimmer style={{color:'#38bdf8'}} />,
