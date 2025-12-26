@@ -48,7 +48,7 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
     }
   };
 
-  const handleEditUser = (e) => {
+  const handleEditUser = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editData.username && editData.role) {
       editUser(editIdx, { ...editData, password: editData.password || '' });
