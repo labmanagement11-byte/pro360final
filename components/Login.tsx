@@ -40,9 +40,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
   return (
     <div className="login-container">
-      <div style={{display:'flex',justifyContent:'center',alignItems:'center',margin:'1.5rem 0 1.2rem 0'}}>
-        <img src="/logo360pro.png" alt="Limpieza 360Pro Logo" className="logo360pro" />
-      </div>
+      {/* Logo eliminado, restaurado a versión previa */}
       <h2>Iniciar Sesin</h2>
       <form onSubmit={handleSubmit}>
         <input

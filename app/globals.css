@@ -2,19 +2,7 @@
 @import './modern-theme.css';
 
 /* Logo branding styles: solo ajuste visual, sin fondo ni sombra fuerte */
-.logo360pro {
-  display: block;
-  height: 56px;
-  max-width: 180px;
-  width: auto;
-  margin: 0 auto 1rem auto;
-  border-radius: 10px;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  object-fit: contain;
-  transition: filter 0.2s;
-}
+
 
 @media (prefers-color-scheme: dark) {
   :root {
