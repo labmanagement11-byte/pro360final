@@ -88,10 +88,10 @@ const Checklist = ({ user }: { user: User }) => {
   }, [cleaning, maintenance]);
 
   const toggleCleaning = (idx: number) => {
-    setCleaning(cleaning.map((i, iidx) => iidx === idx ? { ...i, done: !i.done } : i));
+    setCleaning(cleaning.map((i: { task: string; done: boolean }, iidx: number) => iidx === idx ? { ...i, done: !i.done } : i));
   };
   const toggleMaintenance = (idx: number) => {
-    setMaintenance(maintenance.map((i, iidx) => iidx === idx ? { ...i, done: !i.done } : i));
+    setMaintenance(maintenance.map((i: { task: string; done: boolean }, iidx: number) => iidx === idx ? { ...i, done: !i.done } : i));
   };
 
   const resetChecklist = () => {
