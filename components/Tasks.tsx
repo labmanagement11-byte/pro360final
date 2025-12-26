@@ -153,7 +153,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
             <span className="tasks-task-text">{t.task} <span className="tasks-employee">({t.employee})</span> <span className="tasks-date">{t.date} {t.time}</span> <span className="tasks-house">[{t.house}]</span></span>
             {(user.role === 'dueno' || user.role === 'manager') && (
               <>
-                <button onClick={() => { setEditIdx(tasks.indexOf(t)); setEditForm({ task: t.task, employee: t.employee }); }}>Editar</button>
+                <button onClick={() => { setEditIdx(tasks.indexOf(t)); setEditForm({ task: t.task, employee: t.employee, date: t.date || '', time: t.time || '', house: t.house || '' }); }}>Editar</button>
                 <button onClick={() => deleteTask(tasks.indexOf(t))} className="tasks-delete-btn">Eliminar</button>
               </>
             )}
