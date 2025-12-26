@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { User } from './Dashboard';
 import './Login.css';
 
 const SESSION_KEY = 'dashboard_session_user';
-const Login = ({ onLogin, users }) => {
+interface LoginProps {
+  onLogin: (user: User) => void;
+  users: User[];
+}
+
+const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
