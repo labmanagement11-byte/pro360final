@@ -22,6 +22,10 @@ const App = () => {
 
   // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {
+    if (!supabase) {
+      alert('Supabase no está configurado. Contacta al administrador.');
+      return;
+    }
     const userToEdit = users[idx];
     if (!userToEdit || !userToEdit.id) {
       alert('No se puede editar: falta id');
@@ -37,6 +41,10 @@ const App = () => {
 
   // Eliminar usuario en Supabase
   const deleteUser = async (idx: number) => {
+    if (!supabase) {
+      alert('Supabase no está configurado. Contacta al administrador.');
+      return;
+    }
     const userToDelete = users[idx];
     if (!userToDelete || !userToDelete.id) {
       alert('No se puede eliminar: falta id');
@@ -52,6 +60,10 @@ const App = () => {
 
   // Función para agregar usuario a Supabase y refrescar lista
   const addUser = async (user: User) => {
+    if (!supabase) {
+      alert('Supabase no está configurado. Contacta al administrador.');
+      return;
+    }
     const { data, error } = await supabase.from('users').insert([user]).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => [...prev, data[0]]);
@@ -78,6 +90,10 @@ const App = () => {
   // Cargar usuarios desde Supabase al iniciar la app y agregar empleados reales si no existen
   useEffect(() => {
     async function fetchAndSeedUsers() {
+      if (!supabase) {
+        console.error('Supabase no está configurado. Contacta al administrador.');
+        return;
+      }
       const { data, error } = await supabase.from('users').select('*');
       if (data) {
         setUsers(data);
