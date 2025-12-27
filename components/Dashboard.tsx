@@ -254,7 +254,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const deleteHistory = async (idx: number) => {
     const item = shoppingHistory[idx];
     if (!item || !item.id) return;
-    const { error } = await supabase.from('shopping_list').delete().eq('id', item.id);
+    const { error } = await supabase!.from('shopping_list').delete().eq('id', item.id);
     if (!error) {
       setShoppingHistory(shoppingHistory.filter((_, i) => i !== idx));
     }
