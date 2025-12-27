@@ -169,7 +169,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const addItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const newItem = { ...form, complete: false, missing: 0, house: 'EPIC D1' };
-    const { data, error } = await supabase!.from('inventory').insert([newItem]).select();
+      const { data, error } = await supabase!.from('inventory').insert([newItem]).select();
     if (!error && data && data.length > 0) {
       setItemsState([...items, data[0]]);
       setForm({ name: '', room: ROOMS[0], quantity: 1 });
