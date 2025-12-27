@@ -185,6 +185,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     const updatedItem = { ...itemToEdit, ...editForm };
     const { data, error } = await supabase!
       .from('inventory')
+      // @ts-expect-error
       .update({ name: updatedItem.name, room: updatedItem.room, quantity: updatedItem.quantity })
       .eq('id', itemToEdit.id)
       .select();
