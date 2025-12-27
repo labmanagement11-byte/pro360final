@@ -132,7 +132,7 @@ const Checklist = ({ user }: { user: User }) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('checklist')
       .update({ complete: !item.complete })
       .eq('id', item.id)
@@ -145,7 +145,7 @@ const Checklist = ({ user }: { user: User }) => {
   const toggleMaintenance = async (idx: number) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('checklist')
       .update({ complete: !item.complete })
       .eq('id', item.id)
