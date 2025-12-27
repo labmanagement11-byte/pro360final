@@ -195,6 +195,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     if (!newProduct.name.trim() || newProduct.qty < 1) return;
     const { data, error } = await supabase!
       .from('shopping_list')
+      // @ts-expect-error
       .insert([{ name: newProduct.name, qty: newProduct.qty, completed: false, house: 'EPIC D1' }])
       .select();
     if (!error && data && data.length > 0) {
