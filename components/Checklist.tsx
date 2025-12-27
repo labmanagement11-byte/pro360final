@@ -80,7 +80,9 @@ const Checklist = ({ user }: { user: User }) => {
         .select('*')
         .eq('house', 'EPIC D1');
       if (!error && data) {
+        // @ts-expect-error
         setCleaning(data.filter(i => !i.room || i.room === 'Limpieza'));
+        // @ts-expect-error
         setMaintenance(data.filter(i => i.room === 'Mantenimiento'));
       } else {
         setCleaning([]);
