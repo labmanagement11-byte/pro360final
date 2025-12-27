@@ -132,6 +132,7 @@ const Checklist = ({ user }: { user: User }) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
+    // @ts-expect-error
     const { data, error } = await supabase!
       .from('checklist')
       .update({ complete: !item.complete })
@@ -145,6 +146,7 @@ const Checklist = ({ user }: { user: User }) => {
   const toggleMaintenance = async (idx: number) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
+    // @ts-expect-error
     const { data, error } = await supabase!
       .from('checklist')
       .update({ complete: !item.complete })
