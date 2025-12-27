@@ -31,7 +31,7 @@ const App = () => {
       alert('No se puede editar: falta id');
       return;
     }
-    const { data, error } = await supabase.from('users').update(user).eq('id', userToEdit.id).select();
+    const { data, error } = await supabase.from<'users', User>('users').update(user).eq('id', userToEdit.id).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => prev.map((u, i) => i === idx ? data[0] : u));
     } else if (error) {
@@ -50,7 +50,7 @@ const App = () => {
       alert('No se puede eliminar: falta id');
       return;
     }
-    const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+    const { error } = await supabase.from<'users', User>('users').delete().eq('id', userToDelete.id);
     if (!error) {
       setUsers(prev => prev.filter((_, i) => i !== idx));
     } else {
@@ -64,7 +64,7 @@ const App = () => {
       alert('Supabase no está configurado. Contacta al administrador.');
       return;
     }
-    const { data, error } = await supabase.from('users').insert([user]).select();
+    const { data, error } = await supabase.from<'users', User>('users').insert([user]).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => [...prev, data[0]]);
     } else if (error) {
@@ -94,7 +94,7 @@ const App = () => {
         console.error('Supabase no está configurado. Contacta al administrador.');
         return;
       }
-      const { data, error } = await supabase.from('users').select('*');
+      const { data, error } = await supabase.from<'users', User>('users').select('*');
       if (data) {
         setUsers(data);
         // Empleados reales a insertar si no existen
@@ -106,7 +106,7 @@ const App = () => {
         // Verificar si ya existen por username y casa
         const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
         if (missing.length > 0) {
-          const { data: inserted, error: insertError } = await supabase.from('users').insert(missing).select();
+          const { data: inserted, error: insertError } = await supabase.from<'users', User>('users').insert(missing).select();
           if (!insertError && inserted) {
             setUsers(prev => [...prev, ...inserted]);
           }
