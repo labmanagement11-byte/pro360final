@@ -171,7 +171,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   useEffect(() => {
     const fetchShopping = async () => {
       setLoadingShopping(true);
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('shopping_list')
         .select('*')
         .eq('house', 'EPIC D1');
