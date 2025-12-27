@@ -211,6 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     if (!item || !item.id) return;
     const { data, error } = await supabase!
       .from('shopping_list')
+      // @ts-expect-error
       .update({ name: newProduct.name, qty: newProduct.qty })
       .eq('id', item.id)
       .select();
