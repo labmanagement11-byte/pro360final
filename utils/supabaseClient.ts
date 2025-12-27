@@ -6,7 +6,15 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 
 type Database = {
-	users: User;
+	public: {
+		Tables: {
+			users: {
+				Row: User;
+				Insert: Omit<User, 'id'>;
+				Update: Partial<User>;
+			};
+		};
+	};
 };
 
 let supabase: ReturnType<typeof createClient<Database>> | null = null;
