@@ -235,7 +235,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const completeShopping = async () => {
     const ids = shoppingList.map(i => i.id);
     if (!ids.length) return;
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('shopping_list')
       .update({ completed: true, completed_at: new Date().toISOString() })
       .in('id', ids)
