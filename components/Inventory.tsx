@@ -139,7 +139,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   useEffect(() => {
     const fetchInventory = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('inventory')
         .select('*')
         .eq('house', 'EPIC D1');
