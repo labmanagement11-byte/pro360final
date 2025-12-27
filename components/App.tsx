@@ -109,7 +109,6 @@ const App = () => {
         // @ts-expect-error
         const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
         if (missing.length > 0) {
-          // @ts-expect-error
           const { data: inserted, error: insertError } = await supabase.from('users').insert(missing as any).select();
           if (!insertError && inserted) {
             setUsers(prev => [...prev, ...inserted]);
