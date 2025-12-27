@@ -106,6 +106,7 @@ const App = () => {
           { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'EPIC D1' },
         ];
         // Verificar si ya existen por username y casa
+        // @ts-expect-error
         const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
         if (missing.length > 0) {
           // @ts-expect-error
