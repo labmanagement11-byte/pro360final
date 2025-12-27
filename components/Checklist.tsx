@@ -75,7 +75,7 @@ const Checklist = ({ user }: { user: User }) => {
   useEffect(() => {
     const fetchChecklist = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('checklist')
         .select('*')
         .eq('house', 'EPIC D1');
