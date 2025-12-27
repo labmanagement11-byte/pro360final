@@ -1,3 +1,7 @@
+/* Centrado para el mensaje de carga del checklist */
+.ultra-task-loading {
+  text-align: center;
+}
 /* --- Mejoras para mobile: lista de tareas más visible y bonita --- */
 @media (max-width: 600px) {
   .tasks-list {

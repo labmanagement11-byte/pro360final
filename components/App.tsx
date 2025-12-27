@@ -1,11 +1,11 @@
-'use client';
+"use client"
 import React, { useState, useEffect } from 'react';
+
 import Dashboard, { User } from './Dashboard';
 import Login from './Login';
-import Users from './Users';
+import { supabase } from '../utils/supabaseClient';
 
-const OWNER = { username: 'galindo123@email.com', password: 'galindo123', role: 'dueno', house: '' };
-const USERS_KEY = 'dashboard_users';
+
 const SESSION_KEY = 'dashboard_session_user';
 const App = () => {
   const [userState, setUserState] = useState<User | null>(() => {
@@ -17,14 +17,62 @@ const App = () => {
   });
   // Wrapper para compatibilidad exacta de tipos
   const setUser = (user: User | null) => setUserState(user);
-  const [users, setUsers] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(USERS_KEY);
-      if (saved) return JSON.parse(saved);
-    }
-    return [OWNER];
-  });
+  const [users, setUsers] = useState<User[]>([]);
   const [theme, setTheme] = useState('light');
+
+  // Editar usuario en Supabase
+  const editUser = async (idx: number, user: User) => {
+    if (!supabase) {
+      alert('Supabase no está configurado. Contacta al administrador.');
+      return;
+    }
+    const userToEdit = users[idx];
+    if (!userToEdit || !userToEdit.id) {
+      alert('No se puede editar: falta id');
+      return;
+    }
+    // @ts-expect-error
+    const { data, error } = await supabase.from('users').update(user as any).eq('id', userToEdit.id).select();
+    if (!error && data && data.length > 0) {
+      setUsers(prev => prev.map((u, i) => i === idx ? data[0] : u));
+    } else if (error) {
+      alert('Error al editar usuario: ' + error.message);
+    }
+  };
+
+  // Eliminar usuario en Supabase
+  const deleteUser = async (idx: number) => {
+    if (!supabase) {
+      alert('Supabase no está configurado. Contacta al administrador.');
+      return;
+    }
+    const userToDelete = users[idx];
+    if (!userToDelete || !userToDelete.id) {
+      alert('No se puede eliminar: falta id');
+      return;
+    }
+    const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+    if (!error) {
+      setUsers(prev => prev.filter((_, i) => i !== idx));
+    } else {
+      alert('Error al eliminar usuario: ' + error.message);
+    }
+  };
+
+  // Función para agregar usuario a Supabase y refrescar lista
+  const addUser = async (user: User) => {
+    if (!supabase) {
+      alert('Supabase no está configurado. Contacta al administrador.');
+      return;
+    }
+    // @ts-expect-error
+    const { data, error } = await supabase.from('users').insert([user as any]).select();
+    if (!error && data && data.length > 0) {
+      setUsers(prev => [...prev, data[0]]);
+    } else if (error) {
+      alert('Error al agregar usuario: ' + error.message);
+    }
+  };
 
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
@@ -40,24 +88,40 @@ const App = () => {
     }
   }, [userState]);
 
-  // Persist users in localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      window.dashboardUsers = users;
-    }
-  }, [users]);
 
-  // Only owner can add/edit/delete users
-  const addUser = (newUser: { username: string; password: string; role: string; house?: string }) => {
-    setUsers([...users, { ...newUser, password: newUser.password || '', house: newUser.house || '' }]);
-  };
-  const editUser = (idx: number, updated: { username: string; password: string; role: string; house?: string }) => {
-    setUsers(users.map((u: { username: string; password: string; role: string; house?: string }, i: number) => i === idx ? { ...u, ...updated, password: updated.password || '', house: updated.house || '' } : u));
-  };
-  const deleteUser = (idx: number) => {
-    setUsers(users.filter((user: { username: string; password: string; role: string; house?: string }, i: number) => i !== idx));
-  };
+  // Cargar usuarios desde Supabase al iniciar la app y agregar empleados reales si no existen
+  useEffect(() => {
+    async function fetchAndSeedUsers() {
+      if (!supabase) {
+        console.error('Supabase no está configurado. Contacta al administrador.');
+        return;
+      }
+      const { data, error } = await supabase.from('users').select('*');
+      if (data) {
+        setUsers(data);
+        // Empleados reales a insertar si no existen
+        const realEmployees = [
+          { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'EPIC D1' },
+          { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'EPIC D1' },
+          { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'EPIC D1' },
+        ];
+        // Verificar si ya existen por username y casa
+        // @ts-expect-error
+        const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
+        if (missing.length > 0) {
+          const { data: inserted, error: insertError } = await supabase.from('users').insert(missing as any).select();
+          if (!insertError && inserted) {
+            setUsers(prev => [...prev, ...inserted]);
+          }
+        }
+      }
+      // Si quieres manejar errores, puedes agregar un setError aquí
+    }
+    fetchAndSeedUsers();
+  }, []);
+
+  // Si necesitas agregar/editar/borrar usuarios, deberías hacerlo vía Supabase, no local
+  // Puedes implementar funciones aquí para interactuar con la base de datos si lo deseas
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(SESSION_KEY);

@@ -49,10 +49,10 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
     );
   }
 
-  const handleAddUser = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (username && role && house) {
-      addUser({ username, password: password || '', role, house });
+      await addUser({ username, password: password || '', role, house });
       setUsername('');
       setPassword('');
       setRole('empleado');
@@ -60,10 +60,10 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
     }
   };
 
-  const handleEditUser = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEditUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editData.username && editData.role) {
-      editUser(editIdx, { ...editData, password: editData.password || '' });
+      await editUser(editIdx, { ...editData, password: editData.password || '' });
       setEditIdx(-1);
       setEditData({ username: '', password: '', role: 'empleado', house: '' });
     }
@@ -138,7 +138,7 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
                         setEditIdx(idx);
                         setEditData({ username: u.username, password: u.password || '', role: u.role, house: u.house || '' });
                       }}>Editar</button>
-                      <button onClick={() => deleteUser(idx)} className="users-delete-btn">Eliminar</button>
+                      <button onClick={async () => await deleteUser(idx)} className="users-delete-btn">Eliminar</button>
                     </>
                   )}
                 </>
