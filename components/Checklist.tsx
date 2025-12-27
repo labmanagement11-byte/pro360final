@@ -162,6 +162,7 @@ const Checklist = ({ user }: { user: User }) => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
     const { data, error } = await supabase!
       .from('checklist')
+      // @ts-expect-error
       .update({ complete: false })
       .in('id', allIds);
     if (!error) {
