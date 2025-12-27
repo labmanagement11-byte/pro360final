@@ -160,7 +160,7 @@ const Checklist = ({ user }: { user: User }) => {
   // Reiniciar checklist (manager/dueno)
   const resetChecklist = async () => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('checklist')
       .update({ complete: false })
       .in('id', allIds);
