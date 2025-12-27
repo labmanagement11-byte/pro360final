@@ -31,7 +31,7 @@ const App = () => {
       alert('No se puede editar: falta id');
       return;
     }
-    const { data, error } = await supabase.from('users').update(user).eq('id', userToEdit.id).select();
+    const { data, error } = await supabase.from('users').update(user as any).eq('id', userToEdit.id).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => prev.map((u, i) => i === idx ? data[0] : u));
     } else if (error) {
@@ -64,7 +64,7 @@ const App = () => {
       alert('Supabase no está configurado. Contacta al administrador.');
       return;
     }
-    const { data, error } = await supabase.from('users').insert([user]).select();
+    const { data, error } = await supabase.from('users').insert([user as any]).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => [...prev, data[0]]);
     } else if (error) {
@@ -106,7 +106,7 @@ const App = () => {
         // Verificar si ya existen por username y casa
         const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
         if (missing.length > 0) {
-          const { data: inserted, error: insertError } = await supabase.from('users').insert(missing).select();
+          const { data: inserted, error: insertError } = await supabase.from('users').insert(missing as any).select();
           if (!insertError && inserted) {
             setUsers(prev => [...prev, ...inserted]);
           }
