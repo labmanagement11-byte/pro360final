@@ -209,7 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     e.preventDefault();
     const item = shoppingList[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('shopping_list')
       .update({ name: newProduct.name, qty: newProduct.qty })
       .eq('id', item.id)
