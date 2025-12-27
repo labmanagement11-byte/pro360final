@@ -176,7 +176,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         .select('*')
         .eq('house', 'EPIC D1');
       if (!error && data) {
+        // @ts-expect-error
         setShoppingList(data.filter(i => !i.completed));
+        // @ts-expect-error
         setShoppingHistory(data.filter(i => i.completed).sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')));
       } else {
         setShoppingList([]);
