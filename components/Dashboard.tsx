@@ -225,7 +225,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const deleteProduct = async (idx: number) => {
     const item = shoppingList[idx];
     if (!item || !item.id) return;
-    const { error } = await supabase.from('shopping_list').delete().eq('id', item.id);
+    // @ts-expect-error
+    const { error } = await supabase!.from('shopping_list').delete().eq('id', item.id);
     if (!error) {
       setShoppingList(shoppingList.filter((_, i) => i !== idx));
     }
