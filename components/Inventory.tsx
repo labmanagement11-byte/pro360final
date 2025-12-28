@@ -201,7 +201,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const deleteItem = async (idx: number) => {
     const item = items[idx];
     if (!item || !item.id) return;
-    const { error } = await supabase.from('inventory').delete().eq('id', item.id);
+    const { error } = await supabase!.from('inventory').delete().eq('id', item.id);
     if (!error) {
       setItemsState(items.filter((_, i) => i !== idx));
     }
