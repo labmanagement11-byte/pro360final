@@ -133,7 +133,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   const setReason = async (idx: number, value: string) => {
     const task = tasks[idx];
     if (!task || !task.id) return;
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('tasks')
       .update({ reason: value })
       .eq('id', task.id)
