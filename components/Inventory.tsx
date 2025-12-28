@@ -254,7 +254,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const resetInventory = async () => {
     // Actualizar todos los items en Supabase
     const ids = items.map(it => it.id);
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('inventory')
       .update({ complete: false, missing: 0 })
       .in('id', ids);
