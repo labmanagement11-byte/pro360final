@@ -239,7 +239,8 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const setReason = async (idx: number, value: string) => {
     const item = items[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase
+    // @ts-expect-error
+    const { data, error } = await supabase!
       .from('inventory')
       .update({ reason: value })
       .eq('id', item.id)
