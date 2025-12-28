@@ -91,7 +91,6 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     if (editIdx === null) return;
     const taskToEdit = tasks[editIdx];
     const updatedTask = { ...taskToEdit, ...editForm };
-    // @ts-expect-error
     const { data, error } = await supabase!
       .from('tasks')
       .update({ task: updatedTask.task, employee: updatedTask.employee, date: updatedTask.date, time: updatedTask.time, house: updatedTask.house })
