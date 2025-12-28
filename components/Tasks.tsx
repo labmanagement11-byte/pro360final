@@ -93,6 +93,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     const updatedTask = { ...taskToEdit, ...editForm };
     const { data, error } = await supabase!
       .from('tasks')
+      // @ts-expect-error
       .update({ task: updatedTask.task, employee: updatedTask.employee, date: updatedTask.date, time: updatedTask.time, house: updatedTask.house })
       .eq('id', taskToEdit.id)
       .select();
