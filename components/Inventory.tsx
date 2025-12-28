@@ -241,6 +241,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     if (!item || !item.id) return;
     const { data, error } = await supabase!
       .from('inventory')
+      // @ts-expect-error
       .update({ reason: value })
       .eq('id', item.id)
       .select();
