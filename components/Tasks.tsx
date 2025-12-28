@@ -59,7 +59,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   useEffect(() => {
     const fetchTasks = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('tasks')
         .select('*')
         .eq('house', user.house || 'EPIC D1');
