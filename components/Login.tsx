@@ -39,7 +39,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
     // Buscar usuario por username en la tabla 'users'
     const { data, error: queryError } = await supabase
-      .from<User>('users')
+      .from<User, User>('users')
       .select('*')
       .eq('username', username)
       .limit(1)
