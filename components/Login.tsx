@@ -33,6 +33,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setLoading(true);
     setError('');
     // Autenticación con Supabase
+    if (!supabase) {
+      setError('No se pudo conectar con Supabase. Verifica configuración.');
+      setLoading(false);
+      return;
+    }
+    // @ts-ignore
     const { data, error: loginError } = await supabase.auth.signInWithPassword({
       email: username,
       password
@@ -43,11 +49,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       return;
     }
     if (data && data.user) {
-      // Puedes guardar el usuario en localStorage si quieres persistencia
       if (remember && typeof window !== 'undefined') {
         localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
       }
-      // Puedes mapear el user de Supabase a tu tipo User si lo necesitas
       onLogin({
         username: data.user.email || '',
         password: '',
