@@ -118,7 +118,8 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   const toggleComplete = async (idx: number) => {
     const task = tasks[idx];
     if (!task || !task.id) return;
-    const { data, error } = await supabase
+    // @ts-expect-error
+    const { data, error } = await supabase!
       .from('tasks')
       .update({ complete: !task.complete })
       .eq('id', task.id)
