@@ -135,6 +135,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     if (!task || !task.id) return;
     const { data, error } = await supabase!
       .from('tasks')
+      // @ts-ignore
       .update({ reason: value })
       .eq('id', task.id)
       .select();
