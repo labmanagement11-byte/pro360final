@@ -256,6 +256,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     const ids = items.map(it => it.id);
     const { data, error } = await supabase!
       .from('inventory')
+      // @ts-expect-error
       .update({ complete: false, missing: 0 })
       .in('id', ids);
     if (!error) {
