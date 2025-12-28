@@ -95,7 +95,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
       .from('tasks')
       // @ts-expect-error
       .update({ task: updatedTask.task, employee: updatedTask.employee, date: updatedTask.date, time: updatedTask.time, house: updatedTask.house })
-      .eq('id', taskToEdit.id)
+      .eq('id', taskToEdit.id ?? 0)
       .select();
     if (!error && data && data.length > 0) {
       setTasksState(tasks.map((t, idx) => idx === editIdx ? data[0] : t));
