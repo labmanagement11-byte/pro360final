@@ -149,6 +149,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     const ids = tasks.map(t => t.id);
     const { data, error } = await supabase!
       .from('tasks')
+      // @ts-ignore
       .update({ complete: false })
       .in('id', ids);
     if (!error) {
