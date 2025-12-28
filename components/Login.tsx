@@ -39,31 +39,32 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
     // Buscar usuario por username en la tabla 'users'
     const { data, error: queryError } = await supabase
-      .from('users')
+      .from<User>('users')
       .select('*')
       .eq('username', username)
       .limit(1)
       .single();
-    if (queryError || !data) {
+    const user = data as User | null;
+    if (queryError || !user) {
       setError('Usuario o contraseña incorrectos');
       setLoading(false);
       return;
     }
     // Validar contraseña
-    if (data.password !== password) {
+    if (user.password !== password) {
       setError('Usuario o contraseña incorrectos');
       setLoading(false);
       return;
     }
     // Login exitoso
     if (remember && typeof window !== 'undefined') {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     }
     onLogin({
-      username: data.username,
+      username: user.username,
       password: '',
-      role: data.role,
-      house: data.house || ''
+      role: user.role,
+      house: user.house || ''
     });
     setLoading(false);
   };
