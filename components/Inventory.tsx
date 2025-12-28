@@ -183,11 +183,12 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     if (editIdx === null) return;
     const itemToEdit = items[editIdx];
     const updatedItem = { ...itemToEdit, ...editForm };
+      // @ts-expect-error
       const { data, error } = await supabase!
         .from('inventory')
         .update({ missing: value })
-      .eq('id', itemToEdit.id)
-      .select();
+        .eq('id', itemToEdit.id)
+        .select();
     if (!error && data && data.length > 0) {
       setItemsState(items.map((it, idx) => idx === editIdx ? data[0] : it));
       setEditIdx(null);
