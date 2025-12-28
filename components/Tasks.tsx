@@ -108,7 +108,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   const deleteTask = async (idx: number) => {
     const task = tasks[idx];
     if (!task || !task.id) return;
-    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    const { error } = await supabase!.from('tasks').delete().eq('id', task.id);
     if (!error) {
       setTasksState(tasks.filter((_, i) => i !== idx));
     }
