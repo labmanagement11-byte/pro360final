@@ -77,6 +77,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   const addTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const newTask = { ...form, complete: false, house: form.house || user.house || 'EPIC D1' };
+    // @ts-expect-error
     const { data, error } = await supabase!.from('tasks').insert([newTask]).select();
     if (!error && data && data.length > 0) {
       setTasksState([...tasks, data[0]]);
