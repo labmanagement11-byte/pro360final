@@ -120,7 +120,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     if (!task || !task.id) return;
     const { data, error } = await supabase!
       .from('tasks')
-      .update({ complete: !task.complete })
+      .update({ complete: !task.complete } as any)
       .eq('id', task.id)
       .select();
     if (!error && data && data.length > 0) {
