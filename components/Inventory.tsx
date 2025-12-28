@@ -211,7 +211,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const toggleComplete = async (idx: number) => {
     const item = items[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('inventory')
       .update({ complete: !item.complete })
       .eq('id', item.id)
