@@ -187,6 +187,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
         .from('inventory')
         // @ts-expect-error
         .update({ missing: value })
+        // @ts-expect-error
         .eq('id', itemToEdit.id)
         .select();
     if (!error && data && data.length > 0) {
