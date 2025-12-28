@@ -32,35 +32,39 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    // Autenticación con Supabase
     if (!supabase) {
       setError('No se pudo conectar con Supabase. Verifica configuración.');
       setLoading(false);
       return;
     }
-    // @ts-ignore
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: username,
-      password
-    });
-    if (loginError) {
+    // Buscar usuario por username en la tabla 'users'
+    const { data, error: queryError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .limit(1)
+      .single();
+    if (queryError || !data) {
       setError('Usuario o contraseña incorrectos');
       setLoading(false);
       return;
     }
-    if (data && data.user) {
-      if (remember && typeof window !== 'undefined') {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
-      }
-      onLogin({
-        username: data.user.email || '',
-        password: '',
-        role: data.user.user_metadata?.role || '',
-        house: data.user.user_metadata?.house || ''
-      });
-    } else {
+    // Validar contraseña
+    if (data.password !== password) {
       setError('Usuario o contraseña incorrectos');
+      setLoading(false);
+      return;
     }
+    // Login exitoso
+    if (remember && typeof window !== 'undefined') {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+    }
+    onLogin({
+      username: data.username,
+      password: '',
+      role: data.role,
+      house: data.house || ''
+    });
     setLoading(false);
   };
 
