@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
 import './Login.css';
 
@@ -7,6 +9,7 @@ interface LoginProps {
   onLogin: (user: User) => void;
   users: User[];
 }
+
 
 const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [username, setUsername] = useState('');
@@ -28,16 +31,29 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const user = users.find(
-      u => u.username.toLowerCase() === username.trim().toLowerCase() &&
-           u.password === password
-    );
-    if (user) {
-      setError('');
+    setError('');
+    // Autenticación con Supabase
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email: username,
+      password
+    });
+    if (loginError) {
+      setError('Usuario o contraseña incorrectos');
+      setLoading(false);
+      return;
+    }
+    if (data && data.user) {
+      // Puedes guardar el usuario en localStorage si quieres persistencia
       if (remember && typeof window !== 'undefined') {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
       }
-      onLogin(user);
+      // Puedes mapear el user de Supabase a tu tipo User si lo necesitas
+      onLogin({
+        username: data.user.email || '',
+        password: '',
+        role: data.user.user_metadata?.role || '',
+        house: data.user.user_metadata?.house || ''
+      });
     } else {
       setError('Usuario o contraseña incorrectos');
     }
