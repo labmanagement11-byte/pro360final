@@ -147,7 +147,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   // Reiniciar tareas (manager/dueno)
   const resetTasks = async () => {
     const ids = tasks.map(t => t.id);
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('tasks')
       .update({ complete: false })
       .in('id', ids);
