@@ -410,7 +410,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         />
       )}
       {view === 'calendar' && <Calendar users={users as any} user={user as any} />}
-      {view === 'checklist' && <Checklist user={user} />}
+      {view === 'checklist' && <Checklist user={user} users={users} />}
       {view === 'reminders' && (
         <div className="dashboard-reminders redesigned-reminders">
           <h2 className="dashboard-reminders-title redesigned-reminders-title">Recordatorios</h2>

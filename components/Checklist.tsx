@@ -66,23 +66,28 @@ const maintenanceTasks = [
 const CHECKLIST_KEY = 'dashboard_checklist'; // legacy, no longer usado
 
 
-const Checklist = ({ user }: { user: User }) => {
-  const [cleaning, setCleaning] = useState<{ id?: number; item: string; room?: string; complete: boolean; reason?: string }[]>([]);
-  const [maintenance, setMaintenance] = useState<{ id?: number; item: string; room?: string; complete: boolean; reason?: string }[]>([]);
+// Recibe también la lista de usuarios para asignar tareas
+interface ChecklistProps {
+  user: User;
+  users?: User[];
+}
+const Checklist = ({ user, users = [] }: ChecklistProps) => {
+  const [cleaning, setCleaning] = useState<any[]>([]);
+  const [maintenance, setMaintenance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Cargar checklist desde Supabase
   useEffect(() => {
     const fetchChecklist = async () => {
       setLoading(true);
-      const { data, error } = await supabase!
-        .from('checklist')
-        .select('*')
-        .eq('house', 'EPIC D1');
+      let query = supabase!.from('checklist').select('*').eq('house', 'EPIC D1');
+      // Si es empleado, solo ve tareas asignadas a él o no asignadas
+      if (user.role === 'empleado') {
+        query = query.in('assigned_to', [user.username, null]);
+      }
+      const { data, error } = await query;
       if (!error && data) {
-        // @ts-expect-error
         setCleaning(data.filter(i => !i.room || i.room === 'Limpieza'));
-        // @ts-expect-error
         setMaintenance(data.filter(i => i.room === 'Mantenimiento'));
       } else {
         setCleaning([]);
@@ -91,7 +96,24 @@ const Checklist = ({ user }: { user: User }) => {
       setLoading(false);
     };
     fetchChecklist();
-  }, []);
+  }, [user]);
+  // Asignar tarea a usuario (manager/dueno)
+  const handleAssign = async (taskId: number, assignedTo: string) => {
+    setLoading(true);
+    await supabase!.from('checklist').update({ assigned_to: assignedTo }).eq('id', taskId);
+    // Refrescar checklist
+    const fetchChecklist = async () => {
+      let query = supabase!.from('checklist').select('*').eq('house', 'EPIC D1');
+      if (user.role === 'empleado') {
+        query = query.in('assigned_to', [user.username, null]);
+      }
+      const { data } = await query;
+      setCleaning(data ? data.filter(i => !i.room || i.room === 'Limpieza') : []);
+      setMaintenance(data ? data.filter(i => i.room === 'Mantenimiento') : []);
+    };
+    await fetchChecklist();
+    setLoading(false);
+  };
 
   // Agrupar tareas de limpieza por zona
   const cleaningZones = [
@@ -188,6 +210,18 @@ const Checklist = ({ user }: { user: User }) => {
                     <span className="ultra-task-icon">{i.complete ? '✔️' : '🧹'}</span>
                     <span className="ultra-task-text">{i.item}</span>
                   </label>
+                  {(user.role === 'manager' || user.role === 'dueno') && users.length > 0 && (
+                    <select
+                      value={i.assigned_to || ''}
+                      onChange={e => handleAssign(i.id, e.target.value)}
+                      className="ultra-assign-dropdown"
+                    >
+                      <option value="">Sin asignar</option>
+                      {users.filter(u => u.role === 'empleado').map(u => (
+                        <option key={u.username} value={u.username}>{u.username}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               ))}
             </div>
@@ -204,6 +238,18 @@ const Checklist = ({ user }: { user: User }) => {
                 <span className="ultra-task-icon">{i.complete ? '🔧' : '🛠️'}</span>
                 <span className="ultra-task-text">{i.item}</span>
               </label>
+              {(user.role === 'manager' || user.role === 'dueno') && users.length > 0 && (
+                <select
+                  value={i.assigned_to || ''}
+                  onChange={e => handleAssign(i.id, e.target.value)}
+                  className="ultra-assign-dropdown"
+                >
+                  <option value="">Sin asignar</option>
+                  {users.filter(u => u.role === 'empleado').map(u => (
+                    <option key={u.username} value={u.username}>{u.username}</option>
+                  ))}
+                </select>
+              )}
             </div>
           ))}
         </div>
