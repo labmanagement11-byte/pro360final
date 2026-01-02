@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaCalendarAlt, FaUser, FaTasks, FaClock, FaBoxOpen, FaTrash } from 'react-icons/fa';
+import { supabase } from '../utils/supabaseClient';
 
-const CALENDAR_KEY = 'dashboard_calendar';
+const CALENDAR_KEY = 'dashboard_calendar'; // legacy, no longer used
 
 const defaultTypes = [
   'Limpieza profunda',
@@ -9,6 +10,17 @@ const defaultTypes = [
   'Mantenimiento',
 ];
 
+interface CalendarEvent {
+  id?: number;
+  house: string;
+  date: string;
+  type: string;
+  employee: string;
+  time: string;
+  tasks: string;
+  inventory: string;
+  created_at?: string;
+}
 
 interface User {
   username: string;
@@ -19,13 +31,8 @@ interface CalendarProps {
   user: User;
 }
 const Calendar = ({ users, user }: CalendarProps) => {
-  const [events, setEvents] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(CALENDAR_KEY);
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     date: '',
     type: defaultTypes[0],
@@ -35,20 +42,56 @@ const Calendar = ({ users, user }: CalendarProps) => {
     inventory: '',
   });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(CALENDAR_KEY, JSON.stringify(events));
+  // Cargar eventos desde Supabase
+  const fetchEvents = async () => {
+    setLoading(true);
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('calendar')
+      .select('*')
+      .eq('house', 'EPIC D1')
+      .order('date', { ascending: true });
+    if (!error && data) {
+      setEvents(data);
+    } else {
+      setEvents([]);
     }
-  }, [events]);
-
-  const addEvent = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setEvents([...events, form]);
-    setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
+    setLoading(false);
   };
 
-  const deleteEvent = (idx: number) => {
-    setEvents(events.filter((_: any, i: number) => i !== idx));
+  // Cargar eventos al montar y suscribirse a cambios en tiempo real
+  useEffect(() => {
+    fetchEvents();
+
+    if (!supabase) return;
+
+    // Suscripción realtime a cambios en calendar
+    const channel = supabase
+      .channel('calendar-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar' }, (payload: any) => {
+        console.log('Cambio en calendar:', payload);
+        fetchEvents();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, []);
+
+  const addEvent = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!supabase) return;
+    const newEvent = { ...form, house: 'EPIC D1' };
+    await supabase.from('calendar').insert(newEvent);
+    setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
+    // Realtime actualizará automáticamente
+  };
+
+  const deleteEvent = async (eventId: number) => {
+    if (!supabase) return;
+    await supabase.from('calendar').delete().eq('id', eventId);
+    // Realtime actualizará automáticamente
   };
 
   // Solo managers y dueños pueden agregar/eliminar
@@ -82,9 +125,10 @@ const Calendar = ({ users, user }: CalendarProps) => {
         </form>
       )}
       <div className="calendar-events">
-        {visibleEvents.length === 0 && <div className="calendar-empty">No hay asignaciones.</div>}
-        {visibleEvents.map((ev: any, idx: number) => (
-          <div key={idx} className="calendar-event-card">
+        {loading && <div className="calendar-empty">Cargando eventos...</div>}
+        {!loading && visibleEvents.length === 0 && <div className="calendar-empty">No hay asignaciones.</div>}
+        {!loading && visibleEvents.map((ev: CalendarEvent) => (
+          <div key={ev.id} className="calendar-event-card">
             <div className="calendar-event-row">
               <span className="calendar-event-icon"><FaCalendarAlt /></span>
               <span className="calendar-event-date">{ev.date}</span>
@@ -104,7 +148,7 @@ const Calendar = ({ users, user }: CalendarProps) => {
               <span className="calendar-event-icon"><FaBoxOpen /></span>
               <span className="calendar-event-inventory">{ev.inventory}</span>
             </div>
-            {canEdit && <button className="calendar-btn danger" onClick={() => deleteEvent(events.indexOf(ev))} title="Eliminar"><FaTrash /></button>}
+            {canEdit && <button className="calendar-btn danger" onClick={() => deleteEvent(ev.id!)} title="Eliminar"><FaTrash /></button>}
           </div>
         ))}
       </div>
