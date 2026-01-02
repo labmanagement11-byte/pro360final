@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { supabase, getSupabaseClient } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
 
 const cleaningTasks = [
@@ -91,7 +91,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   useEffect(() => {
     const fetchChecklist = async () => {
       setLoading(true);
-      let query = supabase!.from('checklist').select('*').eq('house', 'EPIC D1');
+      let query = getSupabaseClient().from('checklist').select('*').eq('house', 'EPIC D1');
       // Si es empleado, solo ve tareas asignadas a él o no asignadas
       if (user.role === 'empleado') {
         query = query.in('assigned_to', [user.username, null]);
@@ -112,10 +112,10 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   // Asignar tarea a usuario (manager/dueno)
   const handleAssign = async (taskId: number, assignedTo: string) => {
     setLoading(true);
-    await supabase!.from('checklist').update({ assigned_to: assignedTo }).eq('id', taskId);
+    await getSupabaseClient().from('checklist').update({ assigned_to: assignedTo }).eq('id', taskId);
     // Refrescar checklist
     const fetchChecklist = async () => {
-      let query = supabase!.from('checklist').select('*').eq('house', 'EPIC D1');
+      let query = getSupabaseClient().from('checklist').select('*').eq('house', 'EPIC D1');
       if (user.role === 'empleado') {
         query = query.in('assigned_to', [user.username, null]);
       }
@@ -167,7 +167,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase!
+    const { data, error } = await getSupabaseClient()
       .from('checklist')
       .update({ complete: !item.complete })
       .eq('id', item.id)
@@ -180,7 +180,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const toggleMaintenance = async (idx: number) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
-    const { data, error } = await supabase!
+    const { data, error } = await getSupabaseClient()
       .from('checklist')
       .update({ complete: !item.complete })
       .eq('id', item.id)
@@ -193,7 +193,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   // Reiniciar checklist (manager/dueno)
   const resetChecklist = async () => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
-    const { data, error } = await supabase!
+    const { data, error } = await getSupabaseClient()
       .from('checklist')
       .update({ complete: false })
       .in('id', allIds);

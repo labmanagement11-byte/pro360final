@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Definir tipos de base de datos
 export interface Database {
@@ -41,14 +41,23 @@ export interface Database {
   };
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-let supabase: ReturnType<typeof createClient<Database>> | null = null;
-if (!supabaseUrl || !supabaseAnonKey) {
-	console.error('Missing Supabase environment variables. Supabase client will not be initialized.');
+let supabaseInstance: SupabaseClient<Database> | null = null;
+
+if (supabaseUrl && supabaseAnonKey) {
+	supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey);
 } else {
-	supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+	console.error('Missing Supabase environment variables. Supabase client will not be initialized.');
 }
 
-export { supabase };
+// Helper function to ensure supabase is defined
+export function getSupabaseClient(): SupabaseClient<Database> {
+	if (!supabaseInstance) {
+		throw new Error('Supabase client is not initialized. Check your environment variables.');
+	}
+	return supabaseInstance;
+}
+
+export const supabase = supabaseInstance;
