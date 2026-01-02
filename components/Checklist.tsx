@@ -98,8 +98,9 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
       }
       const { data, error } = await query;
       if (!error && data) {
-        setCleaning(data.filter(i => !i.room || i.room === 'Limpieza'));
-        setMaintenance(data.filter(i => i.room === 'Mantenimiento'));
+        const items = data as ChecklistItem[];
+        setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
+        setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
       } else {
         setCleaning([]);
         setMaintenance([]);
@@ -119,8 +120,9 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
         query = query.in('assigned_to', [user.username, null]);
       }
       const { data } = await query;
-      setCleaning(data ? data.filter(i => !i.room || i.room === 'Limpieza') : []);
-      setMaintenance(data ? data.filter(i => i.room === 'Mantenimiento') : []);
+      const items = (data || []) as ChecklistItem[];
+      setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
+      setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
     };
     await fetchChecklist();
     setLoading(false);
