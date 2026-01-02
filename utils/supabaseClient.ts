@@ -60,4 +60,9 @@ export function getSupabaseClient(): SupabaseClient<Database> {
 	return supabaseInstance;
 }
 
+// Helper for checklist table operations with proper typing
+export function checklistTable() {
+	return getSupabaseClient().from('checklist' as const);
+}
+
 export const supabase = supabaseInstance;
