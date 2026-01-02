@@ -10,9 +10,8 @@ interface LoginProps {
   users: User[];
 }
 
-
 const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
@@ -26,47 +25,62 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         onLogin(user);
       }
     }
-  }, []);
+  }, [onLogin]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
     if (!supabase) {
       setError('No se pudo conectar con Supabase. Verifica configuración.');
       setLoading(false);
       return;
     }
-    // Buscar usuario por username en la tabla 'users'
-    const { data, error: queryError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .limit(1)
-      .single();
-    const user = data as User | null;
-    if (queryError || !user) {
-      setError('Usuario o contraseña incorrectos');
+
+    try {
+      // Login con Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError || !authData.user) {
+        setError('Email o contraseña incorrectos');
+        setLoading(false);
+        return;
+      }
+
+      // Obtener perfil desde tabla profiles
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        setError('Perfil no encontrado');
+        setLoading(false);
+        return;
+      }
+
+      const user: User = {
+        username: profileData.username,
+        password: '',
+        role: profileData.role,
+        house: 'EPIC D1',
+      };
+
+      if (remember && typeof window !== 'undefined') {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      }
+
+      onLogin(user);
       setLoading(false);
-      return;
-    }
-    // Validar contraseña
-    if (user.password !== password) {
-      setError('Usuario o contraseña incorrectos');
+    } catch (err) {
+      setError('Error durante login');
       setLoading(false);
-      return;
     }
-    // Login exitoso
-    if (remember && typeof window !== 'undefined') {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-    }
-    onLogin({
-      username: user.username,
-      password: '',
-      role: user.role,
-      house: user.house || ''
-    });
-    setLoading(false);
   };
 
   return (
@@ -86,10 +100,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       <h2 className="login-title">Bienvenido</h2>
       <form onSubmit={handleSubmit} className="login-form-modern">
         <input
-          type="text"
-          placeholder="Usuario"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           required
         />
         <input

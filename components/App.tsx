@@ -20,6 +20,40 @@ const App = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [theme, setTheme] = useState('light');
 
+  // Suscripción a cambios en tiempo real de profiles
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: any) => {
+        console.log('Cambio en profiles:', payload);
+        // Refrescar lista de usuarios/perfiles si es necesario
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+          fetchUsers();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, []);
+
+  // Cargar usuarios desde Supabase
+  const fetchUsers = async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (data) {
+      setUsers(data.map((p: any) => ({
+        username: p.username,
+        password: '',
+        role: p.role,
+        house: 'EPIC D1',
+      })));
+    }
+  };
+
   // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {
     if (!supabase) {
@@ -89,40 +123,16 @@ const App = () => {
   }, [userState]);
 
 
-  // Cargar usuarios desde Supabase al iniciar la app y agregar empleados reales si no existen
+  // Cargar usuarios (profiles) al iniciar la app
   useEffect(() => {
-    async function fetchAndSeedUsers() {
-      if (!supabase) {
-        console.error('Supabase no está configurado. Contacta al administrador.');
-        return;
-      }
-      const { data, error } = await supabase.from('users').select('*');
-      if (data) {
-        setUsers(data);
-        // Empleados reales a insertar si no existen
-        const realEmployees = [
-          { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'EPIC D1' },
-          { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'EPIC D1' },
-          { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'EPIC D1' },
-        ];
-        // Verificar si ya existen por username y casa
-        // @ts-expect-error
-        const missing = realEmployees.filter(emp => !data.some(u => u.username === emp.username && u.house === emp.house));
-        if (missing.length > 0) {
-          const { data: inserted, error: insertError } = await supabase.from('users').insert(missing as any).select();
-          if (!insertError && inserted) {
-            setUsers(prev => [...prev, ...inserted]);
-          }
-        }
-      }
-      // Si quieres manejar errores, puedes agregar un setError aquí
-    }
-    fetchAndSeedUsers();
+    fetchUsers();
   }, []);
 
-  // Si necesitas agregar/editar/borrar usuarios, deberías hacerlo vía Supabase, no local
-  // Puedes implementar funciones aquí para interactuar con la base de datos si lo deseas
-  const handleLogout = () => {
+  // Logout con Supabase Auth
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem(SESSION_KEY);
     }
