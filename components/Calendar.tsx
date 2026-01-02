@@ -46,7 +46,7 @@ const Calendar = ({ users, user }: CalendarProps) => {
   const fetchEvents = async () => {
     setLoading(true);
     if (!supabase) return;
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('calendar')
       .select('*')
       .eq('house', 'EPIC D1')
@@ -83,14 +83,14 @@ const Calendar = ({ users, user }: CalendarProps) => {
     e.preventDefault();
     if (!supabase) return;
     const newEvent = { ...form, house: 'EPIC D1' };
-    await supabase.from('calendar').insert(newEvent);
+    await (supabase as any).from('calendar').insert(newEvent);
     setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
     // Realtime actualizará automáticamente
   };
 
   const deleteEvent = async (eventId: number) => {
     if (!supabase) return;
-    await supabase.from('calendar').delete().eq('id', eventId);
+    await (supabase as any).from('calendar').delete().eq('id', eventId);
     // Realtime actualizará automáticamente
   };
 
