@@ -111,6 +111,8 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   useEffect(() => {
     fetchChecklist();
 
+    if (!supabase) return;
+
     // Suscripción realtime a cambios en checklist
     const channel = supabase
       .channel('checklist-changes')

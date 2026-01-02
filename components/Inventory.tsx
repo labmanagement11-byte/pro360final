@@ -154,8 +154,10 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   useEffect(() => {
     fetchInventory();
 
+    if (!supabase) return;
+
     // Suscripción realtime a cambios en inventory
-    const channel = supabase!
+    const channel = supabase
       .channel('inventory-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload: any) => {
         console.log('Cambio en inventory:', payload);

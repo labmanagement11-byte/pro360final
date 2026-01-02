@@ -74,8 +74,10 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   useEffect(() => {
     fetchTasks();
 
+    if (!supabase) return;
+
     // Suscripción realtime a cambios en tasks
-    const channel = supabase!
+    const channel = supabase
       .channel('tasks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload: any) => {
         console.log('Cambio en tasks:', payload);
