@@ -112,7 +112,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   // Asignar tarea a usuario (manager/dueno)
   const handleAssign = async (taskId: number, assignedTo: string) => {
     setLoading(true);
-    // @ts-expect-error - Supabase typing issue
     await (checklistTable() as any).update({ assigned_to: assignedTo }).eq('id', taskId);
     // Refrescar checklist
     const fetchChecklist = async () => {
