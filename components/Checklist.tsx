@@ -112,8 +112,8 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   // Asignar tarea a usuario (manager/dueno)
   const handleAssign = async (taskId: number, assignedTo: string) => {
     setLoading(true);
-    // @ts-expect-error - Supabase typing issue with dynamic table references
-    await checklistTable().update({ assigned_to: assignedTo }).eq('id', taskId);
+    // @ts-expect-error - Supabase typing issue
+    await (checklistTable() as any).update({ assigned_to: assignedTo }).eq('id', taskId);
     // Refrescar checklist
     const fetchChecklist = async () => {
       let query = checklistTable().select('*').eq('house', 'EPIC D1');
@@ -168,8 +168,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
-    // @ts-expect-error - Supabase typing issue
-    const { data, error } = await checklistTable()
+    const { data, error } = await (checklistTable() as any)
       .update({ complete: !item.complete })
       .eq('id', item.id)
       .select();
@@ -182,7 +181,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
     // @ts-expect-error - Supabase typing issue
-    const { data, error } = await checklistTable()
+    const { data, error } = await (checklistTable() as any)
       .update({ complete: !item.complete })
       .eq('id', item.id)
       .select();
@@ -195,7 +194,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const resetChecklist = async () => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
     // @ts-expect-error - Supabase typing issue
-    const { data, error } = await checklistTable()
+    const { data, error } = await (checklistTable() as any)
       .update({ complete: false })
       .in('id', allIds);
     if (!error) {
