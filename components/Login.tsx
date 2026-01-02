@@ -65,9 +65,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
 
       const user: User = {
-        username: profileData.username,
+        username: (profileData as any).username,
         password: '',
-        role: profileData.role,
+        role: (profileData as any).role,
         house: 'EPIC D1',
       };
 
