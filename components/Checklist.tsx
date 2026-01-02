@@ -179,7 +179,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const toggleMaintenance = async (idx: number) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
-    // @ts-expect-error - Supabase typing issue
     const { data, error } = await (checklistTable() as any)
       .update({ complete: !item.complete })
       .eq('id', item.id)
@@ -192,7 +191,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   // Reiniciar checklist (manager/dueno)
   const resetChecklist = async () => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
-    // @ts-expect-error - Supabase typing issue
     const { data, error } = await (checklistTable() as any)
       .update({ complete: false })
       .in('id', allIds);
