@@ -75,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return saved ? JSON.parse(saved) : defaultReminders;
   });
 
-  const showReminders = user.role === 'dueno' || user.role === 'manager';
+  const showReminders = user.role === 'owner' || user.role === 'manager';
 
   // Estado para casas dinámicas y usuarios sincronizados
   const [houses, setHouses] = useState<any[]>(() => {
@@ -130,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'shopping',
       title: 'Lista de Compras',
       desc: 'Agrega productos por comprar y gestiona compras realizadas.',
-      show: user.role === 'dueno' || user.role === 'manager' || user.role === 'empleado',
+      show: user.role === 'owner' || user.role === 'manager' || user.role === 'empleado',
     },
     {
       key: 'calendar',
@@ -142,7 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'reminders',
       title: 'Recordatorios',
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
-      show: user.role === 'dueno' || user.role === 'manager',
+      show: user.role === 'owner' || user.role === 'manager',
     },
     // Solo mostrar la tarjeta de seleccionar casa si NO es empleado
     {
@@ -155,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'users',
       title: 'Usuarios',
       desc: 'Administra roles: dueño, manager, empleado.',
-      show: user.role === 'dueno',
+      show: user.role === 'owner',
     },
   ];
 
@@ -330,7 +330,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <span className="dashboard-inventory-name">{item.name}</span>
                         <span className="dashboard-inventory-qty">x{item.qty}</span>
                         <div className="dashboard-inventory-actions">
-                          {(user.role === 'dueno' || user.role === 'manager') && (
+                          {(user.role === 'owner' || user.role === 'manager') && (
                             <>
                               <button className="dashboard-btn" onClick={() => { setEditShoppingIdx(idx); setNewProduct({ name: item.name, qty: item.qty }); }}>Editar</button>
                               <button className="dashboard-btn danger" onClick={() => deleteProduct(idx)}>Eliminar</button>
@@ -343,7 +343,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 ))}
               </div>
               <div className="dashboard-inventory-add-row">
-                {(user.role === 'empleado' || user.role === 'dueno' || user.role === 'manager') && (
+                {(user.role === 'empleado' || user.role === 'owner' || user.role === 'manager') && (
                   <form className="dashboard-inventory-add-form" onSubmit={addProduct}>
                     <input
                       type="text"
@@ -365,7 +365,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   </form>
                 )}
               </div>
-              {(user.role === 'dueno' || user.role === 'manager') && shoppingList.length > 0 && (
+              {(user.role === 'owner' || user.role === 'manager') && shoppingList.length > 0 && (
                 <button
                   className="dashboard-btn main"
                   style={{ marginTop: 16 }}
@@ -374,7 +374,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   Marcar compra como completada
                 </button>
               )}
-              {(user.role === 'dueno' || user.role === 'manager') && shoppingHistory.length > 0 && (
+              {(user.role === 'owner' || user.role === 'manager') && shoppingHistory.length > 0 && (
                 <div className="dashboard-inventory-history">
                   <h3>Historial de compras</h3>
                   <div className="dashboard-inventory-list">

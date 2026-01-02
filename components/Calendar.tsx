@@ -52,7 +52,7 @@ const Calendar = ({ users, user }: CalendarProps) => {
   };
 
   // Solo managers y dueños pueden agregar/eliminar
-  const canEdit = user.role === 'dueno' || user.role === 'manager';
+  const canEdit = user.role === 'owner' || user.role === 'manager';
   // Empleados solo ven sus asignaciones
   const visibleEvents = user.role === 'empleado' ? events.filter((ev: any) => ev.employee === user.username) : events;
 

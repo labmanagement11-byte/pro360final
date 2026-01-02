@@ -250,7 +250,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     }
   };
 
-  // Reiniciar inventario (manager/dueno)
+  // Reiniciar inventario (manager/owner)
   const resetInventory = async () => {
     // Actualizar todos los items en Supabase
     const ids = items.map(it => it.id);
@@ -277,7 +277,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     <div className="inventory-list ultra-checklist">
       <h2 className="ultra-checklist-title">Inventario EPIC D1</h2>
       {loading && <p className="ultra-task-text" style={{textAlign:'center'}}>Cargando inventario...</p>}
-      {!loading && (user.role === 'dueno' || user.role === 'manager') && (
+      {!loading && (user.role === 'owner' || user.role === 'manager') && (
         <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}>
           <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text" style={{minWidth:'120px'}} />
           <select id="inv-room-select" value={editIdx !== null ? editForm.room : form.room} onChange={e => editIdx !== null ? setEditForm({ ...editForm, room: e.target.value }) : setForm({ ...form, room: e.target.value })} title="Selecciona la habitación" className="ultra-task-text">
@@ -319,7 +319,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
                       )}
                     </div>
                   )}
-                  {(user.role === 'dueno' || user.role === 'manager') && (it.missing ?? 0) > 0 && (
+                  {(user.role === 'owner' || user.role === 'manager') && (it.missing ?? 0) > 0 && (
                     <span className="ultra-task-text" style={{color:'#e11d48',marginLeft:'0.7rem'}}>Reportado: Faltan {it.missing ?? 0}</span>
                   )}
                 </div>
@@ -328,7 +328,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
           </div>
         ))}
       </div>
-      {!loading && (user.role === 'dueno' || user.role === 'manager') && grouped.length > 0 && (
+      {!loading && (user.role === 'owner' || user.role === 'manager') && grouped.length > 0 && (
         <button onClick={resetInventory} className="ultra-reset-btn" style={{marginTop:'2rem'}}>Reiniciar Inventario</button>
       )}
     </div>

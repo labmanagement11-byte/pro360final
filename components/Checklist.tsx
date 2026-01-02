@@ -109,7 +109,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     };
     fetchChecklist();
   }, [user]);
-  // Asignar tarea a usuario (manager/dueno)
+  // Asignar tarea a usuario (manager/owner)
   const handleAssign = async (taskId: number, assignedTo: string) => {
     setLoading(true);
     await (checklistTable() as any).update({ assigned_to: assignedTo }).eq('id', taskId);
@@ -188,7 +188,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     }
   };
 
-  // Reiniciar checklist (manager/dueno)
+  // Reiniciar checklist (manager/owner)
   const resetChecklist = async () => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
     const { data, error } = await (checklistTable() as any)
@@ -217,7 +217,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
                     <span className="ultra-task-icon">{i.complete ? '✔️' : '🧹'}</span>
                     <span className="ultra-task-text">{i.item}</span>
                   </label>
-                  {(user.role === 'manager' || user.role === 'dueno') && users.length > 0 && (
+                  {(user.role === 'manager' || user.role === 'owner') && users.length > 0 && (
                     <select
                       value={i.assigned_to || ''}
                       onChange={e => handleAssign(i.id, e.target.value)}
@@ -262,7 +262,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
         </div>
       </div>
       </>}
-      {!loading && (user.role === 'dueno' || user.role === 'manager') && (
+      {!loading && (user.role === 'owner' || user.role === 'manager') && (
         <button onClick={resetChecklist} className="ultra-reset-btn">Reiniciar Checklist</button>
       )}
     </div>
