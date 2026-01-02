@@ -168,7 +168,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
-    // @ts-expect-error - Supabase typing issue with update method
     const { data, error } = await checklistTable()
       .update({ complete: !item.complete })
       .eq('id', item.id)
