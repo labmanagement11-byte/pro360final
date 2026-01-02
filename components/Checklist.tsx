@@ -65,6 +65,17 @@ const maintenanceTasks = [
 
 const CHECKLIST_KEY = 'dashboard_checklist'; // legacy, no longer usado
 
+// Definir tipo para los items del checklist
+interface ChecklistItem {
+  id: number;
+  house: string;
+  item: string;
+  complete: boolean;
+  room?: string;
+  assigned_to?: string | null;
+  due_date?: string | null;
+  created_at?: string;
+}
 
 // Recibe también la lista de usuarios para asignar tareas
 interface ChecklistProps {
@@ -72,8 +83,8 @@ interface ChecklistProps {
   users?: User[];
 }
 const Checklist = ({ user, users = [] }: ChecklistProps) => {
-  const [cleaning, setCleaning] = useState<any[]>([]);
-  const [maintenance, setMaintenance] = useState<any[]>([]);
+  const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
+  const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Cargar checklist desde Supabase
@@ -156,7 +167,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     if (!item || !item.id) return;
     const { data, error } = await supabase!
       .from('checklist')
-      // @ts-expect-error
       .update({ complete: !item.complete })
       .eq('id', item.id)
       .select();
@@ -170,7 +180,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     if (!item || !item.id) return;
     const { data, error } = await supabase!
       .from('checklist')
-      // @ts-expect-error
       .update({ complete: !item.complete })
       .eq('id', item.id)
       .select();
@@ -184,7 +193,6 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
     const { data, error } = await supabase!
       .from('checklist')
-      // @ts-expect-error
       .update({ complete: false })
       .in('id', allIds);
     if (!error) {
