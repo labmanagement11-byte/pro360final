@@ -136,21 +136,36 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   const [loading, setLoading] = useState(true);
 
   // Cargar inventario desde Supabase
+  const fetchInventory = async () => {
+    setLoading(true);
+    const { data, error } = await supabase!
+      .from('inventory')
+      .select('*')
+      .eq('house', 'EPIC D1');
+    if (!error && data) {
+      setItemsState(data);
+    } else {
+      setItemsState([]);
+    }
+    setLoading(false);
+  };
+
+  // Cargar inventario al montar y suscribirse a cambios en tiempo real
   useEffect(() => {
-    const fetchInventory = async () => {
-      setLoading(true);
-      const { data, error } = await supabase!
-        .from('inventory')
-        .select('*')
-        .eq('house', 'EPIC D1');
-      if (!error && data) {
-        setItemsState(data);
-      } else {
-        setItemsState([]);
-      }
-      setLoading(false);
-    };
     fetchInventory();
+
+    // Suscripción realtime a cambios en inventory
+    const channel = supabase!
+      .channel('inventory-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload: any) => {
+        console.log('Cambio en inventory:', payload);
+        fetchInventory();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, []);
 
   // Sync with external inventory if provided

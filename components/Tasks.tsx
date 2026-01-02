@@ -56,21 +56,36 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   });
 
   // Cargar tareas desde Supabase
+  const fetchTasks = async () => {
+    setLoading(true);
+    const { data, error } = await supabase!
+      .from('tasks')
+      .select('*')
+      .eq('house', user.house || 'EPIC D1');
+    if (!error && data) {
+      setTasksState(data);
+    } else {
+      setTasksState([]);
+    }
+    setLoading(false);
+  };
+
+  // Cargar tareas al montar y suscribirse a cambios en tiempo real
   useEffect(() => {
-    const fetchTasks = async () => {
-      setLoading(true);
-      const { data, error } = await supabase!
-        .from('tasks')
-        .select('*')
-        .eq('house', user.house || 'EPIC D1');
-      if (!error && data) {
-        setTasksState(data);
-      } else {
-        setTasksState([]);
-      }
-      setLoading(false);
-    };
     fetchTasks();
+
+    // Suscripción realtime a cambios en tasks
+    const channel = supabase!
+      .channel('tasks-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload: any) => {
+        console.log('Cambio en tasks:', payload);
+        fetchTasks();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [user.house]);
 
   // Agregar tarea a Supabase

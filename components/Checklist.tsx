@@ -88,43 +88,48 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const [loading, setLoading] = useState(true);
 
   // Cargar checklist desde Supabase
+  const fetchChecklist = async () => {
+    setLoading(true);
+    let query = checklistTable().select('*').eq('house', 'EPIC D1');
+    // Si es empleado, solo ve tareas asignadas a él o no asignadas
+    if (user.role === 'empleado') {
+      query = query.in('assigned_to', [user.username, null]);
+    }
+    const { data, error } = await query;
+    if (!error && data) {
+      const items = data as ChecklistItem[];
+      setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
+      setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
+    } else {
+      setCleaning([]);
+      setMaintenance([]);
+    }
+    setLoading(false);
+  };
+
+  // Cargar checklist al montar y suscribirse a cambios en tiempo real
   useEffect(() => {
-    const fetchChecklist = async () => {
-      setLoading(true);
-      let query = checklistTable().select('*').eq('house', 'EPIC D1');
-      // Si es empleado, solo ve tareas asignadas a él o no asignadas
-      if (user.role === 'empleado') {
-        query = query.in('assigned_to', [user.username, null]);
-      }
-      const { data, error } = await query;
-      if (!error && data) {
-        const items = data as ChecklistItem[];
-        setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
-        setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
-      } else {
-        setCleaning([]);
-        setMaintenance([]);
-      }
-      setLoading(false);
-    };
     fetchChecklist();
+
+    // Suscripción realtime a cambios en checklist
+    const channel = supabase
+      .channel('checklist-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist' }, (payload: any) => {
+        console.log('Cambio en checklist:', payload);
+        fetchChecklist();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [user]);
+
   // Asignar tarea a usuario (manager/owner)
   const handleAssign = async (taskId: number, assignedTo: string) => {
     setLoading(true);
     await (checklistTable() as any).update({ assigned_to: assignedTo }).eq('id', taskId);
-    // Refrescar checklist
-    const fetchChecklist = async () => {
-      let query = checklistTable().select('*').eq('house', 'EPIC D1');
-      if (user.role === 'empleado') {
-        query = query.in('assigned_to', [user.username, null]);
-      }
-      const { data } = await query;
-      const items = (data || []) as ChecklistItem[];
-      setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
-      setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
-    };
-    await fetchChecklist();
+    // Ya no es necesario refrescar manualmente, el realtime lo hará
     setLoading(false);
   };
 
