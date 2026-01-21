@@ -76,6 +76,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return saved ? JSON.parse(saved) : defaultReminders;
   });
 
+  // Estado para asignaciones de calendario
+  const CALENDAR_KEY = 'dashboard_calendar_assignments';
+  const [calendarAssignments, setCalendarAssignments] = useState<any[]>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(CALENDAR_KEY) : null;
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newAssignment, setNewAssignment] = useState({
+    employee: '',
+    date: '',
+    time: '',
+    type: 'Limpieza regular',
+  });
+
+  // Guardar asignaciones en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(CALENDAR_KEY, JSON.stringify(calendarAssignments));
+    }
+  }, [calendarAssignments]);
+
   const showReminders = user.role === 'owner' || user.role === 'manager';
 
   // Estado para casas dinámicas y usuarios sincronizados
@@ -561,41 +581,149 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             
             <div className="modal-body">
               {selectedModalCard === 'calendar' && (
-                <div className="subcards-grid">
-                  {reminders.length > 0 ? (
-                    <>
-                      <div className="modal-stats">
-                        <div className="stat-box">
-                          <p className="stat-box-number">{reminders.length}</p>
-                          <p className="stat-box-label">Próximas fechas</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{reminders.filter(r => new Date(r.due) < new Date()).length}</p>
-                          <p className="stat-box-label">Vencidas</p>
-                        </div>
-                      </div>
-                      {reminders.map((item, idx) => (
-                        <div key={idx} className="subcard">
-                          <div className="subcard-header">
-                            <div className="subcard-icon">📅</div>
-                            <h3>{item.name || 'Sin título'}</h3>
+                <>
+                  {/* Formulario de asignación */}
+                  {(user.role === 'owner' || user.role === 'manager') && (
+                    <div className="modal-assignment-form">
+                      <h3>Nueva Asignación</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        if (newAssignment.employee && newAssignment.date && newAssignment.time) {
+                          setCalendarAssignments([...calendarAssignments, {
+                            ...newAssignment,
+                            id: Date.now(),
+                            createdAt: new Date().toISOString()
+                          }]);
+                          setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
+                        }
+                      }}>
+                        <div className="assignment-form-grid">
+                          <div className="form-group">
+                            <label>Empleado</label>
+                            <select 
+                              value={newAssignment.employee}
+                              onChange={(e) => setNewAssignment({...newAssignment, employee: e.target.value})}
+                              required
+                            >
+                              <option value="">Seleccionar empleado</option>
+                              {users.filter(u => u.role === 'empleado' || u.role === 'manager').map((u, idx) => (
+                                <option key={idx} value={u.username}>{u.username}</option>
+                              ))}
+                            </select>
                           </div>
-                          <div className="subcard-content">
-                            <p><strong>Fecha:</strong> {new Date(item.due).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p><strong>Empleado:</strong> {item.employee || 'No asignado'}</p>
-                            <span className={`subcard-badge ${new Date(item.due) < new Date() ? 'danger' : 'success'}`}>
-                              {new Date(item.due) < new Date() ? '⚠️ Vencido' : '✅ Pendiente'}
-                            </span>
+                          
+                          <div className="form-group">
+                            <label>Fecha</label>
+                            <input
+                              type="date"
+                              value={newAssignment.date}
+                              onChange={(e) => setNewAssignment({...newAssignment, date: e.target.value})}
+                              required
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>Hora</label>
+                            <input
+                              type="time"
+                              value={newAssignment.time}
+                              onChange={(e) => setNewAssignment({...newAssignment, time: e.target.value})}
+                              required
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>Tipo de servicio</label>
+                            <select
+                              value={newAssignment.type}
+                              onChange={(e) => setNewAssignment({...newAssignment, type: e.target.value})}
+                              required
+                            >
+                              <option value="Limpieza regular">Limpieza regular</option>
+                              <option value="Limpieza profunda">Limpieza profunda</option>
+                              <option value="Mantenimiento">Mantenimiento</option>
+                            </select>
                           </div>
                         </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>
-                      <p>📭 No hay eventos programados</p>
+                        
+                        <button type="submit" className="dashboard-btn main">Asignar Horario</button>
+                      </form>
                     </div>
                   )}
-                </div>
+                  
+                  {/* Asignaciones actuales */}
+                  <div className="subcards-grid">
+                    {calendarAssignments.length > 0 ? (
+                      <>
+                        <div className="modal-stats">
+                          <div className="stat-box">
+                            <p className="stat-box-number">{calendarAssignments.length}</p>
+                            <p className="stat-box-label">Asignaciones totales</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">
+                              {calendarAssignments.filter(a => a.type === 'Limpieza profunda').length}
+                            </p>
+                            <p className="stat-box-label">Limpiezas profundas</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">
+                              {calendarAssignments.filter(a => a.type === 'Limpieza regular').length}
+                            </p>
+                            <p className="stat-box-label">Limpiezas regulares</p>
+                          </div>
+                        </div>
+                        
+                        {calendarAssignments
+                          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                          .map((assignment, idx) => (
+                          <div key={assignment.id || idx} className="subcard">
+                            <div className="subcard-header">
+                              <div className="subcard-icon">
+                                {assignment.type === 'Limpieza profunda' ? '🧹' : 
+                                 assignment.type === 'Limpieza regular' ? '✨' : '🔧'}
+                              </div>
+                              <h3>{assignment.employee}</h3>
+                            </div>
+                            <div className="subcard-content">
+                              <p><strong>📅 Fecha:</strong> {new Date(assignment.date).toLocaleDateString('es-ES', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              })}</p>
+                              <p><strong>🕐 Hora:</strong> {assignment.time}</p>
+                              <p><strong>🏠 Servicio:</strong> {assignment.type}</p>
+                              <span className={`subcard-badge ${
+                                assignment.type === 'Limpieza profunda' ? 'warning' : 
+                                assignment.type === 'Limpieza regular' ? 'success' : ''
+                              }`}>
+                                {assignment.type === 'Limpieza profunda' ? '🧹 Profunda' : 
+                                 assignment.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
+                              </span>
+                            </div>
+                            {(user.role === 'owner' || user.role === 'manager') && (
+                              <div className="subcard-actions">
+                                <button 
+                                  className="danger"
+                                  onClick={() => {
+                                    setCalendarAssignments(calendarAssignments.filter((_, i) => i !== idx));
+                                  }}
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="modal-body-empty">
+                        <p>📭 No hay asignaciones programadas</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               
               {selectedModalCard === 'shopping' && (
