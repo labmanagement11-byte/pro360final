@@ -117,20 +117,28 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
 
     if (!supabase) return;
 
-    console.log('📋 [Checklist] Iniciando suscripción realtime para casa:', user.house || 'EPIC D1');
+    const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
+    console.log('📋 [Checklist] Iniciando suscripción realtime para casa:', selectedHouse);
     
     // Suscripción realtime a cambios en checklist de esta casa
     // El canal se filtra por casa para que todos los managers y empleados de la misma casa
     // vean los cambios en tiempo real cuando se agrega, edita o completa una tarea
     const channel = supabase
-      .channel(`checklist-changes-${user.house || 'EPIC D1'}`)
+      .channel(`checklist-changes-${selectedHouse}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'checklist' 
+        table: 'checklist',
+        filter: `house=eq.${selectedHouse}`
       }, (payload: any) => {
-        console.log('⚡ [Checklist] Cambio en tiempo real:', payload);
-        // Refrescar el checklist cuando hay cambios
+        console.log('⚡ [Checklist] Cambio en tiempo real recibido:', {
+          event: payload.eventType,
+          item: payload.new?.item || payload.old?.item,
+          house: payload.new?.house || payload.old?.house,
+          usuario: user.username
+        });
+        
+        // Refrescar el checklist cuando hay cambios (INSERT, UPDATE, DELETE)
         fetchChecklist();
       })
       .subscribe((status) => {
