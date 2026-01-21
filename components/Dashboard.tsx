@@ -1719,8 +1719,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </>
                     )}
                   </div>
-                    )}
-                  </div>
                 </>
               )}
               
