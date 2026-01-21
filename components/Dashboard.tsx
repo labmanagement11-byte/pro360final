@@ -2140,7 +2140,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         (async () => {
                           try {
                             if (supabase) {
-                              const { data, error } = await supabase
+                              const { data, error } = await (supabase as any)
                                 .from('checklist')
                                 .insert([{
                                   house: selectedHouse,
@@ -2148,7 +2148,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   room: zona,
                                   complete: false,
                                   assigned_to: null
-                                } as any])
+                                }])
                                 .select();
                               
                               if (error) {
