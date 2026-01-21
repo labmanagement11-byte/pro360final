@@ -25,6 +25,7 @@ interface CalendarEvent {
 interface User {
   username: string;
   role: string;
+  house?: string; // Casa asignada (opcional)
 }
 interface CalendarProps {
   users: User[];
