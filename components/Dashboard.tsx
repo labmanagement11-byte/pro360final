@@ -763,36 +763,138 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'shopping' && (
-                <div className="subcards-grid">
-                  <div className="modal-stats">
-                    <div className="stat-box">
-                      <p className="stat-box-number">{shoppingList.length}</p>
-                      <p className="stat-box-label">Productos pendientes</p>
-                    </div>
-                    <div className="stat-box">
-                      <p className="stat-box-number">{shoppingList.reduce((sum, item) => sum + item.qty, 0)}</p>
-                      <p className="stat-box-label">Cantidad total</p>
-                    </div>
-                  </div>
-                  {shoppingList.length > 0 ? (
-                    shoppingList.map((item, idx) => (
-                      <div key={item.id || idx} className="subcard">
-                        <div className="subcard-header">
-                          <div className="subcard-icon">🛒</div>
-                          <h3>{item.name}</h3>
+                <>
+                  {/* Formulario para empleados agregar productos */}
+                  {(user.role === 'empleado' || user.role === 'manager' || user.role === 'owner') && (
+                    <div className="modal-assignment-form">
+                      <h3>🛒 Agregar a Lista de Compras</h3>
+                      <form onSubmit={addProduct}>
+                        <div className="assignment-form-grid">
+                          <div className="form-group">
+                            <label>📝 Producto</label>
+                            <input
+                              type="text"
+                              value={newProduct.name}
+                              onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                              required
+                              placeholder="Ej: Papel higiénico"
+                              title="Nombre del producto"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>🔢 Cantidad</label>
+                            <input
+                              type="number"
+                              value={newProduct.qty}
+                              min={1}
+                              onChange={(e) => setNewProduct({ ...newProduct, qty: Number(e.target.value) })}
+                              title="Cantidad"
+                              style={{width: '100%'}}
+                            />
+                          </div>
                         </div>
-                        <div className="subcard-content">
-                          <p><strong>Cantidad:</strong> {item.qty} unidades</p>
-                          <span className="subcard-badge success">✅ Listo para comprar</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="modal-body-empty">
-                      <p>🎉 No hay productos por comprar</p>
+                        
+                        <button type="submit" className="dashboard-btn main" style={{width: '100%'}}>
+                          ➕ Agregar a la Lista
+                        </button>
+                      </form>
                     </div>
                   )}
-                </div>
+                  
+                  <div className="subcards-grid">
+                    <div className="modal-stats">
+                      <div className="stat-box">
+                        <p className="stat-box-number">{shoppingList.length}</p>
+                        <p className="stat-box-label">Productos pendientes</p>
+                      </div>
+                      <div className="stat-box">
+                        <p className="stat-box-number">{shoppingList.reduce((sum, item) => sum + item.qty, 0)}</p>
+                        <p className="stat-box-label">Cantidad total</p>
+                      </div>
+                      <div className="stat-box">
+                        <p className="stat-box-number">{shoppingHistory.length}</p>
+                        <p className="stat-box-label">Compras realizadas</p>
+                      </div>
+                    </div>
+                    
+                    {shoppingList.length > 0 ? (
+                      shoppingList.map((item, idx) => (
+                        <div key={item.id || idx} className="subcard">
+                          <div className="subcard-header">
+                            <div className="subcard-icon">🛒</div>
+                            <h3>{item.name}</h3>
+                          </div>
+                          <div className="subcard-content">
+                            <p><strong>🔢 Cantidad:</strong> {item.qty} unidades</p>
+                            <span className="subcard-badge success">✅ Por comprar</span>
+                          </div>
+                          
+                          {/* Botón para manager: marcar como comprado */}
+                          {(user.role === 'owner' || user.role === 'manager') && (
+                            <div className="subcard-actions">
+                              <button 
+                                onClick={() => deleteProduct(idx)}
+                                className="danger"
+                              >
+                                🗑️ Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="modal-body-empty">
+                        <p>🎉 No hay productos por comprar</p>
+                      </div>
+                    )}
+                    
+                    {/* Botón para manager: Marcar toda la compra como completada */}
+                    {(user.role === 'owner' || user.role === 'manager') && shoppingList.length > 0 && (
+                      <div className="subcard-full-width" style={{padding: '1rem'}}>
+                        <button 
+                          className="dashboard-btn main" 
+                          onClick={completeShopping}
+                          style={{width: '100%', padding: '1rem', fontSize: '1.1rem'}}
+                        >
+                          ✅ Marcar Todo como Comprado
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Historial de compras (solo manager) */}
+                    {(user.role === 'owner' || user.role === 'manager') && shoppingHistory.length > 0 && (
+                      <>
+                        <div className="subcard-full-width" style={{marginTop: '2rem', borderTop: '3px solid #e5e7eb', paddingTop: '2rem'}}>
+                          <h3 style={{margin: '0 0 1rem 0', color: '#0284c7'}}>📋 Historial de Compras</h3>
+                        </div>
+                        
+                        {shoppingHistory.map((h, idx) => (
+                          <div key={h.id || idx} className="subcard">
+                            <div className="subcard-header">
+                              <div className="subcard-icon">📦</div>
+                              <h3>{h.completed_at ? new Date(h.completed_at).toLocaleDateString('es-ES') : 'Compra'}</h3>
+                            </div>
+                            <div className="subcard-content">
+                              <p><strong>📝 Producto:</strong> {h.name}</p>
+                              <p><strong>🔢 Cantidad:</strong> {h.qty}</p>
+                              <p><strong>📅 Fecha:</strong> {h.completed_at ? new Date(h.completed_at).toLocaleString('es-ES') : 'N/A'}</p>
+                              <span className="subcard-badge">✅ Comprado</span>
+                            </div>
+                            <div className="subcard-actions">
+                              <button 
+                                className="danger"
+                                onClick={() => deleteHistory(idx)}
+                              >
+                                🗑️ Eliminar del Historial
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </>
               )}
               
               {selectedModalCard === 'reminders' && (
@@ -956,33 +1058,197 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'inventory' && (
-                <div className="subcards-grid">
-                  <div className="modal-stats">
-                    <div className="stat-box">
-                      <p className="stat-box-number">{(houses[allowedHouseIdx]?.inventory || []).length}</p>
-                      <p className="stat-box-label">Artículos inventariados</p>
-                    </div>
-                  </div>
-                  {(houses[allowedHouseIdx]?.inventory || []).length > 0 ? (
-                    (houses[allowedHouseIdx]?.inventory || []).map((item: any, idx: number) => (
-                      <div key={idx} className="subcard">
-                        <div className="subcard-header">
-                          <div className="subcard-icon">📦</div>
-                          <h3>{item.name || 'Sin nombre'}</h3>
+                <>
+                  {/* Formulario para agregar inventario (Manager/Owner) */}
+                  {(user.role === 'owner' || user.role === 'manager') && (
+                    <div className="modal-assignment-form">
+                      <h3>📦 {editingInventoryIdx >= 0 ? 'Editar Artículo' : 'Agregar al Inventario'}</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const currentInventory = houses[allowedHouseIdx]?.inventory || [];
+                        const newItem = { ...newInventoryItem, complete: true, notes: '' };
+                        
+                        if (editingInventoryIdx >= 0) {
+                          const updatedInventory = currentInventory.map((item: any, i: number) => 
+                            i === editingInventoryIdx ? newItem : item
+                          );
+                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
+                          setEditingInventoryIdx(-1);
+                        } else {
+                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { 
+                            ...h, 
+                            inventory: [...currentInventory, newItem] 
+                          } : h));
+                        }
+                        setNewInventoryItem({ name: '', quantity: '', location: '', complete: true, notes: '' });
+                      }}>
+                        <div className="assignment-form-grid">
+                          <div className="form-group">
+                            <label>📝 Nombre del artículo</label>
+                            <input
+                              type="text"
+                              value={newInventoryItem.name}
+                              onChange={(e) => setNewInventoryItem({...newInventoryItem, name: e.target.value})}
+                              required
+                              placeholder="Ej: Toallas"
+                              title="Nombre del artículo"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>🔢 Cantidad</label>
+                            <input
+                              type="number"
+                              value={newInventoryItem.quantity}
+                              onChange={(e) => setNewInventoryItem({...newInventoryItem, quantity: e.target.value})}
+                              required
+                              min="1"
+                              placeholder="Ej: 10"
+                              title="Cantidad"
+                            />
+                          </div>
+                          
+                          <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                            <label>📍 Ubicación</label>
+                            <input
+                              type="text"
+                              value={newInventoryItem.location}
+                              onChange={(e) => setNewInventoryItem({...newInventoryItem, location: e.target.value})}
+                              required
+                              placeholder="Ej: Baño principal"
+                              title="Ubicación"
+                            />
+                          </div>
                         </div>
-                        <div className="subcard-content">
-                          <p><strong>Cantidad:</strong> {item.quantity || 0}</p>
-                          <p><strong>Ubicación:</strong> {item.location || 'No especificada'}</p>
-                          <span className="subcard-badge success">✅ Registrado</span>
+                        
+                        <div style={{display: 'flex', gap: '1rem'}}>
+                          <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
+                            {editingInventoryIdx >= 0 ? '✏️ Actualizar' : '➕ Agregar al Inventario'}
+                          </button>
+                          {editingInventoryIdx >= 0 && (
+                            <button 
+                              type="button" 
+                              className="dashboard-btn danger" 
+                              onClick={() => {
+                                setEditingInventoryIdx(-1);
+                                setNewInventoryItem({ name: '', quantity: '', location: '', complete: true, notes: '' });
+                              }}
+                            >
+                              ❌ Cancelar
+                            </button>
+                          )}
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="modal-body-empty">
-                      <p>📭 No hay artículos en el inventario</p>
+                      </form>
                     </div>
                   )}
-                </div>
+                  
+                  <div className="subcards-grid">
+                    <div className="modal-stats">
+                      <div className="stat-box">
+                        <p className="stat-box-number">{(houses[allowedHouseIdx]?.inventory || []).length}</p>
+                        <p className="stat-box-label">Artículos totales</p>
+                      </div>
+                      <div className="stat-box">
+                        <p className="stat-box-number">
+                          {(houses[allowedHouseIdx]?.inventory || []).filter((item: any) => item.complete).length}
+                        </p>
+                        <p className="stat-box-label">Completos</p>
+                      </div>
+                      <div className="stat-box">
+                        <p className="stat-box-number">
+                          {(houses[allowedHouseIdx]?.inventory || []).filter((item: any) => !item.complete).length}
+                        </p>
+                        <p className="stat-box-label">Incompletos</p>
+                      </div>
+                    </div>
+                    {(houses[allowedHouseIdx]?.inventory || []).length > 0 ? (
+                      (houses[allowedHouseIdx]?.inventory || []).map((item: any, idx: number) => (
+                        <div key={idx} className="subcard">
+                          <div className="subcard-header">
+                            <div className="subcard-icon">📦</div>
+                            <h3>{item.name || 'Sin nombre'}</h3>
+                          </div>
+                          <div className="subcard-content">
+                            <p><strong>🔢 Cantidad:</strong> {item.quantity || 0}</p>
+                            <p><strong>📍 Ubicación:</strong> {item.location || 'No especificada'}</p>
+                            {item.notes && (
+                              <p><strong>📝 Notas:</strong> {item.notes}</p>
+                            )}
+                            <span className={`subcard-badge ${item.complete ? 'success' : 'danger'}`}>
+                              {item.complete ? '✅ Completo' : '⚠️ Incompleto'}
+                            </span>
+                          </div>
+                          
+                          {/* Botones para empleados: marcar completo/incompleto */}
+                          {user.role === 'empleado' && (
+                            <div className="subcard-actions">
+                              {item.complete ? (
+                                <button 
+                                  className="danger"
+                                  onClick={() => {
+                                    const reason = prompt('¿Por qué está incompleto o cuántos faltan?');
+                                    if (reason) {
+                                      const updatedInventory = (houses[allowedHouseIdx]?.inventory || []).map((inv: any, i: number) => 
+                                        i === idx ? { ...inv, complete: false, notes: reason } : inv
+                                      );
+                                      setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
+                                    }
+                                  }}
+                                >
+                                  ⚠️ Marcar Incompleto
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => {
+                                    const updatedInventory = (houses[allowedHouseIdx]?.inventory || []).map((inv: any, i: number) => 
+                                      i === idx ? { ...inv, complete: true, notes: '' } : inv
+                                    );
+                                    setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
+                                  }}
+                                >
+                                  ✅ Marcar Completo
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Botones para manager: editar y eliminar */}
+                          {(user.role === 'owner' || user.role === 'manager') && (
+                            <div className="subcard-actions">
+                              <button 
+                                onClick={() => {
+                                  setNewInventoryItem({
+                                    name: item.name,
+                                    quantity: item.quantity.toString(),
+                                    location: item.location,
+                                    complete: item.complete,
+                                    notes: item.notes || ''
+                                  });
+                                  setEditingInventoryIdx(idx);
+                                }}
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button 
+                                className="danger"
+                                onClick={() => {
+                                  const updatedInventory = (houses[allowedHouseIdx]?.inventory || []).filter((_: any, i: number) => i !== idx);
+                                  setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
+                                }}
+                              >
+                                🗑️ Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="modal-body-empty">
+                        <p>📭 No hay artículos en el inventario</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               
               {selectedModalCard === 'tasks' && (
