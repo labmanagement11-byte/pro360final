@@ -13,7 +13,7 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +71,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         house: (profileData as any).house || 'EPIC D1',
       };
 
-      if (remember && typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));
       }
 
