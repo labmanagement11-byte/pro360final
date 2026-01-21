@@ -77,24 +77,37 @@ export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a tasks para house:', house);
     const supabase = getSupabaseClient();
-    const subscription = (supabase
-      .from('tasks') as any)
-      .on('*', (payload: any) => {
-        console.log('⚡ [Realtime Service] Evento recibido:', payload);
-        if (payload?.new?.house === house || payload?.old?.house === house) {
-          console.log('✅ [Realtime Service] Evento coincide con house, ejecutando callback');
-          callback(payload);
-        } else {
-          console.log('⚠️ [Realtime Service] Evento no coincide con house:', {
-            payloadHouse: payload?.new?.house || payload?.old?.house,
-            expectedHouse: house
-          });
-        }
-      })
-      .subscribe();
     
-    console.log('✅ [Realtime Service] Suscripción creada:', subscription);
-    return subscription;
+    const channel = supabase
+      .channel('tasks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          console.log('⚡ [Realtime Service] Evento recibido:', payload);
+          
+          // Mapear el evento al formato esperado
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          
+          console.log('✅ [Realtime Service] Ejecutando callback con:', mappedPayload);
+          callback(mappedPayload);
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Realtime Service] Estado de suscripción:', status);
+      });
+    
+    console.log('✅ [Realtime Service] Canal creado:', channel);
+    return channel;
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse:', error);
     return null;
@@ -247,17 +260,35 @@ export async function deleteInventoryItem(itemId: string) {
 }
 
 export function subscribeToInventory(house: string = 'EPIC D1', callback: (data: any) => void) {
-  const supabase = getSupabaseClient();
-  const subscription = (supabase
-    .from('inventory') as any)
-    .on('*', (payload: any) => {
-      if (payload?.new?.house === house || payload?.old?.house === house) {
-        callback(payload);
-      }
-    })
-    .subscribe();
-  
-  return subscription;
+  try {
+    const supabase = getSupabaseClient();
+    
+    const channel = supabase
+      .channel('inventory-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to inventory:', error);
+    return null;
+  }
 }
 
 // ==================== CALENDAR ASSIGNMENTS ====================
@@ -337,21 +368,40 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 }
 
 export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callback: (data: any) => void, employee?: string) {
-  const supabase = getSupabaseClient();
-  const subscription = (supabase
-    .from('calendar_assignments') as any)
-    .on('*', (payload: any) => {
-      const newHouse = payload?.new?.house === house;
-      const oldHouse = payload?.old?.house === house;
-      const matchesEmployee = !employee || payload?.new?.employee === employee || payload?.old?.employee === employee;
-      
-      if ((newHouse || oldHouse) && matchesEmployee) {
-        callback(payload);
-      }
-    })
-    .subscribe();
-  
-  return subscription;
+  try {
+    const supabase = getSupabaseClient();
+    
+    let filter = `house=eq.${house}`;
+    if (employee) {
+      filter += `,employee=eq.${employee}`;
+    }
+    
+    const channel = supabase
+      .channel('calendar-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_assignments',
+          filter: filter
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to calendar assignments:', error);
+    return null;
+  }
 }
 
 // ==================== SHOPPING LIST ====================
@@ -377,17 +427,35 @@ export async function getShoppingList(house: string = 'EPIC D1') {
 }
 
 export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
-  const supabase = getSupabaseClient();
-  const subscription = (supabase
-    .from('shopping_list') as any)
-    .on('*', (payload: any) => {
-      if (payload?.new?.house === house || payload?.old?.house === house) {
-        callback(payload);
-      }
-    })
-    .subscribe();
-  
-  return subscription;
+  try {
+    const supabase = getSupabaseClient();
+    
+    const channel = supabase
+      .channel('shopping-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shopping_list',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to shopping list:', error);
+    return null;
+  }
 }
 
 // ==================== Unsubscribe Helper ====================

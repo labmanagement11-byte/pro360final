@@ -329,7 +329,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return () => {
       try {
         console.log('🔌 Desconectando suscripción de tareas...');
-        subscription?.unsubscribe?.();
+        if (subscription) {
+          supabase?.removeChannel(subscription);
+        }
       } catch (error) {
         console.error('❌ Error unsubscribing from tasks:', error);
       }
@@ -371,7 +373,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
     return () => {
       try {
-        subscription?.unsubscribe?.();
+        if (subscription) {
+          supabase?.removeChannel(subscription);
+        }
       } catch (error) {
         console.error('Error unsubscribing from inventory:', error);
       }
@@ -420,7 +424,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
     return () => {
       try {
-        subscription?.unsubscribe?.();
+        if (subscription) {
+          supabase?.removeChannel(subscription);
+        }
       } catch (error) {
         console.error('Error unsubscribing from calendar:', error);
       }
