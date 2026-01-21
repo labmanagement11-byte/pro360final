@@ -253,20 +253,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   // IMPORTANTE: Limpiamos localStorage de casas para forzar que cargue desde Supabase
   // Esto garantiza que siempre tenga los nombres correctos, sin nombres antiguos
   const [houses, setHouses] = useState<any[]>(() => {
-    // Limpiar localStorage de casas al iniciar (para forzar carga desde Supabase)
+    // SIEMPRE limpiar localStorage de casas para forzar que cargue desde Supabase con valores correctos
     if (typeof window !== 'undefined') {
       localStorage.removeItem('dashboard_houses');
-      console.log('🧹 localStorage de casas limpiado al iniciar');
+      localStorage.removeItem('dashboard_selected_house_idx');
+      console.log('🧹 localStorage limpiado completamente al iniciar (casas + índice)');
     }
-    return [
-      { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: defaultUsers }
-    ];
+    // Iniciar con array vacío, loadHousesAndUsers llenará esto desde Supabase
+    return [];
   });
   // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
   const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
   const employeeHouseIdx = isRestrictedUser && user.house
     ? houses.findIndex(h => h.name === user.house)
     : -1;
+  
+  // LOG: Ver qué está pasando con la búsqueda de casa
+  if (isRestrictedUser) {
+    console.log(`👤 ${user.username} (${user.role}): buscando user.house="${user.house}" en houses=[${houses.map(h => `"${h.name}"`).join(', ')}], índice encontrado: ${employeeHouseIdx}`);
+  }
+  
   const [selectedHouseIdx, setSelectedHouseIdx] = useState(() => {
     if (employeeHouseIdx >= 0) return employeeHouseIdx;
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
@@ -516,13 +522,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       try {
         // Cargar casas (para TODOS los usuarios, para sincronizar nombres correctos)
         const housesData = await realtimeService.getHouses();
-        console.log('🏠 Casas cargadas desde Supabase:', housesData);
+        console.log('🏠 Casas cargadas desde Supabase (RAW):', housesData);
+        console.log('🏠 Casas cargadas - nombres específicamente:', housesData.map((h: any) => `id=${h.id}, name="${h.name}", houseName="${h.houseName}"`));
         if (housesData.length > 0) {
-          const mappedHouses = housesData.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] }));
+          const mappedHouses = housesData.map((h: any) => ({ 
+            name: h.name, 
+            id: h.id, 
+            houseName: h.name, 
+            tasks: [], 
+            inventory: [], 
+            users: [] 
+          }));
+          console.log('🏠 Casas mapeadas para estado:', mappedHouses);
           setHouses(mappedHouses);
           // Guardar en localStorage con los nombres correctos de Supabase
           if (typeof window !== 'undefined') {
             localStorage.setItem('dashboard_houses', JSON.stringify(mappedHouses));
+            console.log('💾 Casas guardadas en localStorage');
           }
         }
 
@@ -546,7 +562,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('🏠 Casas actualizadas (realtime):', housesArray);
         // subscribeToHouses ahora devuelve el array completo de casas
         if (Array.isArray(housesArray) && housesArray.length > 0) {
-          const mappedHouses = housesArray.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] }));
+          const mappedHouses = housesArray.map((h: any) => ({ 
+            name: h.name, 
+            id: h.id, 
+            houseName: h.name, 
+            tasks: [], 
+            inventory: [], 
+            users: [] 
+          }));
+          console.log('🏠 Casas mapeadas desde realtime:', mappedHouses);
           setHouses(mappedHouses);
           // Guardar en localStorage con los nombres correctos
           if (typeof window !== 'undefined') {
