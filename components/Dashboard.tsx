@@ -89,6 +89,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     type: 'Limpieza regular',
   });
 
+  // Estado para tareas en modal
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    assignedTo: '',
+    type: 'Limpieza general',
+  });
+  const [editingTaskIdx, setEditingTaskIdx] = useState(-1);
+
+  // Estado para recordatorios en modal
+  const [newReminder, setNewReminder] = useState({
+    name: '',
+    due: '',
+    bank: '',
+    account: '',
+  });
+  const [editingReminderIdx, setEditingReminderIdx] = useState(-1);
+
+  // Estado para inventario en modal
+  const [newInventoryItem, setNewInventoryItem] = useState({
+    name: '',
+    quantity: '',
+    location: '',
+    complete: true,
+    notes: '',
+  });
+  const [editingInventoryIdx, setEditingInventoryIdx] = useState(-1);
+
   // Guardar asignaciones en localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -768,34 +796,140 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'reminders' && (
-                <div className="subcards-grid">
-                  <div className="modal-stats">
-                    <div className="stat-box">
-                      <p className="stat-box-number">{reminders.length}</p>
-                      <p className="stat-box-label">Recordatorios activos</p>
-                    </div>
-                  </div>
-                  {reminders.length > 0 ? (
-                    reminders.map((item, idx) => (
-                      <div key={idx} className="subcard">
-                        <div className="subcard-header">
-                          <div className="subcard-icon">🔔</div>
-                          <h3>{item.name}</h3>
+                <>
+                  {/* Formulario para agregar/editar recordatorios (Manager/Owner) */}
+                  {(user.role === 'owner' || user.role === 'manager') && (
+                    <div className="modal-assignment-form">
+                      <h3>🔔 {editingReminderIdx >= 0 ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        if (editingReminderIdx >= 0) {
+                          setReminders(reminders.map((r, i) => i === editingReminderIdx ? newReminder : r));
+                          setEditingReminderIdx(-1);
+                        } else {
+                          setReminders([...reminders, newReminder]);
+                        }
+                        setNewReminder({ name: '', due: '', bank: '', account: '' });
+                      }}>
+                        <div className="assignment-form-grid">
+                          <div className="form-group">
+                            <label>💳 Nombre del pago</label>
+                            <input
+                              type="text"
+                              value={newReminder.name}
+                              onChange={(e) => setNewReminder({...newReminder, name: e.target.value})}
+                              required
+                              placeholder="Ej: Luz, Agua, Internet..."
+                              title="Nombre del pago"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>📅 Fecha de pago</label>
+                            <input
+                              type="date"
+                              value={newReminder.due}
+                              onChange={(e) => setNewReminder({...newReminder, due: e.target.value})}
+                              required
+                              title="Fecha de pago"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>🏦 Banco</label>
+                            <input
+                              type="text"
+                              value={newReminder.bank}
+                              onChange={(e) => setNewReminder({...newReminder, bank: e.target.value})}
+                              required
+                              placeholder="Ej: Banco Popular"
+                              title="Nombre del banco"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>🔢 Número de cuenta</label>
+                            <input
+                              type="text"
+                              value={newReminder.account}
+                              onChange={(e) => setNewReminder({...newReminder, account: e.target.value})}
+                              required
+                              placeholder="Ej: ****1234"
+                              title="Número de cuenta"
+                            />
+                          </div>
                         </div>
-                        <div className="subcard-content">
-                          <p><strong>Fecha:</strong> {item.due}</p>
-                          <p><strong>Banco:</strong> {item.bank}</p>
-                          <p><strong>Cuenta:</strong> {item.account}</p>
-                          <span className="subcard-badge">{item.bank}</span>
+                        
+                        <div style={{display: 'flex', gap: '1rem'}}>
+                          <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
+                            {editingReminderIdx >= 0 ? '✏️ Actualizar' : '➕ Agregar Recordatorio'}
+                          </button>
+                          {editingReminderIdx >= 0 && (
+                            <button 
+                              type="button" 
+                              className="dashboard-btn danger" 
+                              onClick={() => {
+                                setEditingReminderIdx(-1);
+                                setNewReminder({ name: '', due: '', bank: '', account: '' });
+                              }}
+                            >
+                              ❌ Cancelar
+                            </button>
+                          )}
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="modal-body-empty">
-                      <p>✨ No hay recordatorios pendientes</p>
+                      </form>
                     </div>
                   )}
-                </div>
+                  
+                  <div className="subcards-grid">
+                    <div className="modal-stats">
+                      <div className="stat-box">
+                        <p className="stat-box-number">{reminders.length}</p>
+                        <p className="stat-box-label">Recordatorios activos</p>
+                      </div>
+                    </div>
+                    {reminders.length > 0 ? (
+                      reminders.map((item, idx) => (
+                        <div key={idx} className="subcard">
+                          <div className="subcard-header">
+                            <div className="subcard-icon">🔔</div>
+                            <h3>{item.name}</h3>
+                          </div>
+                          <div className="subcard-content">
+                            <p><strong>📅 Fecha:</strong> {item.due}</p>
+                            <p><strong>🏦 Banco:</strong> {item.bank}</p>
+                            <p><strong>🔢 Cuenta:</strong> {item.account}</p>
+                            <span className="subcard-badge">{item.bank}</span>
+                          </div>
+                          {(user.role === 'owner' || user.role === 'manager') && (
+                            <div className="subcard-actions">
+                              <button 
+                                onClick={() => {
+                                  setNewReminder(item);
+                                  setEditingReminderIdx(idx);
+                                }}
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button 
+                                className="danger"
+                                onClick={() => {
+                                  setReminders(reminders.filter((_, i) => i !== idx));
+                                }}
+                              >
+                                🗑️ Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="modal-body-empty">
+                        <p>✨ No hay recordatorios pendientes</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               
               {selectedModalCard === 'checklist' && (
@@ -852,35 +986,185 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'tasks' && (
-                <div className="subcards-grid">
-                  <div className="modal-stats">
-                    <div className="stat-box">
-                      <p className="stat-box-number">{(houses[allowedHouseIdx]?.tasks || []).length}</p>
-                      <p className="stat-box-label">Tareas totales</p>
-                    </div>
-                  </div>
-                  {(houses[allowedHouseIdx]?.tasks || []).length > 0 ? (
-                    (houses[allowedHouseIdx]?.tasks || []).map((task: any, idx: number) => (
-                      <div key={idx} className="subcard">
-                        <div className="subcard-header">
-                          <div className="subcard-icon">📋</div>
-                          <h3>{task.title || 'Sin título'}</h3>
+                <>
+                  {/* Formulario para agregar tareas (Manager/Owner) */}
+                  {(user.role === 'owner' || user.role === 'manager') && (
+                    <div className="modal-assignment-form">
+                      <h3>📋 {editingTaskIdx >= 0 ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const currentTasks = houses[allowedHouseIdx]?.tasks || [];
+                        if (editingTaskIdx >= 0) {
+                          // Editar tarea existente
+                          const updatedTasks = currentTasks.map((t: any, i: number) => 
+                            i === editingTaskIdx ? { ...newTask, completed: false } : t
+                          );
+                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks: updatedTasks } : h));
+                          setEditingTaskIdx(-1);
+                        } else {
+                          // Agregar nueva tarea
+                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { 
+                            ...h, 
+                            tasks: [...currentTasks, { ...newTask, completed: false }] 
+                          } : h));
+                        }
+                        setNewTask({ title: '', description: '', assignedTo: '', type: 'Limpieza general' });
+                      }}>
+                        <div className="assignment-form-grid">
+                          <div className="form-group">
+                            <label>📝 Título de la tarea</label>
+                            <input
+                              type="text"
+                              value={newTask.title}
+                              onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+                              required
+                              placeholder="Ej: Limpiar sala"
+                              title="Título de la tarea"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>👤 Asignar a</label>
+                            <select 
+                              value={newTask.assignedTo}
+                              onChange={(e) => setNewTask({...newTask, assignedTo: e.target.value})}
+                              required
+                              title="Seleccionar empleado"
+                            >
+                              <option value="">Seleccionar empleado...</option>
+                              {users && users.length > 0 ? (
+                                users.filter(u => u.role === 'empleado' || u.role === 'manager').map((u, idx) => (
+                                  <option key={u.id || idx} value={u.username}>{u.username}</option>
+                                ))
+                              ) : (
+                                <option value="" disabled>No hay empleados</option>
+                              )}
+                            </select>
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>🏠 Tipo de tarea</label>
+                            <select
+                              value={newTask.type}
+                              onChange={(e) => setNewTask({...newTask, type: e.target.value})}
+                              required
+                              title="Tipo de tarea"
+                            >
+                              <option value="Limpieza general">✨ Limpieza general</option>
+                              <option value="Limpieza profunda">🧹 Limpieza profunda</option>
+                              <option value="Mantenimiento">🔧 Mantenimiento</option>
+                            </select>
+                          </div>
+                          
+                          <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                            <label>📄 Descripción</label>
+                            <textarea
+                              value={newTask.description}
+                              onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+                              placeholder="Descripción detallada de la tarea..."
+                              rows={3}
+                              style={{resize: 'vertical', padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb'}}
+                            />
+                          </div>
                         </div>
-                        <div className="subcard-content">
-                          <p><strong>Asignado a:</strong> {task.assignedTo || 'Sin asignar'}</p>
-                          <p><strong>Descripción:</strong> {task.description || 'Sin descripción'}</p>
-                          <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
-                            {task.completed ? '✅ Completada' : '⏳ Pendiente'}
-                          </span>
+                        
+                        <div style={{display: 'flex', gap: '1rem'}}>
+                          <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
+                            {editingTaskIdx >= 0 ? '✏️ Actualizar Tarea' : '➕ Agregar Tarea'}
+                          </button>
+                          {editingTaskIdx >= 0 && (
+                            <button 
+                              type="button" 
+                              className="dashboard-btn danger" 
+                              onClick={() => {
+                                setEditingTaskIdx(-1);
+                                setNewTask({ title: '', description: '', assignedTo: '', type: 'Limpieza general' });
+                              }}
+                            >
+                              ❌ Cancelar
+                            </button>
+                          )}
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="modal-body-empty">
-                      <p>🎉 No hay tareas asignadas</p>
+                      </form>
                     </div>
                   )}
-                </div>
+                  
+                  {/* Lista de tareas */}
+                  <div className="subcards-grid">
+                    {(houses[allowedHouseIdx]?.tasks || []).length > 0 ? (
+                      <>
+                        <div className="modal-stats">
+                          <div className="stat-box">
+                            <p className="stat-box-number">{(houses[allowedHouseIdx]?.tasks || []).length}</p>
+                            <p className="stat-box-label">Tareas totales</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">
+                              {(houses[allowedHouseIdx]?.tasks || []).filter((t: any) => t.completed).length}
+                            </p>
+                            <p className="stat-box-label">Completadas</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">
+                              {(houses[allowedHouseIdx]?.tasks || []).filter((t: any) => !t.completed).length}
+                            </p>
+                            <p className="stat-box-label">Pendientes</p>
+                          </div>
+                        </div>
+                        
+                        {(houses[allowedHouseIdx]?.tasks || []).map((task: any, idx: number) => (
+                          <div key={idx} className="subcard">
+                            <div className="subcard-header">
+                              <div className="subcard-icon">
+                                {task.type === 'Limpieza profunda' ? '🧹' : 
+                                 task.type === 'Limpieza general' ? '✨' : '🔧'}
+                              </div>
+                              <h3>{task.title || 'Sin título'}</h3>
+                            </div>
+                            <div className="subcard-content">
+                              <p><strong>👤 Asignado a:</strong> {task.assignedTo || 'Sin asignar'}</p>
+                              <p><strong>🏠 Tipo:</strong> {task.type}</p>
+                              <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
+                              <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
+                                {task.completed ? '✅ Completada' : '⏳ Pendiente'}
+                              </span>
+                            </div>
+                            {(user.role === 'owner' || user.role === 'manager') && (
+                              <div className="subcard-actions">
+                                <button 
+                                  onClick={() => {
+                                    setNewTask({
+                                      title: task.title,
+                                      description: task.description,
+                                      assignedTo: task.assignedTo,
+                                      type: task.type
+                                    });
+                                    setEditingTaskIdx(idx);
+                                  }}
+                                >
+                                  ✏️ Editar
+                                </button>
+                                <button 
+                                  className="danger"
+                                  onClick={() => {
+                                    const updatedTasks = (houses[allowedHouseIdx]?.tasks || []).filter((_: any, i: number) => i !== idx);
+                                    setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks: updatedTasks } : h));
+                                  }}
+                                >
+                                  🗑️ Eliminar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="modal-body-empty">
+                        <p>🎉 No hay tareas asignadas</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
