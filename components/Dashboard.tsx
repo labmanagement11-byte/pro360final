@@ -1941,7 +1941,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               onChange={(e) => setNewTask({...newTask, description: e.target.value})}
                               placeholder="Descripción detallada de la tarea..."
                               rows={3}
-                              style={{resize: 'vertical', padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb'}}
+                              style={{resize: 'vertical', padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb', color: '#111827', backgroundColor: '#ffffff'}}
                             />
                           </div>
                         </div>
