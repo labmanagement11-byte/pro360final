@@ -414,60 +414,6 @@ export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callba
   }
 }
 
-// ==================== SHOPPING LIST ====================
-export async function getShoppingList(house: string = 'EPIC D1') {
-  try {
-    const supabase = getSupabaseClient();
-    const { data, error } = await (supabase
-      .from('shopping_list') as any)
-      .select('*')
-      .eq('house', house)
-      .eq('completed', false)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching shopping list:', error);
-      return [];
-    }
-    return data || [];
-  } catch (error) {
-    console.error('Exception fetching shopping list:', error);
-    return [];
-  }
-}
-
-export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
-  try {
-    const supabase = getSupabaseClient();
-    
-    const channel = supabase
-      .channel('shopping-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shopping_list',
-          filter: `house=eq.${house}`
-        },
-        (payload: any) => {
-          const mappedPayload = {
-            eventType: payload.eventType,
-            new: payload.new,
-            old: payload.old
-          };
-          callback(mappedPayload);
-        }
-      )
-      .subscribe();
-    
-    return channel;
-  } catch (error) {
-    console.error('Error subscribing to shopping list:', error);
-    return null;
-  }
-}
-
 // ==================== CLEANING CHECKLIST ====================
 export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'EPIC D1') {
   const supabase = getSupabaseClient();
