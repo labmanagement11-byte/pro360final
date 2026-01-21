@@ -993,7 +993,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
       {/* Modal Tareas Extra (solo empleado) */}
       {selectedModalCard === 'extraTasks' && (
-        <div className="modal-overlay" onClick={() => setSelectedModalCard(null)}>
+        <div className="modal-overlay" onClick={() => setSelectedModalCard(null)} style={{zIndex: 2000}}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>🟦 Tareas Extra</h2>
