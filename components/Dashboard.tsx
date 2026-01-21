@@ -309,7 +309,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     });
 
     return () => {
-      if (subscription) supabase.removeSubscription(subscription);
+      if (subscription && supabase) supabase.removeSubscription(subscription);
     };
   }, []);
 
@@ -336,7 +336,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     });
 
     return () => {
-      if (subscription) supabase.removeSubscription(subscription);
+      if (subscription && supabase) supabase.removeSubscription(subscription);
     };
   }, []);
 
@@ -370,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     );
 
     return () => {
-      if (subscription) supabase.removeSubscription(subscription);
+      if (subscription && supabase) supabase.removeSubscription(subscription);
     };
   }, [user.role, user.username]);
 
