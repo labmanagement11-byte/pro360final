@@ -250,9 +250,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
 
   // Casas y selección de casa
+  // IMPORTANTE: No cargamos nombres de casas desde localStorage porque puede tener nombres antiguos
+  // Los nombres SIEMPRE se cargan desde Supabase para garantizar consistencia
   const [houses, setHouses] = useState<any[]>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
-    return saved ? JSON.parse(saved) : [
+    // Limpiar localStorage si tiene nombres antiguos
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboard_houses');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Si encuentra nombres antiguos, limpiar
+          if (parsed.some((h: any) => h.name && h.name.includes('YNTIBA') && !h.name.includes('HYNTIBA'))) {
+            console.log('🧹 Limpiando localStorage con nombres antiguos de casas');
+            localStorage.removeItem('dashboard_houses');
+          }
+        } catch (e) {
+          console.log('Error al parsear localStorage de casas, limpiando');
+          localStorage.removeItem('dashboard_houses');
+        }
+      }
+    }
+    return [
       { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: defaultUsers }
     ];
   });
@@ -510,9 +528,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       try {
         // Cargar casas (para TODOS los usuarios, para sincronizar nombres correctos)
         const housesData = await realtimeService.getHouses();
-        console.log('🏠 Casas cargadas:', housesData);
+        console.log('🏠 Casas cargadas desde Supabase:', housesData);
         if (housesData.length > 0) {
-          setHouses(housesData.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] })));
+          const mappedHouses = housesData.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] }));
+          setHouses(mappedHouses);
+          // Guardar en localStorage con los nombres correctos de Supabase
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('dashboard_houses', JSON.stringify(mappedHouses));
+          }
         }
 
         // Cargar usuarios solo si es jonathan
@@ -535,7 +558,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('🏠 Casas actualizadas (realtime):', housesArray);
         // subscribeToHouses ahora devuelve el array completo de casas
         if (Array.isArray(housesArray) && housesArray.length > 0) {
-          setHouses(housesArray.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] })));
+          const mappedHouses = housesArray.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] }));
+          setHouses(mappedHouses);
+          // Guardar en localStorage con los nombres correctos
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('dashboard_houses', JSON.stringify(mappedHouses));
+          }
         }
       });
 
