@@ -1128,7 +1128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           </ul>
         </div>
       )}
-      {view === 'house' && !isEmployee && (
+      {view === 'house' && !isRestrictedUser && (
         <div className="house-selector">
           <h2 className="house-title">Seleccionar Casa</h2>
           <div className="house-cards">
