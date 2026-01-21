@@ -2134,7 +2134,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         
                         if (!taskText.trim() || !zona) return;
                         
-                        // Agregar tarea a la zona seleccionada
+                        const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
+                        
+                        // Agregar tarea a Supabase para sincronización en tiempo real
+                        (async () => {
+                          try {
+                            const { data, error } = await supabase
+                              .from('checklist')
+                              .insert([{
+                                house: selectedHouse,
+                                item: taskText,
+                                room: zona,
+                                complete: false,
+                                assigned_to: null
+                              }])
+                              .select();
+                            
+                            if (error) {
+                              console.error('❌ Error agregando tarea al checklist:', error);
+                            } else {
+                              console.log('✅ Tarea agregada al checklist de', selectedHouse, ':', taskText);
+                            }
+                          } catch (error) {
+                            console.error('❌ Error en insert checklist:', error);
+                          }
+                        })();
+                        
+                        // También actualizar el estado local para UI inmediata
                         const updatedZone = {
                           ...checklistData[zona],
                           tasks: [...(checklistData[zona]?.tasks || []), { text: taskText, completed: false }]
