@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
+import * as realtimeService from '../utils/supabaseRealtimeService';
 
 import Tasks from './Tasks';
 import Inventory from './Inventory';
@@ -184,12 +185,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return saved ? JSON.parse(saved) : defaultReminders;
   });
 
-  // Estado para asignaciones de calendario
+  // Estado para asignaciones de calendario - AHORA CON SUPABASE
   const CALENDAR_KEY = 'dashboard_calendar_assignments';
-  const [calendarAssignments, setCalendarAssignments] = useState<any[]>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem(CALENDAR_KEY) : null;
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [calendarAssignments, setCalendarAssignments] = useState<any[]>([]);
+  const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [newAssignment, setNewAssignment] = useState({
     employee: '',
     date: '',
@@ -197,7 +196,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     type: 'Limpieza regular',
   });
 
-  // Estado para tareas en modal
+  // Estado para tareas en modal - AHORA CON SUPABASE
+  const [tasksList, setTasksList] = useState<any[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -215,7 +216,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
   const [editingReminderIdx, setEditingReminderIdx] = useState(-1);
 
-  // Estado para inventario en modal
+  // Estado para inventario en modal - AHORA CON SUPABASE
+  const [inventoryList, setInventoryList] = useState<any[]>([]);
+  const [loadingInventory, setLoadingInventory] = useState(true);
   const [newInventoryItem, setNewInventoryItem] = useState({
     name: '',
     quantity: '',
@@ -283,12 +286,93 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return initial;
   });
 
-  // Guardar asignaciones en localStorage
+  // Cargar tareas desde Supabase con suscripción en tiempo real
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(CALENDAR_KEY, JSON.stringify(calendarAssignments));
-    }
-  }, [calendarAssignments]);
+    const loadTasks = async () => {
+      setLoadingTasks(true);
+      const tasks = await realtimeService.getTasks('EPIC D1');
+      setTasksList(tasks);
+      setLoadingTasks(false);
+    };
+
+    loadTasks();
+
+    // Suscribirse a cambios en tiempo real
+    const subscription = realtimeService.subscribeToTasks('EPIC D1', (payload) => {
+      if (payload.eventType === 'INSERT') {
+        setTasksList(prev => [...prev, payload.new]);
+      } else if (payload.eventType === 'UPDATE') {
+        setTasksList(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
+      } else if (payload.eventType === 'DELETE') {
+        setTasksList(prev => prev.filter(t => t.id !== payload.old.id));
+      }
+    });
+
+    return () => {
+      if (subscription) supabase.removeSubscription(subscription);
+    };
+  }, []);
+
+  // Cargar inventario desde Supabase con suscripción en tiempo real
+  useEffect(() => {
+    const loadInventory = async () => {
+      setLoadingInventory(true);
+      const items = await realtimeService.getInventoryItems('EPIC D1');
+      setInventoryList(items);
+      setLoadingInventory(false);
+    };
+
+    loadInventory();
+
+    // Suscribirse a cambios en tiempo real
+    const subscription = realtimeService.subscribeToInventory('EPIC D1', (payload) => {
+      if (payload.eventType === 'INSERT') {
+        setInventoryList(prev => [...prev, payload.new]);
+      } else if (payload.eventType === 'UPDATE') {
+        setInventoryList(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
+      } else if (payload.eventType === 'DELETE') {
+        setInventoryList(prev => prev.filter(i => i.id !== payload.old.id));
+      }
+    });
+
+    return () => {
+      if (subscription) supabase.removeSubscription(subscription);
+    };
+  }, []);
+
+  // Cargar asignaciones de calendario desde Supabase con suscripción en tiempo real
+  useEffect(() => {
+    const loadCalendarAssignments = async () => {
+      setLoadingCalendar(true);
+      // Si es empleado, cargar solo sus asignaciones
+      const assignments = user.role === 'empleado' 
+        ? await realtimeService.getCalendarAssignments('EPIC D1', user.username)
+        : await realtimeService.getCalendarAssignments('EPIC D1');
+      setCalendarAssignments(assignments);
+      setLoadingCalendar(false);
+    };
+
+    loadCalendarAssignments();
+
+    // Suscribirse a cambios en tiempo real
+    const subscription = realtimeService.subscribeToCalendarAssignments(
+      'EPIC D1',
+      user.role === 'empleado' ? user.username : undefined,
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setCalendarAssignments(prev => [...prev, payload.new]);
+        } else if (payload.eventType === 'UPDATE') {
+          setCalendarAssignments(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
+        } else if (payload.eventType === 'DELETE') {
+          setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old.id));
+        }
+      }
+    );
+
+    return () => {
+      if (subscription) supabase.removeSubscription(subscription);
+    };
+  }, [user.role, user.username]);
 
   // Guardar checklist en localStorage
   useEffect(() => {
@@ -1680,22 +1764,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {(user.role === 'owner' || user.role === 'manager') && (
                     <div className="modal-assignment-form">
                       <h3>📋 {editingTaskIdx >= 0 ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
-                      <form onSubmit={(e) => {
+                      <form onSubmit={async (e) => {
                         e.preventDefault();
-                        const currentTasks = houses[allowedHouseIdx]?.tasks || [];
+                        
                         if (editingTaskIdx >= 0) {
                           // Editar tarea existente
-                          const updatedTasks = currentTasks.map((t: any, i: number) => 
-                            i === editingTaskIdx ? { ...newTask, completed: false } : t
-                          );
-                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks: updatedTasks } : h));
+                          await realtimeService.updateTask(tasksList[editingTaskIdx].id, {
+                            title: newTask.title,
+                            description: newTask.description,
+                            assignedTo: newTask.assignedTo,
+                            type: newTask.type
+                          });
                           setEditingTaskIdx(-1);
                         } else {
                           // Agregar nueva tarea
-                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { 
-                            ...h, 
-                            tasks: [...currentTasks, { ...newTask, completed: false }] 
-                          } : h));
+                          await realtimeService.createTask({
+                            title: newTask.title,
+                            description: newTask.description,
+                            assignedTo: newTask.assignedTo,
+                            type: newTask.type,
+                            house: 'EPIC D1',
+                            createdBy: user.username
+                          });
                         }
                         setNewTask({ title: '', description: '', assignedTo: '', type: 'Limpieza general' });
                       }}>
@@ -1780,29 +1870,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   
                   {/* Lista de tareas */}
                   <div className="subcards-grid">
-                    {(houses[allowedHouseIdx]?.tasks || []).length > 0 ? (
+                    {loadingTasks ? (
+                      <div className="modal-body-empty"><p>Cargando tareas...</p></div>
+                    ) : tasksList.length > 0 ? (
                       <>
                         <div className="modal-stats">
                           <div className="stat-box">
-                            <p className="stat-box-number">{(houses[allowedHouseIdx]?.tasks || []).length}</p>
+                            <p className="stat-box-number">{tasksList.length}</p>
                             <p className="stat-box-label">Tareas totales</p>
                           </div>
                           <div className="stat-box">
                             <p className="stat-box-number">
-                              {(houses[allowedHouseIdx]?.tasks || []).filter((t: any) => t.completed).length}
+                              {tasksList.filter((t: any) => t.completed).length}
                             </p>
                             <p className="stat-box-label">Completadas</p>
                           </div>
                           <div className="stat-box">
                             <p className="stat-box-number">
-                              {(houses[allowedHouseIdx]?.tasks || []).filter((t: any) => !t.completed).length}
+                              {tasksList.filter((t: any) => !t.completed).length}
                             </p>
                             <p className="stat-box-label">Pendientes</p>
                           </div>
                         </div>
                         
-                        {(houses[allowedHouseIdx]?.tasks || []).map((task: any, idx: number) => (
-                          <div key={idx} className="subcard">
+                        {tasksList.map((task: any, idx: number) => (
+                          <div key={task.id} className="subcard">
                             <div className="subcard-header">
                               <div className="subcard-icon">
                                 {task.type === 'Limpieza profunda' ? '🧹' : 
@@ -1825,7 +1917,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   onClick={() => {
                                     setSelectedTaskMaintenance({ ...task, taskIdx: idx });
                                     // Inicializar checklist para esta tarea si no existe
-                                    const taskKey = `task_${idx}_maintenance`;
+                                    const taskKey = `task_${task.id}_maintenance`;
                                     if (!taskMaintenanceData[taskKey]) {
                                       const newData: any = {};
                                       Object.keys(MANTENIMIENTO).forEach(zona => {
@@ -1863,9 +1955,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   </button>
                                   <button 
                                     className="danger"
-                                    onClick={() => {
-                                      const updatedTasks = (houses[allowedHouseIdx]?.tasks || []).filter((_: any, i: number) => i !== idx);
-                                      setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks: updatedTasks } : h));
+                                    onClick={async () => {
+                                      await realtimeService.deleteTask(task.id);
                                     }}
                                   >
                                     🗑️ Eliminar
