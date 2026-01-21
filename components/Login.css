@@ -7,7 +7,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.25)), url('/FONDO2.png');
+  background-size: 15%;
+  background-position: center;
+  background-repeat: repeat;
+  background-attachment: fixed;
+  background-color: #0b1221;
   position: relative;
   padding: 1.5rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -20,8 +25,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
-              radial-gradient(circle at 80% 80%, rgba(99, 102, 241, 0.3), transparent 50%);
+  background: none;
   pointer-events: none;
 }
 
@@ -31,11 +35,12 @@
 }
 
 .login-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: transparent;
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   border-radius: 2rem;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+              0 0 0 1px rgba(255, 255, 255, 0.2) inset;
   padding: 3.5rem 3rem;
   text-align: center;
   position: relative;
@@ -124,14 +129,14 @@
 .login-title {
   font-size: 2rem;
   font-weight: 800;
-  color: #1f2937;
+  color: #f9fafb;
   margin-bottom: 0.5rem;
   letter-spacing: -0.75px;
 }
 
 .login-subtitle {
   font-size: 1rem;
-  color: #6b7280;
+  color: rgba(241, 245, 249, 0.85);
   margin-bottom: 0;
   font-weight: 400;
 }
@@ -156,7 +161,7 @@
 .login-input-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: #f8fafc;
   letter-spacing: 0.025em;
 }
 
@@ -164,27 +169,27 @@
 .login-form-modern select {
   width: 100%;
   padding: 0.875rem 1.125rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid rgba(255, 255, 255, 0.45);
   border-radius: 1rem;
   font-size: 1rem;
-  background: #ffffff;
-  color: #111827;
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-weight: 600;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .login-form-modern input::placeholder {
-  color: #9ca3af;
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 400;
 }
 
 .login-form-modern input:focus,
 .login-form-modern select:focus {
   outline: none;
-  border-color: #667eea;
-  background: white;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1),
-              0 1px 3px rgba(0, 0, 0, 0.1);
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 4px rgba(215, 226, 255, 0.12),
+              0 1px 6px rgba(0, 0, 0, 0.18);
   transform: translateY(-1px);
 }
 
@@ -280,7 +285,7 @@
   align-items: center;
   gap: 0.625rem;
   font-size: 0.9375rem;
-  color: #4b5563;
+  color: rgba(248, 250, 252, 0.8);
   font-weight: 500;
   cursor: pointer;
   padding: 0.25rem 0;

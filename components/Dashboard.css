@@ -14,6 +14,23 @@
   --color-text-secondary: #4b5563;
 }
 
+/* ============================================
+   FONDO DASHBOARD
+   ============================================ */
+
+html,
+body,
+#root,
+.dashboard-container {
+  background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.1)), url('/FONDO.png');
+  background-size: 50%;
+  background-position: center;
+  background-repeat: repeat;
+  background-attachment: fixed;
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
 /* Centrado para el mensaje de carga del checklist */
 .ultra-task-loading {
   text-align: center;

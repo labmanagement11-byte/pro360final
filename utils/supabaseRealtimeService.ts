@@ -1089,6 +1089,11 @@ export async function createReminder(reminder: any) {
 export async function getReminders(house: string = 'EPIC D1') {
   try {
     const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.warn('Supabase client not available, using local reminders');
+      return [];
+    }
+    
     const { data, error } = await (supabase
       .from('reminders') as any)
       .select('*')
@@ -1096,7 +1101,7 @@ export async function getReminders(house: string = 'EPIC D1') {
       .order('due_date', { ascending: true });
     
     if (error) {
-      console.error('Error fetching reminders:', error);
+      console.warn('Reminders table might not exist, using fallback:', error?.message);
       return [];
     }
     // Mapear campos snake_case a camelCase
@@ -1106,7 +1111,7 @@ export async function getReminders(house: string = 'EPIC D1') {
       invoiceNumber: r.invoice_number
     }));
   } catch (error) {
-    console.error('Exception fetching reminders:', error);
+    console.warn('Exception fetching reminders, using fallback:', error);
     return [];
   }
 }
