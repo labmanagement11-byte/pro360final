@@ -35,4 +35,5 @@ async function createOrResetUser(email, password, role, username) {
 (async () => {
   await createOrResetUser('galindo123@email.com', 'galindo123', 'dueno', 'galindo123');
   await createOrResetUser('alejandra@email.com', 'vela123', 'manager', 'Alejandra');
+  await createOrResetUser('jonathan@email.com', 'jonathan123', 'dueno', 'Jonathan');
 })();

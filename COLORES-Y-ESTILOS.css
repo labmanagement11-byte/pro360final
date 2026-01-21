@@ -1,0 +1,286 @@
+/* ============================================
+   REFERENCIA RÁPIDA DE COLORES Y ESTILOS
+   ============================================ */
+
+/* IMPORTAR EN TUS ARCHIVOS SCSS/CSS */
+/* @import './app/modern-design-system.css'; */
+
+/* ============================================
+   COLORES DISPONIBLES (Variables CSS)
+   ============================================ */
+
+:root {
+  /* Primarios - El azul es profesional y confiable */
+  --primary-dark: #0f172a;      /* Fondo muy oscuro */
+  --primary: #0284c7;           /* AZUL PRINCIPAL - Úsalo en botones, bordes */
+  --primary-light: #0ea5e9;     /* Azul claro - Gradientes */
+  --primary-lighter: #38bdf8;   /* Azul más claro - Acentos */
+  
+  /* Secundarios - Teal verde profesional */
+  --secondary: #0d9488;         /* Verde principal */
+  --secondary-light: #14b8a6;   /* Verde claro */
+  --secondary-lighter: #2dd4bf; /* Verde más claro */
+  
+  /* Estados - Universales */
+  --success: #10b981;           /* Verde éxito */
+  --warning: #f59e0b;           /* Naranja alerta */
+  --danger: #ef4444;            /* Rojo peligro */
+  --info: #3b82f6;              /* Azul información */
+  
+  /* Grises - Para fondos y textos */
+  --neutral-50: #f9fafb;        /* Blanco muy suave */
+  --neutral-100: #f3f4f6;       /* Fondo secundario claro */
+  --neutral-200: #e5e7eb;       /* Bordes */
+  --neutral-300: #d1d5db;       /* Bordes fuertes */
+  --neutral-400: #9ca3af;       /* Texto deshabilitado */
+  --neutral-500: #6b7280;       /* Texto terciario */
+  --neutral-600: #4b5563;       /* Texto secundario */
+  --neutral-700: #374151;       /* Texto fuerte */
+  --neutral-800: #1f2937;       /* Texto muy fuerte */
+  --neutral-900: #111827;       /* Negro casi puro */
+  
+  /* Fondos */
+  --bg-primary: #ffffff;        /* Fondo principal (blanco) */
+  --bg-secondary: #f9fafb;      /* Fondo secundario (gris muy suave) */
+  --bg-tertiary: #f3f4f6;       /* Fondo terciario (gris claro) */
+  
+  /* Textos */
+  --text-primary: #111827;      /* Texto principal (negro) */
+  --text-secondary: #4b5563;    /* Texto secundario (gris medio) */
+  --text-tertiary: #6b7280;     /* Texto terciario (gris claro) */
+  --text-light: #ffffff;        /* Texto sobre fondos oscuros */
+}
+
+/* ============================================
+   EJEMPLOS DE USO EN TUS COMPONENTES
+   ============================================ */
+
+/* BOTÓN PRIMARIO - Gradiente azul */
+.mi-boton-principal {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: var(--text-light);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3); /* Sombra azul */
+}
+
+/* BOTÓN DE ÉXITO - Verde */
+.mi-boton-exito {
+  background: var(--success);
+  color: var(--text-light);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* BOTÓN DE PELIGRO - Rojo */
+.mi-boton-peligro {
+  background: var(--danger);
+  color: var(--text-light);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* INPUT/TEXTAREA */
+.mi-input {
+  border: 2px solid var(--neutral-200);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.mi-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+}
+
+/* TARJETA */
+.mi-tarjeta {
+  background: var(--bg-primary);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+/* FONDO SECUNDARIO */
+.mi-fondo-secundario {
+  background: var(--bg-secondary);
+  border-radius: 1rem;
+}
+
+/* TEXTO DESHABILITADO */
+.texto-deshabilitado {
+  color: var(--neutral-400);
+}
+
+/* BADGE DE ALERTA */
+.badge-alerta {
+  background: rgba(245, 158, 11, 0.15); /* Naranja muy suave */
+  color: #92400e; /* Naranja oscuro */
+}
+
+/* BADGE DE ÉXITO */
+.badge-exito {
+  background: rgba(16, 185, 129, 0.15); /* Verde muy suave */
+  color: #065f46; /* Verde oscuro */
+}
+
+/* ============================================
+   SOMBRAS DISPONIBLES
+   ============================================ */
+
+/* Sombra XS - Muy sutil */
+box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+/* Sombra SM - Sutil */
+box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+
+/* Sombra MD - Estándar en hover */
+box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+
+/* Sombra LG - Para elementos destacados */
+box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+/* Sombra XL - Para modales */
+box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+/* ============================================
+   BORDER-RADIUS DISPONIBLES
+   ============================================ */
+
+--radius-sm: 0.375rem;    /* 6px - Para inputs pequeños */
+--radius-md: 0.5rem;      /* 8px - Para inputs normales */
+--radius-lg: 0.75rem;     /* 12px - Para botones */
+--radius-xl: 1rem;        /* 16px - Para tarjetas */
+--radius-2xl: 1.5rem;     /* 24px - Para headers grandes */
+
+/* ============================================
+   TRANSICIONES DISPONIBLES
+   ============================================ */
+
+/* Rápida - 150ms */
+transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+/* Base - 200ms (recomendada) */
+transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+/* Lenta - 300ms */
+transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+/* ============================================
+   GRADIENTES LISTOS PARA USAR
+   ============================================ */
+
+/* Gradiente azul (recomendado) */
+background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+
+/* Gradiente rojo */
+background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+
+/* Gradiente verde */
+background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+
+/* Gradiente naranja */
+background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+
+/* ============================================
+   TIPS DE USABILIDAD
+   ============================================ */
+
+/*
+1. SIEMPRE USA VAR() PARA COLORES
+   ✅ color: var(--primary);
+   ❌ color: #0284c7;
+   
+2. RESPETA EL CONTRASTE
+   ✅ Texto oscuro sobre fondo claro
+   ✅ Texto claro sobre fondo oscuro
+   ❌ Gris medio sobre gris claro
+   
+3. TRANSICIONES EN TODO
+   ✅ buttons, links, inputs en hover
+   ✅ cards en hover
+   ❌ No abuses - máximo 0.3s
+   
+4. SOMBRAS PARA JERARQUÍA
+   ✅ Sin sombra: Fondo
+   ✅ Sombra SM: Normal
+   ✅ Sombra MD: Hover
+   ✅ Sombra LG: Elemento importante
+   ✅ Sombra XL: Modal/Overlay
+   
+5. ESPACIADO CONSISTENTE
+   ✅ Usa múltiplos de 0.5rem (8px)
+   ✅ 1rem, 1.5rem, 2rem, etc.
+   ❌ Números aleatorios como 13px
+   
+6. TIPOGRAFÍA CLARA
+   ✅ Font-size: 1rem (16px base)
+   ✅ Line-height: 1.6
+   ✅ Letter-spacing: -0.25px
+   ❌ Fuentes abajo de 14px en mobile
+   
+7. MOBILE PRIMERO
+   ✅ Diseña para mobile, amplía a desktop
+   ✅ Padding: 1rem en mobile, 2rem en desktop
+   ✅ Font-size: adapt with clamp()
+   ❌ Esconder elementos solo en mobile
+*/
+
+/* ============================================
+   COMPONENTES LISTOS PARA COPIAR
+   ============================================ */
+
+/* BOTÓN SIMPLE PROFESIONAL */
+.boton-pro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  border: none;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: var(--text-light);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.boton-pro:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+}
+
+/* TARJETA SIMPLE PROFESIONAL */
+.tarjeta-pro {
+  background: var(--bg-primary);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tarjeta-pro:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* INPUT SIMPLE PROFESIONAL */
+.input-pro {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--neutral-200);
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.input-pro:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+}
+
+.input-pro::placeholder {
+  color: var(--text-tertiary);
+}
