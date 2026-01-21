@@ -717,6 +717,241 @@ export function subscribeToChecklist(assignmentId: string, callback: (data: any)
   }
 }
 
+// ==================== ASSIGNMENT INVENTORY (Inventario por Asignación) ====================
+
+// Obtener template de inventario
+export async function getInventoryTemplate(house: string = 'EPIC D1') {
+  try {
+    console.log('📦 [Inventory Template] Obteniendo template para:', house);
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory_template') as any)
+      .select('*')
+      .eq('house', house)
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('❌ [Inventory Template] Error:', error);
+      return [];
+    }
+    console.log('✅ [Inventory Template] Items obtenidos:', data?.length);
+    return data || [];
+  } catch (error) {
+    console.error('❌ [Inventory Template] Exception:', error);
+    return [];
+  }
+}
+
+// Crear inventario para una asignación (copia del template)
+export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'EPIC D1') {
+  const supabase = getSupabaseClient();
+  
+  console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId);
+  
+  // Obtener template
+  const template = await getInventoryTemplate(house);
+  
+  if (template.length === 0) {
+    console.warn('⚠️ [Assignment Inventory] No hay template de inventario');
+    return [];
+  }
+
+  // Crear items basados en el template
+  const itemsToInsert = template.map(item => ({
+    calendar_assignment_id: assignmentId,
+    employee: employee,
+    house: house,
+    item_name: item.item_name,
+    quantity: item.quantity,
+    category: item.category,
+    is_complete: false
+  }));
+
+  console.log('📝 [Assignment Inventory] Insertando', itemsToInsert.length, 'items');
+
+  const { data, error } = await (supabase
+    .from('assignment_inventory') as any)
+    .insert(itemsToInsert)
+    .select();
+
+  if (error) {
+    console.error('❌ [Assignment Inventory] Error creating:', error);
+    return [];
+  }
+  
+  console.log('✅ [Assignment Inventory] Items creados:', data?.length);
+  return data || [];
+}
+
+// Obtener inventario de una asignación
+export async function getAssignmentInventory(assignmentId: string) {
+  try {
+    console.log('📦 [Assignment Inventory] Obteniendo para asignación:', assignmentId);
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('assignment_inventory') as any)
+      .select('*')
+      .eq('calendar_assignment_id', assignmentId)
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('❌ [Assignment Inventory] Error:', error);
+      return [];
+    }
+    console.log('✅ [Assignment Inventory] Items obtenidos:', data?.length);
+    return data || [];
+  } catch (error) {
+    console.error('❌ [Assignment Inventory] Exception:', error);
+    return [];
+  }
+}
+
+// Actualizar item de inventario
+export async function updateAssignmentInventoryItem(itemId: string, isComplete: boolean, notes?: string, checkedBy?: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('assignment_inventory') as any)
+    .update({
+      is_complete: isComplete,
+      notes: notes || null,
+      checked_by: isComplete ? checkedBy : null,
+      checked_at: isComplete ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('❌ [Assignment Inventory] Error updating:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+// Suscribirse a cambios en inventario de asignación
+export function subscribeToAssignmentInventory(assignmentId: string, callback: (data: any) => void) {
+  try {
+    console.log('📦 [Assignment Inventory] Iniciando suscripción:', assignmentId);
+    const supabase = getSupabaseClient();
+
+    const channel = supabase
+      .channel(`inventory-${assignmentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'assignment_inventory',
+          filter: `calendar_assignment_id=eq.${assignmentId}`
+        },
+        (payload: any) => {
+          console.log('⚡ [Assignment Inventory] Evento recibido:', payload);
+          
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          
+          callback(mappedPayload);
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Assignment Inventory] Estado:', status);
+      });
+
+    console.log('✅ [Assignment Inventory] Canal creado');
+    return channel;
+  } catch (error) {
+    console.error('❌ [Assignment Inventory] Error subscribing:', error);
+    return null;
+  }
+}
+
+// CRUD para inventory_template (manager edita el template)
+export async function createInventoryTemplateItem(item: any, house: string = 'EPIC D1') {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('inventory_template') as any)
+    .insert([{
+      house: house,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      category: item.category
+    }])
+    .select();
+
+  if (error) {
+    console.error('Error creating inventory template item:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+export async function updateInventoryTemplateItem(itemId: string, updates: any) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('inventory_template') as any)
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('Error updating inventory template item:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+export async function deleteInventoryTemplateItem(itemId: string) {
+  const supabase = getSupabaseClient();
+  const { error } = await (supabase
+    .from('inventory_template') as any)
+    .delete()
+    .eq('id', itemId);
+
+  if (error) {
+    console.error('Error deleting inventory template item:', error);
+    return false;
+  }
+  return true;
+}
+
+export function subscribeToInventoryTemplate(house: string = 'EPIC D1', callback: (data: any) => void) {
+  try {
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel('inventory-template-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_template',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to inventory template:', error);
+    return null;
+  }
+}
+
 // ==================== Unsubscribe Helper ====================
 export function unsubscribeFromAll(subscriptions: any[]) {
   subscriptions.forEach(sub => {

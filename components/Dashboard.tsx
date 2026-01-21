@@ -233,6 +233,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [selectedAssignmentForChecklist, setSelectedAssignmentForChecklist] = useState<string | null>(null);
   const [checklistSubscriptions, setChecklistSubscriptions] = useState<Map<string, any>>(new Map());
 
+  // Estado para inventario sincronizado en tiempo real por asignación
+  const [syncedInventories, setSyncedInventories] = useState<Map<string, any[]>>(new Map());
+  const [selectedAssignmentForInventory, setSelectedAssignmentForInventory] = useState<string | null>(null);
+  const [inventorySubscriptions, setInventorySubscriptions] = useState<Map<string, any>>(new Map());
+
   // Estado para checklist
   const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
   const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
@@ -539,6 +544,81 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       }
     };
   }, [selectedAssignmentForChecklist]);
+
+  // useEffect para cargar inventario cuando se selecciona una asignación
+  useEffect(() => {
+    if (!selectedAssignmentForInventory) return;
+    
+    const loadInventory = async () => {
+      try {
+        console.log('📦 Cargando inventario para asignación:', selectedAssignmentForInventory);
+        const items = await realtimeService.getAssignmentInventory(selectedAssignmentForInventory);
+        console.log('✅ Inventario cargado:', items);
+        setSyncedInventories(prev => new Map(prev).set(selectedAssignmentForInventory, items));
+      } catch (error) {
+        console.error('❌ Error loading inventory:', error);
+      }
+    };
+    
+    loadInventory();
+    
+    // Suscribirse a cambios en tiempo real
+    let subscription: any;
+    try {
+      console.log('🔔 Suscribiendo a cambios del inventario en tiempo real...');
+      subscription = realtimeService.subscribeToAssignmentInventory(
+        selectedAssignmentForInventory,
+        (payload: any) => {
+          console.log('⚡ Evento de inventario recibido:', payload);
+          
+          if (payload?.eventType === 'INSERT') {
+            console.log('➕ Nuevo item de inventario:', payload.new);
+            setSyncedInventories(prev => {
+              const newMap = new Map(prev);
+              const items = newMap.get(selectedAssignmentForInventory) || [];
+              newMap.set(selectedAssignmentForInventory, [...items, payload.new]);
+              return newMap;
+            });
+          } else if (payload?.eventType === 'UPDATE') {
+            console.log('📝 Item de inventario actualizado:', payload.new);
+            setSyncedInventories(prev => {
+              const newMap = new Map(prev);
+              const items = newMap.get(selectedAssignmentForInventory) || [];
+              newMap.set(
+                selectedAssignmentForInventory,
+                items.map(item => item.id === payload.new.id ? payload.new : item)
+              );
+              return newMap;
+            });
+          }
+        }
+      );
+      
+      if (subscription) {
+        console.log('✅ Suscripción de inventario activa:', subscription);
+        setInventorySubscriptions(prev => new Map(prev).set(selectedAssignmentForInventory, subscription));
+      }
+    } catch (error) {
+      console.error('❌ Error subscribing to inventory:', error);
+    }
+    
+    return () => {
+      try {
+        console.log('🔌 Desconectando suscripción de inventario...');
+        const sub = inventorySubscriptions.get(selectedAssignmentForInventory);
+        if (sub) {
+          supabase?.removeChannel(sub);
+          setInventorySubscriptions(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(selectedAssignmentForInventory);
+            return newMap;
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error unsubscribing from inventory:', error);
+      }
+    };
+  }, [selectedAssignmentForInventory]);
 
   // Guardar checklist en localStorage
   useEffect(() => {
@@ -1069,6 +1149,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               'EPIC D1'
                             );
                             console.log('✅ Checklist creado con', checklistItems.length, 'items');
+
+                            // Crear inventario para la asignación
+                            const inventoryItems = await realtimeService.createAssignmentInventory(
+                              result.id,
+                              newAssignment.employee,
+                              'EPIC D1'
+                            );
+                            console.log('✅ Inventario creado con', inventoryItems.length, 'items');
                           }
                           
                           setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
@@ -1196,6 +1284,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 }}
                               >
                                 ✅ Ver Checklist
+                              </button>
+                              <button 
+                                className="dashboard-btn success"
+                                onClick={() => {
+                                  console.log('📦 Abriendo inventario para asignación:', assignment.id);
+                                  setSelectedAssignmentForInventory(assignment.id);
+                                }}
+                              >
+                                📦 Ver Inventario
                               </button>
                               {(user.role === 'owner' || user.role === 'manager') && (
                                 <button 
@@ -2295,6 +2392,132 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               ) : (
                 <div className="modal-body-empty">
                   <p>Cargando checklist...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal para Inventario Sincronizado */}
+      {selectedAssignmentForInventory && (
+        <div className="modal-overlay" onClick={() => setSelectedAssignmentForInventory(null)}>
+          <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📦 Inventario</h2>
+              <button className="modal-close" onClick={() => setSelectedAssignmentForInventory(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {syncedInventories.get(selectedAssignmentForInventory) ? (
+                (() => {
+                  const inventoryItems = syncedInventories.get(selectedAssignmentForInventory) || [];
+                  const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForInventory);
+                  
+                  if (!assignment) return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
+                  
+                  // Agrupar por categoría
+                  const categories = new Map<string, any[]>();
+                  inventoryItems.forEach(item => {
+                    if (!categories.has(item.category)) {
+                      categories.set(item.category, []);
+                    }
+                    categories.get(item.category)!.push(item);
+                  });
+                  
+                  const totalItems = inventoryItems.length;
+                  const completeItems = inventoryItems.filter(i => i.is_complete).length;
+                  const progress = totalItems > 0 ? Math.round((completeItems / totalItems) * 100) : 0;
+                  
+                  return (
+                    <>
+                      <div className="modal-stats" style={{marginBottom: '2rem'}}>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{assignment.employee}</p>
+                          <p className="stat-box-label">Empleado</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{progress}%</p>
+                          <p className="stat-box-label">Verificado</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{completeItems}/{totalItems}</p>
+                          <p className="stat-box-label">Items Completos</p>
+                        </div>
+                      </div>
+                      
+                      <div className="progress-bar" style={{marginBottom: '2rem'}}>
+                        <div className="progress-fill" style={{width: `${progress}%`}}></div>
+                      </div>
+                      
+                      {/* Botón para eliminar asignación cuando esté completa (solo manager/owner) */}
+                      {(user.role === 'manager' || user.role === 'owner') && progress === 100 && (
+                        <div style={{marginBottom: '2rem', textAlign: 'center'}}>
+                          <button 
+                            className="dashboard-btn danger"
+                            style={{fontSize: '1rem', padding: '0.75rem 2rem'}}
+                            onClick={async () => {
+                              if (confirm(`¿Eliminar esta asignación completada de ${assignment.employee}? Esto también eliminará el inventario verificado.`)) {
+                                console.log('🗑️ Eliminando asignación:', selectedAssignmentForInventory);
+                                await realtimeService.deleteCalendarAssignment(selectedAssignmentForInventory);
+                                setSelectedAssignmentForInventory(null);
+                              }
+                            }}
+                          >
+                            ✅ Inventario Verificado - Eliminar Asignación
+                          </button>
+                        </div>
+                      )}
+                      
+                      <div className="checklist-zones">
+                        {Array.from(categories.entries()).map(([category, items]) => {
+                          const categoryComplete = items.filter(i => i.is_complete).length;
+                          const categoryTotal = items.length;
+                          
+                          return (
+                            <div key={category} className="checklist-zone-card">
+                              <div className="checklist-zone-header">
+                                <h3>{category}</h3>
+                                <span className="zone-progress">{categoryComplete}/{categoryTotal}</span>
+                              </div>
+                              <div className="checklist-items">
+                                {items.map(item => (
+                                  <label key={item.id} className="checklist-item" style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                    <input
+                                      type="checkbox"
+                                      checked={item.is_complete}
+                                      onChange={async (e) => {
+                                        console.log('📝 Actualizando item inventario:', item.id, 'a', e.target.checked);
+                                        await realtimeService.updateAssignmentInventoryItem(
+                                          item.id,
+                                          e.target.checked,
+                                          item.notes,
+                                          user.username
+                                        );
+                                      }}
+                                      disabled={user.role === 'manager' && user.username !== assignment.employee}
+                                    />
+                                    <span className={item.is_complete ? 'completed' : ''} style={{flex: '1'}}>
+                                      {item.item_name} ({item.quantity})
+                                    </span>
+                                    {item.is_complete && item.checked_by && (
+                                      <span className="completed-by">✓ por {item.checked_by}</span>
+                                    )}
+                                    {item.notes && (
+                                      <span style={{fontSize: '0.875rem', color: '#666'}}>📝 {item.notes}</span>
+                                    )}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()
+              ) : (
+                <div className="modal-body-empty">
+                  <p>Cargando inventario...</p>
                 </div>
               )}
             </div>
