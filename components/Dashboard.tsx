@@ -991,60 +991,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         </div>
       )}
 
-      {/* Modal Tareas Extra (solo empleado) */}
-      {selectedModalCard === 'extraTasks' && (
-        <div className="modal-overlay" onClick={() => setSelectedModalCard(null)} style={{zIndex: 2000}}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>🟦 Tareas Extra</h2>
-              <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              {(() => {
-                console.log('🟦 Modal Tareas Extra abierto');
-                console.log('   Usuario:', user.username);
-                console.log('   Tareas extra para este usuario:', extraTasksForUser);
-                return null;
-              })()}
-              {extraTasksForUser.length === 0 ? (
-                <div className="modal-body-empty">
-                  <p>No tienes tareas extra pendientes.</p>
-                </div>
-              ) : (
-                <div className="subcards-grid">
-                  {extraTasksForUser.map(task => (
-                    <div key={task.id} className="subcard">
-                      <div className="subcard-header">
-                        <div className="subcard-icon">🟦</div>
-                        <h3>{task.title}</h3>
-                      </div>
-                      <div className="subcard-content">
-                        <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
-                        <p><strong>👤 Asignado por:</strong> {task.createdBy || task.created_by || 'Manager'}</p>
-                        <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
-                          {task.completed ? '✅ Completada' : '⏳ Pendiente'}
-                        </span>
-                      </div>
-                      <div className="subcard-actions">
-                        {!task.completed && (
-                          <button
-                            className="dashboard-btn main"
-                            onClick={async () => {
-                              await realtimeService.updateTask(task.id, { completed: true });
-                            }}
-                          >
-                            ✅ Marcar Completada
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
       {view === 'tasks' && <Tasks
         user={user}
         users={users}
@@ -1195,6 +1141,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 {selectedModalCard === 'checklist' && '✅ Checklist Limpieza'}
                 {selectedModalCard === 'inventory' && '📦 Inventario'}
                 {selectedModalCard === 'tasks' && '📋 Asignar Tareas'}
+                {selectedModalCard === 'extraTasks' && '🟦 Tareas Extra'}
               </h2>
               <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
             </div>
@@ -2362,6 +2309,46 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <div className="modal-body-empty">
                         <p>🎉 No hay tareas asignadas</p>
                       </div>
+                    )}
+                  </div>
+                </>
+              )}
+              
+              {selectedModalCard === 'extraTasks' && (
+                <>
+                  <div className="subcards-grid">
+                    {extraTasksForUser.length === 0 ? (
+                      <div className="modal-body-empty">
+                        <p>No tienes tareas extra pendientes.</p>
+                      </div>
+                    ) : (
+                      extraTasksForUser.map(task => (
+                        <div key={task.id} className="subcard">
+                          <div className="subcard-header">
+                            <div className="subcard-icon">🟦</div>
+                            <h3>{task.title}</h3>
+                          </div>
+                          <div className="subcard-content">
+                            <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
+                            <p><strong>👤 Asignado por:</strong> {task.createdBy || task.created_by || 'Manager'}</p>
+                            <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
+                              {task.completed ? '✅ Completada' : '⏳ Pendiente'}
+                            </span>
+                          </div>
+                          <div className="subcard-actions">
+                            {!task.completed && (
+                              <button
+                                className="dashboard-btn main"
+                                onClick={async () => {
+                                  await realtimeService.updateTask(task.id, { completed: true });
+                                }}
+                              >
+                                ✅ Marcar Completada
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </>
