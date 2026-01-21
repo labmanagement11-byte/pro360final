@@ -1660,6 +1660,65 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </button>
                   </div>
 
+                  {/* Formulario para agregar nueva tarea (solo manager/owner) */}
+                  {(user.role === 'owner' || user.role === 'manager') && (
+                    <div className="modal-assignment-form" style={{marginBottom: '2rem'}}>
+                      <h3>➕ Agregar Nueva Tarea al Checklist</h3>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.target as HTMLFormElement;
+                        const taskText = (form.elements.namedItem('taskText') as HTMLInputElement).value;
+                        const zona = (form.elements.namedItem('zona') as HTMLSelectElement).value;
+                        
+                        if (!taskText.trim() || !zona) return;
+                        
+                        // Agregar tarea a la zona seleccionada
+                        const updatedZone = {
+                          ...checklistData[zona],
+                          tasks: [...(checklistData[zona]?.tasks || []), { text: taskText, completed: false }]
+                        };
+                        setChecklistData({
+                          ...checklistData,
+                          [zona]: updatedZone
+                        });
+                        
+                        form.reset();
+                      }}>
+                        <div className="assignment-form-grid">
+                          <div className="form-group">
+                            <label>📋 Descripción de la tarea</label>
+                            <input
+                              type="text"
+                              name="taskText"
+                              required
+                              placeholder="Ej: Limpiar lavamanos"
+                              style={{padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb'}}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>📍 Zona</label>
+                            <select
+                              name="zona"
+                              required
+                              style={{padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb'}}
+                            >
+                              <option value="">Seleccionar zona...</option>
+                              {Object.keys(checklistData)
+                                .filter(zona => checklistData[zona].type === checklistType)
+                                .map(zona => (
+                                  <option key={zona} value={zona}>{zona}</option>
+                                ))
+                              }
+                            </select>
+                          </div>
+                        </div>
+                        <button type="submit" className="dashboard-btn main" style={{marginTop: '1rem'}}>
+                          ➕ Agregar Tarea
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
                   {/* Estadísticas generales */}
                   {(() => {
                     const stats = Object.entries(checklistData)
@@ -1714,28 +1773,73 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <div className="subcard-content" style={{padding: '1rem'}}>
                               <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
                                 {data.tasks.map((task: any, idx: number) => (
-                                  <label key={idx} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: task.completed ? '#f0fdf4' : '#fafafa', transition: 'background-color 0.2s'}}>
-                                    <input
-                                      type="checkbox"
-                                      checked={task.completed}
-                                      onChange={(e) => {
-                                        const updatedZone = {
-                                          ...checklistData[zona],
-                                          tasks: checklistData[zona].tasks.map((t: any, i: number) => 
-                                            i === idx ? { ...t, completed: e.target.checked } : t
-                                          )
-                                        };
-                                        setChecklistData({
-                                          ...checklistData,
-                                          [zona]: updatedZone
-                                        });
-                                      }}
-                                      style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
-                                    />
-                                    <span style={{flex: 1, color: task.completed ? '#6b7280' : '#1f2937', textDecoration: task.completed ? 'line-through' : 'none', fontSize: '0.95rem', lineHeight: '1.5'}}>
-                                      {task.text}
-                                    </span>
-                                  </label>
+                                  <div key={idx} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: task.completed ? '#f0fdf4' : '#fafafa', transition: 'background-color 0.2s'}}>
+                                    <label style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', flex: 1}}>
+                                      <input
+                                        type="checkbox"
+                                        checked={task.completed}
+                                        onChange={(e) => {
+                                          const updatedZone = {
+                                            ...checklistData[zona],
+                                            tasks: checklistData[zona].tasks.map((t: any, i: number) => 
+                                              i === idx ? { ...t, completed: e.target.checked } : t
+                                            )
+                                          };
+                                          setChecklistData({
+                                            ...checklistData,
+                                            [zona]: updatedZone
+                                          });
+                                        }}
+                                        style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
+                                      />
+                                      <span style={{flex: 1, color: task.completed ? '#6b7280' : '#1f2937', textDecoration: task.completed ? 'line-through' : 'none', fontSize: '0.95rem', lineHeight: '1.5'}}>
+                                        {task.text}
+                                      </span>
+                                    </label>
+                                    {(user.role === 'owner' || user.role === 'manager') && (
+                                      <div style={{display: 'flex', gap: '0.25rem', marginLeft: 'auto'}}>
+                                        <button
+                                          onClick={() => {
+                                            const newText = prompt('Editar tarea:', task.text);
+                                            if (newText && newText.trim()) {
+                                              const updatedZone = {
+                                                ...checklistData[zona],
+                                                tasks: checklistData[zona].tasks.map((t: any, i: number) => 
+                                                  i === idx ? { ...t, text: newText.trim() } : t
+                                                )
+                                              };
+                                              setChecklistData({
+                                                ...checklistData,
+                                                [zona]: updatedZone
+                                              });
+                                            }
+                                          }}
+                                          style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white'}}
+                                          title="Editar tarea"
+                                        >
+                                          ✏️
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            if (confirm(`¿Eliminar la tarea "${task.text}"?`)) {
+                                              const updatedZone = {
+                                                ...checklistData[zona],
+                                                tasks: checklistData[zona].tasks.filter((t: any, i: number) => i !== idx)
+                                              };
+                                              setChecklistData({
+                                                ...checklistData,
+                                                [zona]: updatedZone
+                                              });
+                                            }
+                                          }}
+                                          style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', backgroundColor: '#ef4444', color: 'white'}}
+                                          title="Eliminar tarea"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             </div>
