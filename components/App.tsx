@@ -39,7 +39,7 @@ const App = () => {
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) supabase.removeChannel(channel);
     };
   }, [supabase]);
 
