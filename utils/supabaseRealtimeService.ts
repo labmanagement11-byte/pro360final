@@ -307,7 +307,7 @@ export async function deleteCalendarAssignment(assignmentId: string) {
   return true;
 }
 
-export function subscribeToCalendarAssignments(house: string = 'EPIC D1', employee?: string, callback: (data: any) => void) {
+export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callback: (data: any) => void, employee?: string) {
   const supabase = getSupabaseClient();
   const subscription = (supabase
     .from('calendar_assignments') as any)

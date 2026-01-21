@@ -357,7 +357,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     const subscription = realtimeService.subscribeToCalendarAssignments(
       'EPIC D1',
-      user.role === 'empleado' ? user.username : undefined,
       (payload: any) => {
         if (payload?.eventType === 'INSERT') {
           setCalendarAssignments(prev => [...prev, payload.new]);
@@ -366,7 +365,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         } else if (payload?.eventType === 'DELETE') {
           setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
         }
-      }
+      },
+      user.role === 'empleado' ? user.username : undefined
     );
 
     return () => {
