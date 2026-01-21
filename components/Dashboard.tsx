@@ -1074,6 +1074,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         <div className="dashboard-title-block">
           <h1>Dashboard</h1>
           <span className="dashboard-user-pill" aria-label="Usuario en sesión">👤 {user.username}</span>
+          {user.house && <span className="dashboard-house-pill" aria-label="Casa asignada">🏠 {user.house}</span>}
         </div>
         {onLogout && (
           <button className="dashboard-btn danger dashboard-logout-btn" onClick={onLogout}>
