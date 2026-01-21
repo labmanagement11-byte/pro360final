@@ -298,13 +298,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     loadTasks();
 
     // Suscribirse a cambios en tiempo real
-    const subscription = realtimeService.subscribeToTasks('EPIC D1', (payload) => {
-      if (payload.eventType === 'INSERT') {
+    const subscription = realtimeService.subscribeToTasks('EPIC D1', (payload: any) => {
+      if (payload?.eventType === 'INSERT') {
         setTasksList(prev => [...prev, payload.new]);
-      } else if (payload.eventType === 'UPDATE') {
-        setTasksList(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
-      } else if (payload.eventType === 'DELETE') {
-        setTasksList(prev => prev.filter(t => t.id !== payload.old.id));
+      } else if (payload?.eventType === 'UPDATE') {
+        setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
+      } else if (payload?.eventType === 'DELETE') {
+        setTasksList(prev => prev.filter(t => t.id !== payload.old?.id));
       }
     });
 
@@ -325,13 +325,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     loadInventory();
 
     // Suscribirse a cambios en tiempo real
-    const subscription = realtimeService.subscribeToInventory('EPIC D1', (payload) => {
-      if (payload.eventType === 'INSERT') {
+    const subscription = realtimeService.subscribeToInventory('EPIC D1', (payload: any) => {
+      if (payload?.eventType === 'INSERT') {
         setInventoryList(prev => [...prev, payload.new]);
-      } else if (payload.eventType === 'UPDATE') {
-        setInventoryList(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
-      } else if (payload.eventType === 'DELETE') {
-        setInventoryList(prev => prev.filter(i => i.id !== payload.old.id));
+      } else if (payload?.eventType === 'UPDATE') {
+        setInventoryList(prev => prev.map(i => i.id === payload.new?.id ? payload.new : i));
+      } else if (payload?.eventType === 'DELETE') {
+        setInventoryList(prev => prev.filter(i => i.id !== payload.old?.id));
       }
     });
 
@@ -358,13 +358,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const subscription = realtimeService.subscribeToCalendarAssignments(
       'EPIC D1',
       user.role === 'empleado' ? user.username : undefined,
-      (payload) => {
-        if (payload.eventType === 'INSERT') {
+      (payload: any) => {
+        if (payload?.eventType === 'INSERT') {
           setCalendarAssignments(prev => [...prev, payload.new]);
-        } else if (payload.eventType === 'UPDATE') {
-          setCalendarAssignments(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
-        } else if (payload.eventType === 'DELETE') {
-          setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old.id));
+        } else if (payload?.eventType === 'UPDATE') {
+          setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+        } else if (payload?.eventType === 'DELETE') {
+          setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
         }
       }
     );
