@@ -472,6 +472,8 @@ export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (da
 export async function createCleaningChecklistItems(assignmentId: string, employee: string, house: string = 'EPIC D1') {
   const supabase = getSupabaseClient();
   
+  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId);
+  
   // Items predeterminados del checklist por zona
   const checklistItems = [
     { zone: 'Cocina', task: 'Limpiar mostrador', order: 1 },
@@ -495,6 +497,8 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
     { zone: 'Dormitorios', task: 'Limpiar espejos', order: 4 }
   ];
 
+  console.log('📋 [Checklist] Items a insertar:', checklistItems.length);
+
   const itemsToInsert = checklistItems.map(item => ({
     calendar_assignment_id: assignmentId,
     employee: employee,
@@ -505,20 +509,25 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
     order_num: item.order
   }));
 
+  console.log('📝 [Checklist] Items formateados para insertar:', itemsToInsert);
+
   const { data, error } = await (supabase
     .from('cleaning_checklist') as any)
     .insert(itemsToInsert)
     .select();
 
   if (error) {
-    console.error('Error creating checklist items:', error);
+    console.error('❌ [Checklist] Error creating checklist items:', error);
     return [];
   }
+  
+  console.log('✅ [Checklist] Items creados exitosamente:', data?.length, 'items');
   return data || [];
 }
 
 export async function getCleaningChecklistItems(assignmentId: string) {
   try {
+    console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentId);
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
       .from('cleaning_checklist') as any)
@@ -528,12 +537,14 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       .order('order_num', { ascending: true });
 
     if (error) {
-      console.error('Error fetching checklist items:', error);
+      console.error('❌ [Checklist] Error fetching checklist items:', error);
       return [];
     }
+    console.log('✅ [Checklist] Items obtenidos:', data?.length, 'items');
+    console.log('📋 [Checklist] Items:', data);
     return data || [];
   } catch (error) {
-    console.error('Exception fetching checklist items:', error);
+    console.error('❌ [Checklist] Exception fetching checklist items:', error);
     return [];
   }
 }
