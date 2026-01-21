@@ -758,7 +758,7 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
   }
 
   // Crear items basados en el template
-  const itemsToInsert = template.map(item => ({
+  const itemsToInsert = template.map((item: any) => ({
     calendar_assignment_id: assignmentId,
     employee: employee,
     house: house,
