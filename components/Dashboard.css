@@ -554,10 +554,314 @@
 }
 
 /* ============================================
+   MODAL Y SUBTARJETAS EXPANDIBLES
+   ============================================ */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  padding: 2rem 2rem 1rem 2rem;
+  border-bottom: 2px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.modal-header h2 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #0284c7;
+  margin: 0;
+  flex: 1;
+}
+
+.modal-close {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.modal-close:hover {
+  background: #e5e7eb;
+  color: #111827;
+  transform: rotate(90deg);
+}
+
+/* Modal Body */
+.modal-body {
+  padding: 2rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.modal-body-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  color: #9ca3af;
+}
+
+.subcard-full-width {
+  grid-column: 1 / -1;
+}
+
+/* Subtarjetas Grid */
+.subcards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.subcard {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border: 2px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.subcard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.subcard:hover {
+  transform: translateY(-6px);
+  border-color: #0284c7;
+  box-shadow: 0 12px 24px rgba(2, 132, 199, 0.15);
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+}
+
+.subcard:hover::before {
+  left: 100%;
+}
+
+.subcard-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #d1d5db;
+}
+
+.subcard-icon {
+  font-size: 1.75rem;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: rgba(2, 132, 199, 0.1);
+  border-radius: 0.75rem;
+}
+
+.subcard-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.subcard-content {
+  font-size: 0.95rem;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.subcard-content p {
+  margin: 0.75rem 0;
+}
+
+.subcard-badge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+.subcard-badge.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.subcard-badge.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.subcard-badge.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.subcard-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.subcard-actions button {
+  flex: 1;
+  padding: 0.5rem;
+  background: #0284c7;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subcard-actions button:hover {
+  background: #0b5cb8;
+  transform: translateY(-2px);
+}
+
+.subcard-actions button.danger {
+  background: #ef4444;
+}
+
+.subcard-actions button.danger:hover {
+  background: #dc2626;
+}
+
+/* Estadísticas en Modal */
+.modal-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.05) 0%, rgba(2, 132, 199, 0.02) 100%);
+  border-radius: 1rem;
+  border-left: 4px solid #0284c7;
+}
+
+.stat-box {
+  text-align: center;
+}
+
+.stat-box-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0284c7;
+  margin: 0;
+}
+
+.stat-box-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+/* ============================================
    RESPONSIVE DESIGN
    ============================================ */
 
 @media (max-width: 768px) {
+  .modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+    border-radius: 1rem;
+  }
+
+  .modal-header {
+    padding: 1.5rem 1rem 1rem 1rem;
+  }
+
+  .modal-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .subcards-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .subcard {
+    padding: 1.25rem;
+  }
+
   .dashboard-container {
     padding: 1.5rem 1rem;
   }
@@ -581,6 +885,46 @@
 }
 
 @media (max-width: 480px) {
+  .modal-header {
+    padding: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .modal-close {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.25rem;
+  }
+
+  .subcards-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .subcard {
+    padding: 1rem;
+  }
+
+  .subcard-header {
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .subcard-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.25rem;
+  }
+
   .dashboard-container {
     padding: 1rem 0.75rem;
   }

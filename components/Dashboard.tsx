@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
-import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
 
 import Tasks from './Tasks';
@@ -70,6 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Estado para edición de recordatorio
     const [editIdx, setEditIdx] = useState(-1);
   const [view, setView] = useState('home');
+  const [selectedModalCard, setSelectedModalCard] = useState<string | null>(null);
   const [reminders, setReminders] = useState<any[]>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(REMINDERS_KEY) : null;
     return saved ? JSON.parse(saved) : defaultReminders;
@@ -280,7 +281,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               <button
                 key={card.key}
                 className="dashboard-card"
-                onClick={() => setView(card.key)}
+                onClick={() => {
+                  // Para calendar, shopping, reminders: mostrar modal
+                  if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks'].includes(card.key)) {
+                    setSelectedModalCard(card.key);
+                  } else {
+                    // Para los demás: cambiar vista
+                    setView(card.key);
+                  }
+                }}
                 aria-label={card.title}
               >
                 <span className="dashboard-card-title">{card.title}</span>
@@ -533,6 +542,215 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           deleteUser={deleteUser}
         />
       )}
+      
+      {/* Modal de Subtarjetas */}
+      {selectedModalCard && (
+        <div className="modal-overlay" onClick={() => setSelectedModalCard(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                {selectedModalCard === 'calendar' && '📅 Calendario de Asignaciones'}
+                {selectedModalCard === 'shopping' && '🛒 Lista de Compras'}
+                {selectedModalCard === 'reminders' && '🔔 Recordatorios'}
+                {selectedModalCard === 'checklist' && '✅ Checklist Limpieza'}
+                {selectedModalCard === 'inventory' && '📦 Inventario'}
+                {selectedModalCard === 'tasks' && '📋 Asignar Tareas'}
+              </h2>
+              <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
+            </div>
+            
+            <div className="modal-body">
+              {selectedModalCard === 'calendar' && (
+                <div className="subcards-grid">
+                  {reminders.length > 0 ? (
+                    <>
+                      <div className="modal-stats">
+                        <div className="stat-box">
+                          <p className="stat-box-number">{reminders.length}</p>
+                          <p className="stat-box-label">Próximas fechas</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{reminders.filter(r => new Date(r.due) < new Date()).length}</p>
+                          <p className="stat-box-label">Vencidas</p>
+                        </div>
+                      </div>
+                      {reminders.map((item, idx) => (
+                        <div key={idx} className="subcard">
+                          <div className="subcard-header">
+                            <div className="subcard-icon">📅</div>
+                            <h3>{item.name || 'Sin título'}</h3>
+                          </div>
+                          <div className="subcard-content">
+                            <p><strong>Fecha:</strong> {new Date(item.due).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            <p><strong>Empleado:</strong> {item.employee || 'No asignado'}</p>
+                            <span className={`subcard-badge ${new Date(item.due) < new Date() ? 'danger' : 'success'}`}>
+                              {new Date(item.due) < new Date() ? '⚠️ Vencido' : '✅ Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>
+                      <p>📭 No hay eventos programados</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {selectedModalCard === 'shopping' && (
+                <div className="subcards-grid">
+                  <div className="modal-stats">
+                    <div className="stat-box">
+                      <p className="stat-box-number">{shoppingList.length}</p>
+                      <p className="stat-box-label">Productos pendientes</p>
+                    </div>
+                    <div className="stat-box">
+                      <p className="stat-box-number">{shoppingList.reduce((sum, item) => sum + item.qty, 0)}</p>
+                      <p className="stat-box-label">Cantidad total</p>
+                    </div>
+                  </div>
+                  {shoppingList.length > 0 ? (
+                    shoppingList.map((item, idx) => (
+                      <div key={item.id || idx} className="subcard">
+                        <div className="subcard-header">
+                          <div className="subcard-icon">🛒</div>
+                          <h3>{item.name}</h3>
+                        </div>
+                        <div className="subcard-content">
+                          <p><strong>Cantidad:</strong> {item.qty} unidades</p>
+                          <span className="subcard-badge success">✅ Listo para comprar</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="modal-body-empty">
+                      <p>🎉 No hay productos por comprar</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {selectedModalCard === 'reminders' && (
+                <div className="subcards-grid">
+                  <div className="modal-stats">
+                    <div className="stat-box">
+                      <p className="stat-box-number">{reminders.length}</p>
+                      <p className="stat-box-label">Recordatorios activos</p>
+                    </div>
+                  </div>
+                  {reminders.length > 0 ? (
+                    reminders.map((item, idx) => (
+                      <div key={idx} className="subcard">
+                        <div className="subcard-header">
+                          <div className="subcard-icon">🔔</div>
+                          <h3>{item.name}</h3>
+                        </div>
+                        <div className="subcard-content">
+                          <p><strong>Fecha:</strong> {item.due}</p>
+                          <p><strong>Banco:</strong> {item.bank}</p>
+                          <p><strong>Cuenta:</strong> {item.account}</p>
+                          <span className="subcard-badge">{item.bank}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="modal-body-empty">
+                      <p>✨ No hay recordatorios pendientes</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {selectedModalCard === 'checklist' && (
+                <div className="subcards-grid">
+                  <div className="modal-stats">
+                    <div className="stat-box">
+                      <p className="stat-box-number">∞</p>
+                      <p className="stat-box-label">Gestión integral</p>
+                    </div>
+                  </div>
+                  <div className="subcard subcard-full-width">
+                    <div className="subcard-header">
+                      <div className="subcard-icon">✅</div>
+                      <h3>Checklist de Limpieza - EPIC D1</h3>
+                    </div>
+                    <div className="subcard-content">
+                      <p>📋 <strong>Verificación periódica:</strong> Gestiona tareas de limpieza y mantenimiento</p>
+                      <p>👥 <strong>Asignados a:</strong> Todo el equipo de empleados</p>
+                      <p>🔄 <strong>Frecuencia:</strong> Diaria</p>
+                      <span className="subcard-badge success">✅ Sistema activo</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {selectedModalCard === 'inventory' && (
+                <div className="subcards-grid">
+                  <div className="modal-stats">
+                    <div className="stat-box">
+                      <p className="stat-box-number">{(houses[allowedHouseIdx]?.inventory || []).length}</p>
+                      <p className="stat-box-label">Artículos inventariados</p>
+                    </div>
+                  </div>
+                  {(houses[allowedHouseIdx]?.inventory || []).length > 0 ? (
+                    (houses[allowedHouseIdx]?.inventory || []).map((item: any, idx: number) => (
+                      <div key={idx} className="subcard">
+                        <div className="subcard-header">
+                          <div className="subcard-icon">📦</div>
+                          <h3>{item.name || 'Sin nombre'}</h3>
+                        </div>
+                        <div className="subcard-content">
+                          <p><strong>Cantidad:</strong> {item.quantity || 0}</p>
+                          <p><strong>Ubicación:</strong> {item.location || 'No especificada'}</p>
+                          <span className="subcard-badge success">✅ Registrado</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="modal-body-empty">
+                      <p>📭 No hay artículos en el inventario</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {selectedModalCard === 'tasks' && (
+                <div className="subcards-grid">
+                  <div className="modal-stats">
+                    <div className="stat-box">
+                      <p className="stat-box-number">{(houses[allowedHouseIdx]?.tasks || []).length}</p>
+                      <p className="stat-box-label">Tareas totales</p>
+                    </div>
+                  </div>
+                  {(houses[allowedHouseIdx]?.tasks || []).length > 0 ? (
+                    (houses[allowedHouseIdx]?.tasks || []).map((task: any, idx: number) => (
+                      <div key={idx} className="subcard">
+                        <div className="subcard-header">
+                          <div className="subcard-icon">📋</div>
+                          <h3>{task.title || 'Sin título'}</h3>
+                        </div>
+                        <div className="subcard-content">
+                          <p><strong>Asignado a:</strong> {task.assignedTo || 'Sin asignar'}</p>
+                          <p><strong>Descripción:</strong> {task.description || 'Sin descripción'}</p>
+                          <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
+                            {task.completed ? '✅ Completada' : '⏳ Pendiente'}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="modal-body-empty">
+                      <p>🎉 No hay tareas asignadas</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
       {view !== 'home' && (
         <button className="dashboard-back-btn" onClick={() => setView('home')} aria-label="Volver al dashboard">← Volver</button>
       )}
