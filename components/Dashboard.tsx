@@ -309,11 +309,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Cargar tareas desde Supabase con suscripción en tiempo real
   useEffect(() => {
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    
     const loadTasks = async () => {
       try {
         setLoadingTasks(true);
-        const tasks = await realtimeService.getTasks('EPIC D1');
-        console.log('✅ Tareas cargadas:', tasks);
+        const tasks = await realtimeService.getTasks(selectedHouse);
+        console.log('✅ Tareas cargadas para', selectedHouse, ':', tasks);
         setTasksList(tasks || []);
         setLoadingTasks(false);
       } catch (error) {
@@ -328,8 +330,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
-      console.log('🔔 Suscribiendo a cambios en tiempo real de tareas...');
-      subscription = realtimeService.subscribeToTasks('EPIC D1', (payload: any) => {
+      console.log('🔔 Suscribiendo a cambios en tiempo real de tareas para:', selectedHouse);
+      subscription = realtimeService.subscribeToTasks(selectedHouse, (payload: any) => {
         console.log('⚡ Evento recibido en tiempo real:', payload);
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nueva tarea insertada:', payload.new);
@@ -364,14 +366,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.error('❌ Error unsubscribing from tasks:', error);
       }
     };
-  }, []);
+  }, [allowedHouseIdx, houses]);
 
   // Cargar inventario desde Supabase con suscripción en tiempo real
   useEffect(() => {
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    
     const loadInventory = async () => {
       try {
         setLoadingInventory(true);
-        const items = await realtimeService.getInventoryItems('EPIC D1');
+        const items = await realtimeService.getInventoryItems(selectedHouse);
         setInventoryList(items || []);
         setLoadingInventory(false);
       } catch (error) {
@@ -386,7 +390,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
-      subscription = realtimeService.subscribeToInventory('EPIC D1', (payload: any) => {
+      subscription = realtimeService.subscribeToInventory(selectedHouse, (payload: any) => {
         if (payload?.eventType === 'INSERT') {
           setInventoryList(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
@@ -408,15 +412,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.error('Error unsubscribing from inventory:', error);
       }
     };
-  }, []);
+  }, [allowedHouseIdx, houses]);
 
   // Cargar recordatorios desde Supabase con suscripción en tiempo real
   useEffect(() => {
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    
     const loadReminders = async () => {
       try {
         setLoadingReminders(true);
-        const items = await realtimeService.getReminders('EPIC D1');
-        console.log('✅ Recordatorios cargados:', items);
+        const items = await realtimeService.getReminders(selectedHouse);
+        console.log('✅ Recordatorios cargados para', selectedHouse, ':', items);
         setReminders(items || []);
         setLoadingReminders(false);
       } catch (error) {
@@ -431,8 +437,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
-      console.log('🔔 Suscribiendo a cambios en tiempo real de recordatorios...');
-      subscription = realtimeService.subscribeToReminders('EPIC D1', (payload: any) => {
+      console.log('🔔 Suscribiendo a cambios en tiempo real de recordatorios para:', selectedHouse);
+      subscription = realtimeService.subscribeToReminders(selectedHouse, (payload: any) => {
         console.log('⚡ Evento de recordatorios recibido:', payload);
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nuevo recordatorio insertado:', payload.new);
@@ -458,6 +464,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         }
       } catch (error) {
         console.error('❌ Error unsubscribing from reminders:', error);
+      }
+    };
+  }, [allowedHouseIdx, houses]);
       }
     };
   }, []);
@@ -669,10 +678,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   useEffect(() => {
     if (selectedModalCard !== 'inventory') return;
     
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    
     const loadTemplate = async () => {
       try {
         setLoadingInventoryTemplate(true);
-        const template = await realtimeService.getInventoryTemplate('EPIC D1');
+        const template = await realtimeService.getInventoryTemplate(selectedHouse);
         setInventoryTemplate(template);
         setLoadingInventoryTemplate(false);
       } catch (error) {
@@ -684,7 +695,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     loadTemplate();
     
     // Suscribirse a cambios en el template
-    const subscription = realtimeService.subscribeToInventoryTemplate('EPIC D1', (payload: any) => {
+    const subscription = realtimeService.subscribeToInventoryTemplate(selectedHouse, (payload: any) => {
       if (payload.eventType === 'INSERT') {
         setInventoryTemplate(prev => [...prev, payload.new]);
       } else if (payload.eventType === 'UPDATE') {
@@ -699,7 +710,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         supabase?.removeChannel(subscription);
       }
     };
-  }, [selectedModalCard]);
+  }, [selectedModalCard, allowedHouseIdx, houses]);
 
   // Guardar checklist en localStorage
   useEffect(() => {
@@ -1810,6 +1821,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <h3>🔔 {editingReminderIdx >= 0 ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h3>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
+                        const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
                         if (editingReminderIdx >= 0) {
                           // Editar recordatorio existente
                           const reminder = reminders[editingReminderIdx];
@@ -1829,7 +1841,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             bank: newReminder.bank,
                             account: newReminder.account,
                             invoiceNumber: newReminder.invoiceNumber,
-                            house: 'EPIC D1'
+                            house: selectedHouse
                           });
                         }
                         setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '' });
@@ -2556,12 +2568,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             type: newTask.type,
                             createdBy: user.username
                           });
+                            const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
                           const result = await realtimeService.createTask({
                             title: newTask.title,
                             description: newTask.description,
                             assignedTo: newTask.assignedTo,
                             type: newTask.type,
-                            house: 'EPIC D1',
+                              house: selectedHouse,
                             createdBy: user.username
                           });
                           console.log('✅ Tarea creada con resultado:', result);
