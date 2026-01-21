@@ -27,19 +27,26 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   // Cargar usuarios y casas desde Supabase si es jonathan
   useEffect(() => {
     const loadData = async () => {
-      if (user?.username.toLowerCase() !== 'jonathan') {
-        setUsers(propUsers || []);
-        return;
-      }
-
       try {
         setLoading(true);
-        const [fetchedUsers, fetchedHouses] = await Promise.all([
-          realtimeService.getUsers(),
-          realtimeService.getHouses()
-        ]);
-        setUsers(fetchedUsers || []);
-        setHouses(fetchedHouses || propHouses || []);
+        
+        // Si es jonathan, cargar desde Supabase
+        if (user?.username.toLowerCase() === 'jonathan') {
+          const fetchedUsers = await realtimeService.getUsers();
+          setUsers(fetchedUsers || []);
+          
+          // Usar casas del props si están disponibles, sino cargar desde Supabase
+          if (propHouses && propHouses.length > 0) {
+            setHouses(propHouses);
+          } else {
+            const fetchedHouses = await realtimeService.getHouses();
+            setHouses(fetchedHouses || []);
+          }
+        } else {
+          // Si no es jonathan, usar props
+          setUsers(propUsers || []);
+          setHouses(propHouses || []);
+        }
       } catch (error) {
         console.error('Error loading data:', error);
         setUsers(propUsers || []);

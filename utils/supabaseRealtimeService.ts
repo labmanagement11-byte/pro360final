@@ -1203,7 +1203,8 @@ export async function getHouses() {
       console.error('Error fetching houses:', error);
       return [];
     }
-    return data || [];
+    // Mapear 'name' a 'houseName' para consistencia
+    return (data || []).map((h: any) => ({ ...h, houseName: h.name }));
   } catch (error) {
     console.error('Exception fetching houses:', error);
     return [];
@@ -1212,10 +1213,11 @@ export async function getHouses() {
 
 export async function createHouse(house: any) {
   const supabase = getSupabaseClient();
+  const houseName = house.houseName || house.name || '';
   const { data, error } = await (supabase
     .from('houses') as any)
     .insert([{
-      name: house.name,
+      name: houseName,
       created_at: new Date().toISOString()
     }])
     .select();
@@ -1261,6 +1263,12 @@ export function subscribeToHouses(callback: (data: any) => void) {
     console.log('🔔 [Realtime Service] Iniciando suscripción a houses');
     const supabase = getSupabaseClient();
     
+    // Primero cargar todas las casas
+    getHouses().then(houses => {
+      console.log('📨 [Realtime Service] Casas cargadas inicialmente:', houses);
+      callback(houses);
+    });
+    
     const channel = supabase
       .channel('houses-changes')
       .on(
@@ -1272,7 +1280,10 @@ export function subscribeToHouses(callback: (data: any) => void) {
         },
         (payload: any) => {
           console.log('📨 [Realtime Service] Cambio en houses:', payload);
-          callback(payload);
+          // Cuando hay un cambio, recargar todas las casas
+          getHouses().then(houses => {
+            callback(houses);
+          });
         }
       )
       .subscribe();

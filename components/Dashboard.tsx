@@ -472,7 +472,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         const housesData = await realtimeService.getHouses();
         console.log('🏠 Casas cargadas:', housesData);
         if (housesData.length > 0) {
-          setHouses(housesData.map((h: any) => ({ name: h.name, id: h.id, tasks: [], inventory: [], users: [] })));
+          setHouses(housesData.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] })));
         }
 
         // Cargar usuarios
@@ -489,20 +489,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     let housesSubscription: any;
     let usersSubscription: any;
     try {
-      housesSubscription = realtimeService.subscribeToHouses((payload: any) => {
-        console.log('🏠 Cambio en casas:', payload);
-        if (payload?.eventType === 'INSERT') {
-          setHouses(prev => [...prev, { name: payload.new.name, id: payload.new.id, tasks: [], inventory: [], users: [] }]);
-        } else if (payload?.eventType === 'UPDATE') {
-          setHouses(prev => prev.map(h => h.id === payload.new.id ? { ...h, name: payload.new.name } : h));
-        } else if (payload?.eventType === 'DELETE') {
-          setHouses(prev => prev.filter(h => h.id !== payload.old.id));
+      housesSubscription = realtimeService.subscribeToHouses((housesArray: any) => {
+        console.log('🏠 Casas actualizadas (realtime):', housesArray);
+        // subscribeToHouses ahora devuelve el array completo de casas
+        if (Array.isArray(housesArray) && housesArray.length > 0) {
+          setHouses(housesArray.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] })));
         }
       });
 
-      usersSubscription = realtimeService.subscribeToUsers((payload: any) => {
-        console.log('👥 Cambio en usuarios:', payload);
-        // Aquí se podría actualizar el estado global de usuarios si fuera necesario
+      usersSubscription = realtimeService.subscribeToUsers((usersArray: any) => {
+        console.log('👥 Usuarios actualizados (realtime):', usersArray);
+        // Actualizar estado de usuarios si es necesario
+        if (Array.isArray(usersArray)) {
+          setUsers(usersArray);
+        }
       });
     } catch (error) {
       console.error('Error subscribing to houses/users:', error);
