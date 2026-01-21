@@ -1069,9 +1069,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   return (
     <div className="dashboard-container">
-      {/* Logo eliminado, restaurado a versión previa */}
+      {/* Logo y Header */}
       <div className="dashboard-header-row">
         <div className="dashboard-title-block">
+          <img 
+            src="/limpieza360pro-logo.png" 
+            alt="Limpieza 360Pro" 
+            className="dashboard-logo"
+            style={{ width: '50px', height: '50px', objectFit: 'contain', marginRight: '15px' }}
+          />
           <h1>Dashboard</h1>
           <span className="dashboard-user-pill" aria-label="Usuario en sesión">👤 {user.username}</span>
           {user.username.toLowerCase() === 'jonathan' ? (

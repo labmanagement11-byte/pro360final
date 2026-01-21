@@ -66,11 +66,16 @@
   margin-bottom: 2.5rem;
 }
 
-.login-logo360pro svg {
-  width: 80px;
-  height: 80px;
+.login-logo360pro img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
   filter: drop-shadow(0 8px 16px rgba(102, 126, 234, 0.4));
   animation: float 3s ease-in-out infinite;
+}
+
+.login-logo-image {
+  animation: float 3s ease-in-out infinite !important;
 }
 
 @keyframes float {

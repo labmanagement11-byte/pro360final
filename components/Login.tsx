@@ -87,16 +87,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     <div className="login-container modern-login">
       <div className="login-card">
         <div className="login-logo360pro">
-          <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="30" cy="30" r="28" fill="#3182ce" stroke="#2563eb" strokeWidth="2" />
-            <path d="M18 38c2-8 8-14 14-14s12 6 14 14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-            <ellipse cx="30" cy="28" rx="7" ry="4" fill="#fff" fillOpacity=".7" />
-            <path d="M24 24c1-2 3-4 6-4s5 2 6 4" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          </svg>
-          <span className="login-logo360pro-text">
-            <span className="login-logo360pro-main">Limpieza</span>
-            <span className="login-logo360pro-sub">360Pro</span>
-          </span>
+          <img 
+            src="/limpieza360pro-logo.png" 
+            alt="Limpieza 360Pro" 
+            className="login-logo-image"
+            style={{ width: '120px', height: '120px', objectFit: 'contain' }}
+          />
         </div>
         <div className="login-header">
           <h2 className="login-title">Bienvenido</h2>
