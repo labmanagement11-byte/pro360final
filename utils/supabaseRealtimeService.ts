@@ -1068,6 +1068,7 @@ export async function createReminder(reminder: any) {
       due_date: reminder.due,
       bank: reminder.bank,
       account: reminder.account,
+      invoice_number: reminder.invoiceNumber || null,
       house: reminder.house || 'EPIC D1',
       created_at: new Date().toISOString()
     }])
@@ -1077,7 +1078,12 @@ export async function createReminder(reminder: any) {
     console.error('Error creating reminder:', error);
     return null;
   }
-  return data?.[0] || null;
+  const result = data?.[0] || null;
+  if (result) {
+    result.due = result.due_date;
+    result.invoiceNumber = result.invoice_number;
+  }
+  return result;
 }
 
 export async function getReminders(house: string = 'EPIC D1') {
@@ -1096,7 +1102,8 @@ export async function getReminders(house: string = 'EPIC D1') {
     // Mapear campos snake_case a camelCase
     return (data || []).map((r: any) => ({
       ...r,
-      due: r.due_date
+      due: r.due_date,
+      invoiceNumber: r.invoice_number
     }));
   } catch (error) {
     console.error('Exception fetching reminders:', error);
@@ -1113,6 +1120,10 @@ export async function updateReminder(reminderId: string, updates: any) {
     mappedUpdates.due_date = mappedUpdates.due;
     delete mappedUpdates.due;
   }
+  if ('invoiceNumber' in mappedUpdates) {
+    mappedUpdates.invoice_number = mappedUpdates.invoiceNumber;
+    delete mappedUpdates.invoiceNumber;
+  }
   
   const { data, error } = await (supabase
     .from('reminders') as any)
@@ -1127,6 +1138,7 @@ export async function updateReminder(reminderId: string, updates: any) {
   const result = data?.[0] || null;
   if (result) {
     result.due = result.due_date;
+    result.invoiceNumber = result.invoice_number;
   }
   return result;
 }
@@ -1164,8 +1176,8 @@ export function subscribeToReminders(house: string = 'EPIC D1', callback: (data:
           console.log('📨 [Realtime Service] Cambio en reminders:', payload);
           const mappedPayload = {
             ...payload,
-            new: payload.new ? { ...payload.new, due: payload.new.due_date } : null,
-            old: payload.old ? { ...payload.old, due: payload.old.due_date } : null
+            new: payload.new ? { ...payload.new, due: payload.new.due_date, invoiceNumber: payload.new.invoice_number } : null,
+            old: payload.old ? { ...payload.old, due: payload.old.due_date, invoiceNumber: payload.old.invoice_number } : null
           };
           callback(mappedPayload);
         }

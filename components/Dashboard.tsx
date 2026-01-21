@@ -213,6 +213,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     due: '',
     bank: '',
     account: '',
+    invoiceNumber: '',
   });
   const [editingReminderIdx, setEditingReminderIdx] = useState(-1);
 
@@ -1563,7 +1564,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             name: newReminder.name,
                             due: newReminder.due,
                             bank: newReminder.bank,
-                            account: newReminder.account
+                            account: newReminder.account,
+                            invoiceNumber: newReminder.invoiceNumber
                           });
                           setEditingReminderIdx(-1);
                         } else {
@@ -1573,10 +1575,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             due: newReminder.due,
                             bank: newReminder.bank,
                             account: newReminder.account,
+                            invoiceNumber: newReminder.invoiceNumber,
                             house: 'EPIC D1'
                           });
                         }
-                        setNewReminder({ name: '', due: '', bank: '', account: '' });
+                        setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '' });
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
@@ -1625,6 +1628,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               title="Número de cuenta"
                             />
                           </div>
+                          
+                          <div className="form-group">
+                            <label>📄 Número de factura</label>
+                            <input
+                              type="text"
+                              value={newReminder.invoiceNumber}
+                              onChange={(e) => setNewReminder({...newReminder, invoiceNumber: e.target.value})}
+                              placeholder="Ej: FAC-001234"
+                              title="Número de factura"
+                            />
+                          </div>
                         </div>
                         
                         <div style={{display: 'flex', gap: '1rem'}}>
@@ -1637,7 +1651,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               className="dashboard-btn danger" 
                               onClick={() => {
                                 setEditingReminderIdx(-1);
-                                setNewReminder({ name: '', due: '', bank: '', account: '' });
+                                setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '' });
                               }}
                             >
                               ❌ Cancelar
@@ -1670,6 +1684,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <p><strong>📅 Fecha:</strong> {item.due}</p>
                             <p><strong>🏦 Banco:</strong> {item.bank}</p>
                             <p><strong>🔢 Cuenta:</strong> {item.account}</p>
+                            {item.invoiceNumber && <p><strong>📄 Factura:</strong> {item.invoiceNumber}</p>}
                             <span className="subcard-badge">{item.bank}</span>
                           </div>
                           {(user.role === 'owner' || user.role === 'manager') && (
