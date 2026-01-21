@@ -1824,17 +1824,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         if (editingReminderIdx >= 0) {
                           // Editar recordatorio existente
                           const reminder = reminders[editingReminderIdx];
-                          await realtimeService.updateReminder(reminder.id, {
+                          const updated = await realtimeService.updateReminder(reminder.id, {
                             name: newReminder.name,
                             due: newReminder.due,
                             bank: newReminder.bank,
                             account: newReminder.account,
                             invoiceNumber: newReminder.invoiceNumber
                           });
+                          if (updated) {
+                            setReminders(prev => prev.map(r => r.id === reminder.id ? updated : r));
+                          }
                           setEditingReminderIdx(-1);
                         } else {
                           // Agregar nuevo recordatorio
-                          await realtimeService.createReminder({
+                          const created = await realtimeService.createReminder({
                             name: newReminder.name,
                             due: newReminder.due,
                             bank: newReminder.bank,
@@ -1842,6 +1845,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             invoiceNumber: newReminder.invoiceNumber,
                             house: selectedHouse
                           });
+                          if (created) {
+                            setReminders(prev => [...prev, created]);
+                          }
                         }
                         setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '' });
                       }}>
