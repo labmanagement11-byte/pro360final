@@ -597,7 +597,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'checklist',
       title: 'Checklist Limpieza',
       desc: 'Verifica y gestiona la limpieza y mantenimiento.',
-      show: true,
+      show: user.role === 'owner' || user.role === 'manager',
     },
     {
       key: 'inventory',
