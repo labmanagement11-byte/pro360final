@@ -85,45 +85,70 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
   return (
     <div className="login-container modern-login">
-      <div className="login-logo360pro">
-        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="30" cy="30" r="28" fill="#3182ce" stroke="#2563eb" strokeWidth="2" />
-          <path d="M18 38c2-8 8-14 14-14s12 6 14 14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-          <ellipse cx="30" cy="28" rx="7" ry="4" fill="#fff" fillOpacity=".7" />
-          <path d="M24 24c1-2 3-4 6-4s5 2 6 4" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-        </svg>
-        <span className="login-logo360pro-text">
-          <span className="login-logo360pro-main">Limpieza</span>
-          <span className="login-logo360pro-sub">360Pro</span>
-        </span>
+      <div className="login-card">
+        <div className="login-logo360pro">
+          <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="30" cy="30" r="28" fill="#3182ce" stroke="#2563eb" strokeWidth="2" />
+            <path d="M18 38c2-8 8-14 14-14s12 6 14 14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+            <ellipse cx="30" cy="28" rx="7" ry="4" fill="#fff" fillOpacity=".7" />
+            <path d="M24 24c1-2 3-4 6-4s5 2 6 4" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+          </svg>
+          <span className="login-logo360pro-text">
+            <span className="login-logo360pro-main">Limpieza</span>
+            <span className="login-logo360pro-sub">360Pro</span>
+          </span>
+        </div>
+        <div className="login-header">
+          <h2 className="login-title">Bienvenido</h2>
+          <p className="login-subtitle">Ingresa tus credenciales para continuar</p>
+        </div>
+        <form onSubmit={handleSubmit} className="login-form-modern">
+          <div className="login-input-group">
+            <label htmlFor="login-email" className="login-input-label">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="login-input-group">
+            <label htmlFor="login-password" className="login-input-label">Contraseña</label>
+            <input
+              id="login-password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <label className="login-remember-label">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+            />
+            <span>Recordar sesión</span>
+          </label>
+          <button type="submit" disabled={loading} className="login-submit-btn">
+            {loading ? (
+              <span className="login-btn-content">
+                <span className="login-spinner"></span>
+                <span>Ingresando...</span>
+              </span>
+            ) : (
+              <span className="login-btn-content">
+                <span>Entrar</span>
+                <span className="login-arrow">→</span>
+              </span>
+            )}
+          </button>
+        </form>
+        {error && <div className="login-error-msg">{error}</div>}
       </div>
-      <h2 className="login-title">Bienvenido</h2>
-      <form onSubmit={handleSubmit} className="login-form-modern">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
-        <label className="login-remember-label">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={e => setRemember(e.target.checked)}
-          />
-          Recordar sesión
-        </label>
-        <button type="submit" disabled={loading}> {loading ? 'Ingresando...' : 'Entrar'} </button>
-      </form>
-      {error && <p className="login-error-msg">{error}</p>}
     </div>
   );
 };
