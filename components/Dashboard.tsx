@@ -1261,14 +1261,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {view === 'reminders' && (
         <div className="dashboard-reminders redesigned-reminders">
           <h2 className="dashboard-reminders-title redesigned-reminders-title">Recordatorios</h2>
-          <form className="dashboard-reminders-form redesigned-reminders-form" onSubmit={e => {
+          <form className="dashboard-reminders-form redesigned-reminders-form" onSubmit={async e => {
             e.preventDefault();
             const form = e.target as HTMLFormElement;
             const name = (form.elements.namedItem('name') as HTMLInputElement).value;
             const due = (form.elements.namedItem('due') as HTMLInputElement).value;
             const bank = (form.elements.namedItem('bank') as HTMLInputElement).value;
             const account = (form.elements.namedItem('account') as HTMLInputElement).value;
-            setReminders([...reminders, { name, due, bank, account }]);
+            const invoiceNumber = (form.elements.namedItem('invoiceNumber') as HTMLInputElement)?.value || '';
+            const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+            try {
+              const created = await realtimeService.createReminder({ name, due, bank, account, invoiceNumber, house: selectedHouse });
+              if (created) {
+                setReminders(prev => prev.some(r => r.id === created.id) ? prev : [...prev, created]);
+              }
+            } catch (err) {
+              console.error('❌ Error creando recordatorio:', err);
+            }
             form.reset();
           }}>
             <div className="reminders-form-row">
@@ -1276,6 +1285,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               <input id="reminder-name" name="name" type="text" placeholder="Nombre del pago" required />
               <label htmlFor="reminder-due">Fecha de pago</label>
               <input id="reminder-due" name="due" type="date" required placeholder="Fecha de pago" title="Fecha de pago" />
+              <label htmlFor="reminder-invoice">N° de factura (opcional)</label>
+              <input id="reminder-invoice" name="invoiceNumber" type="text" placeholder="N° de factura" />
               <label htmlFor="reminder-bank">Banco</label>
               <input id="reminder-bank" name="bank" type="text" placeholder="Banco" required />
               <label htmlFor="reminder-account">N° de cuenta</label>
@@ -1287,20 +1298,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             {reminders.map((r, idx) => (
               <li key={idx} className="dashboard-reminder-item redesigned-reminder-item">
                 {editIdx === idx ? (
-                  <form className="dashboard-reminders-edit-form redesigned-reminders-edit-form" onSubmit={e => {
+                  <form className="dashboard-reminders-edit-form redesigned-reminders-edit-form" onSubmit={async e => {
                     e.preventDefault();
                     const form = e.target as HTMLFormElement;
                     const name = (form.elements.namedItem('name') as HTMLInputElement).value;
                     const due = (form.elements.namedItem('due') as HTMLInputElement).value;
                     const bank = (form.elements.namedItem('bank') as HTMLInputElement).value;
                     const account = (form.elements.namedItem('account') as HTMLInputElement).value;
-                    setReminders(reminders.map((rem, i) => i === idx ? { name, due, bank, account } : rem));
+                    const invoiceNumber = (form.elements.namedItem('invoiceNumber') as HTMLInputElement)?.value || '';
+                    try {
+                      const updated = await realtimeService.updateReminder(r.id, { name, due, bank, account, invoiceNumber });
+                      if (updated) {
+                        setReminders(prev => prev.map(rem => rem.id === updated.id ? updated : rem));
+                      }
+                    } catch (err) {
+                      console.error('❌ Error actualizando recordatorio:', err);
+                    }
                     setEditIdx(-1);
                   }}>
                     <label htmlFor={`edit-reminder-name-${idx}`}>Nombre del pago</label>
                     <input id={`edit-reminder-name-${idx}`} name="name" type="text" defaultValue={r.name} required />
                     <label htmlFor={`edit-reminder-due-${idx}`}>Fecha de pago</label>
                     <input id={`edit-reminder-due-${idx}`} name="due" type="date" defaultValue={r.due} required placeholder="Fecha de pago" title="Fecha de pago" />
+                    <label htmlFor={`edit-reminder-invoice-${idx}`}>N° de factura (opcional)</label>
+                    <input id={`edit-reminder-invoice-${idx}`} name="invoiceNumber" type="text" defaultValue={r.invoiceNumber || ''} />
                     <label htmlFor={`edit-reminder-bank-${idx}`}>Banco</label>
                     <input id={`edit-reminder-bank-${idx}`} name="bank" type="text" defaultValue={r.bank} required />
                     <label htmlFor={`edit-reminder-account-${idx}`}>N° de cuenta</label>
@@ -1313,12 +1334,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     <div className="reminder-card-main">
                       <span className="dashboard-reminder-name">{r.name}</span>
                       <span className="dashboard-reminder-due">{r.due}</span>
+                      {r.invoiceNumber ? (
+                        <span className="dashboard-reminder-invoice">Factura: {r.invoiceNumber}</span>
+                      ) : null}
                       <span className="dashboard-reminder-bank">{r.bank}</span>
                       <span className="dashboard-reminder-account">{r.account}</span>
                     </div>
                     <div className="reminder-card-actions">
                       <button className="dashboard-btn" onClick={() => setEditIdx(idx)}>Editar</button>
-                      <button className="dashboard-btn danger" onClick={() => setReminders(reminders.filter((_, i) => i !== idx))}>Eliminar</button>
+                      <button className="dashboard-btn danger" onClick={async () => {
+                        try {
+                          const ok = await realtimeService.deleteReminder(r.id);
+                          if (ok) {
+                            setReminders(prev => prev.filter(rem => rem.id !== r.id));
+                          }
+                        } catch (err) {
+                          console.error('❌ Error eliminando recordatorio:', err);
+                        }
+                      }}>Eliminar</button>
                     </div>
                   </div>
                 )}

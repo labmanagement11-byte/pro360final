@@ -11,8 +11,10 @@ interface Task {
   date?: string;
   time?: string;
   house?: string;
-  complete?: boolean;
+  completed?: boolean;
   reason?: string;
+  completed_by?: string;
+  completed_at?: string;
 }
 
 interface User {
@@ -94,7 +96,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   // Agregar tarea a Supabase
   const addTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const newTask = { ...form, complete: false, house: form.house || user.house || 'EPIC D1' };
+    const newTask = { ...form, completed: false, house: form.house || user.house || 'EPIC D1' };
     // @ts-expect-error
     const { data, error } = await supabase!.from('tasks').insert([newTask]).select();
     if (!error && data && data.length > 0) {
@@ -136,10 +138,15 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   const toggleComplete = async (idx: number) => {
     const task = tasks[idx];
     if (!task || !task.id) return;
+    const newCompleted = !task.completed;
     const { data, error } = await supabase!
       .from('tasks')
       // @ts-ignore
-      .update({ complete: !task.complete })
+      .update({
+        completed: newCompleted,
+        completed_by: newCompleted ? user.username : null,
+        completed_at: newCompleted ? new Date().toISOString() : null
+      })
       .eq('id', task.id)
       .select();
     if (!error && data && data.length > 0) {
@@ -168,10 +175,10 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     const { data, error } = await supabase!
       .from('tasks')
       // @ts-ignore
-      .update({ complete: false })
+      .update({ completed: false, completed_by: null, completed_at: null })
       .in('id', ids);
     if (!error) {
-      setTasksState(tasks.map(t => ({ ...t, complete: false })));
+      setTasksState(tasks.map(t => ({ ...t, completed: false, completed_by: undefined, completed_at: undefined })));
     }
   };
 
@@ -242,9 +249,9 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
             {user.role === 'empleado' && (
               <>
                 <label className="tasks-complete-label">
-                  <input type="checkbox" checked={!!t.complete} onChange={() => toggleComplete(tasks.indexOf(t))} /> Completada
+                  <input type="checkbox" checked={!!t.completed} onChange={() => toggleComplete(tasks.indexOf(t))} /> Completada
                 </label>
-                {!t.complete && (
+                {!t.completed && (
                   <input
                     type="text"
                     placeholder="Motivo si no completa"
@@ -256,8 +263,11 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
                 )}
               </>
             )}
-            {(user.role === 'dueno' || user.role === 'manager') && t.complete && (
-              <span className="tasks-completed-label">Completada</span>
+            {(user.role === 'dueno' || user.role === 'manager') && t.completed && (
+              <span className="tasks-completed-label">
+                Completada{t.completed_by ? ` por ${t.completed_by}` : ''}
+                {t.completed_at ? ` el ${new Date(t.completed_at).toLocaleString()}` : ''}
+              </span>
             )}
           </li>
         ))}
