@@ -67,15 +67,15 @@
 }
 
 .login-logo360pro img {
-  width: 150px;
-  height: 150px;
+  width: 170px;
+  height: auto;
+  max-width: 80vw;
   object-fit: contain;
   animation: float 3s ease-in-out infinite;
-  border-radius: 20px;
-  padding: 12px;
-  background: radial-gradient(circle at 40% 30%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)),
-              linear-gradient(145deg, #0f172a 0%, #111827 60%, #0b1221 100%);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 0;
+  background: transparent;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
 .login-logo-image {
