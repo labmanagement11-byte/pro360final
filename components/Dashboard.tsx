@@ -234,7 +234,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
   const [checklistData, setChecklistData] = useState<any>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(CHECKLIST_KEY) : null;
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const data = JSON.parse(saved);
+      // Asegurar que existan todas las zonas de mantenimiento
+      Object.keys(MANTENIMIENTO).forEach(zona => {
+        if (!data[zona]) {
+          data[zona] = {
+            type: 'mantenimiento',
+            tasks: MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO].map((task: string) => ({
+              text: task,
+              completed: false
+            }))
+          };
+        }
+      });
+      return data;
+    }
     
     // Inicializar con estructura vacía
     const initial: any = {};
