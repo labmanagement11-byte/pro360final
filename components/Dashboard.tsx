@@ -332,9 +332,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('⚡ Evento recibido en tiempo real:', payload);
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nueva tarea insertada:', payload.new);
+          console.log('   - ID:', payload.new?.id);
+          console.log('   - Title:', payload.new?.title);
+          console.log('   - AssignedTo:', payload.new?.assignedTo);
+          console.log('   - Type:', payload.new?.type);
           setTasksList(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
           console.log('✏️ Tarea actualizada:', payload.new);
+          console.log('   - ID:', payload.new?.id);
+          console.log('   - AssignedTo:', payload.new?.assignedTo);
+          console.log('   - Completed:', payload.new?.completed);
           setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
         } else if (payload?.eventType === 'DELETE') {
           console.log('🗑️ Tarea eliminada:', payload.old);
@@ -713,6 +720,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   }, [users]);
 
   const extraTasksForUser = tasksList.filter(t => t.assignedTo === user.username && t.type === 'Tarea extra' && !t.completed);
+  
+  // Debug: mostrar tareas que se cargan y el filtro
+  useEffect(() => {
+    console.log('👤 Usuario actual:', user.username);
+    console.log('📋 Todas las tareas cargadas:', tasksList);
+    console.log('🟦 Tareas extra para este usuario:', extraTasksForUser);
+  }, [tasksList, user.username]);
+
   const cards = [
     {
       key: 'tasks',
@@ -985,6 +1000,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
             </div>
             <div className="modal-body">
+              {(() => {
+                console.log('🟦 Modal Tareas Extra abierto');
+                console.log('   Usuario:', user.username);
+                console.log('   Tareas extra para este usuario:', extraTasksForUser);
+                return null;
+              })()}
               {extraTasksForUser.length === 0 ? (
                 <div className="modal-body-empty">
                   <p>No tienes tareas extra pendientes.</p>
