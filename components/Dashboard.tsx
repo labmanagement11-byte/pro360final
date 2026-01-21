@@ -1230,6 +1230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         users={users}
         tasks={houses[allowedHouseIdx]?.tasks || []}
         setTasks={(tasks: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks } : h))}
+        selectedHouse={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name}
       />}
       {view === 'inventory' && (
         <Inventory
@@ -1239,7 +1240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
         />
       )}
-      {view === 'calendar' && <Calendar users={users as any} user={user as any} />}
+      {view === 'calendar' && <Calendar users={users as any} user={user as any} selectedHouse={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name} />}
       {view === 'checklist' && <Checklist user={user} users={users} />}
       {view === 'reminders' && (
         <div className="dashboard-reminders redesigned-reminders">

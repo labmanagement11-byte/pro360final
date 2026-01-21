@@ -26,9 +26,10 @@ interface TasksProps {
   users: User[];
   tasks?: Task[];
   setTasks?: (tasks: Task[]) => void;
+  selectedHouse?: string; // Casa seleccionada para filtrar usuarios
 }
 
-const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTasks: setExternalTasks }) => {
+const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTasks: setExternalTasks, selectedHouse }) => {
   const [tasks, setTasksState] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -199,7 +200,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
             required
           >
             <option value="">Empleado</option>
-            {users.filter(u => u.role === 'empleado').map(u => <option key={u.username} value={u.username}>{u.username}</option>)}
+            {users.filter(u => u.role === 'empleado' && (!selectedHouse || u.house === selectedHouse)).map(u => <option key={u.username} value={u.username}>{u.username}</option>)}
           </select>
           <select title="Casa asignada"
             value={editIdx !== null ? editForm.house : form.house}

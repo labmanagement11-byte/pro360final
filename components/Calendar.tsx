@@ -29,8 +29,9 @@ interface User {
 interface CalendarProps {
   users: User[];
   user: User;
+  selectedHouse?: string; // Casa seleccionada para filtrar usuarios
 }
-const Calendar = ({ users, user }: CalendarProps) => {
+const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
@@ -43,13 +44,13 @@ const Calendar = ({ users, user }: CalendarProps) => {
   });
 
   // Cargar eventos desde Supabase
-  const fetchEvents = async () => {
+  const fetchEvents = async (house: string = 'EPIC D1') => {
     setLoading(true);
     if (!supabase) return;
     const { data, error } = await (supabase as any)
       .from('calendar')
       .select('*')
-      .eq('house', 'EPIC D1')
+      .eq('house', house)
       .order('date', { ascending: true });
     if (!error && data) {
       setEvents(data);
@@ -61,7 +62,8 @@ const Calendar = ({ users, user }: CalendarProps) => {
 
   // Cargar eventos al montar y suscribirse a cambios en tiempo real
   useEffect(() => {
-    fetchEvents();
+    const house = selectedHouse || 'EPIC D1';
+    fetchEvents(house);
 
     if (!supabase) return;
 
@@ -70,19 +72,20 @@ const Calendar = ({ users, user }: CalendarProps) => {
       .channel('calendar-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar' }, (payload: any) => {
         console.log('Cambio en calendar:', payload);
-        fetchEvents();
+        fetchEvents(house);
       })
       .subscribe();
 
     return () => {
       channel.unsubscribe();
     };
-  }, []);
+  }, [selectedHouse]);
 
   const addEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!supabase) return;
-    const newEvent = { ...form, house: 'EPIC D1' };
+    const house = selectedHouse || 'EPIC D1';
+    const newEvent = { ...form, house };
     await (supabase as any).from('calendar').insert(newEvent);
     setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
     // Realtime actualizará automáticamente
@@ -113,7 +116,7 @@ const Calendar = ({ users, user }: CalendarProps) => {
           <label htmlFor="calendar-employee" className="calendar-label">Empleado:</label>
           <select id="calendar-employee" value={form.employee} onChange={e => setForm({ ...form, employee: e.target.value })} required title="Selecciona el empleado">
             <option value="">Empleado</option>
-            {users.filter((u: User) => u.role === 'empleado').map((u: User) => <option key={u.username} value={u.username}>{u.username}</option>)}
+            {users.filter((u: User) => u.role === 'empleado' && (!selectedHouse || u.house === selectedHouse)).map((u: User) => <option key={u.username} value={u.username}>{u.username}</option>)}
           </select>
           <label htmlFor="calendar-time" className="calendar-label">Hora:</label>
           <input id="calendar-time" type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} required title="Selecciona la hora" placeholder="Selecciona la hora" />
