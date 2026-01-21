@@ -712,12 +712,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [users]);
 
+  const extraTasksForUser = tasksList.filter(t => t.assignedTo === user.username && t.type === 'Tarea extra' && !t.completed);
   const cards = [
     {
       key: 'tasks',
       title: 'Asignar Tareas',
       desc: 'Gestiona y asigna tareas a empleados.',
       show: user.role !== 'empleado',
+    },
+    {
+      key: 'extraTasks',
+      title: 'Tareas Extra',
+      desc: 'Tareas adicionales asignadas al empleado.',
+      show: user.role === 'empleado' && extraTasksForUser.length > 0,
     },
     {
       key: 'checklist',
@@ -850,7 +857,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 className="dashboard-card"
                 onClick={() => {
                   // Para calendar, shopping, reminders: mostrar modal
-                  if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks'].includes(card.key)) {
+                  if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks', 'extraTasks'].includes(card.key)) {
                     setSelectedModalCard(card.key);
                   } else {
                     // Para los demás: cambiar vista
@@ -966,6 +973,55 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Modal Tareas Extra (solo empleado) */}
+      {selectedModalCard === 'extraTasks' && (
+        <div className="modal-overlay" onClick={() => setSelectedModalCard(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🟦 Tareas Extra</h2>
+              <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {extraTasksForUser.length === 0 ? (
+                <div className="modal-body-empty">
+                  <p>No tienes tareas extra pendientes.</p>
+                </div>
+              ) : (
+                <div className="subcards-grid">
+                  {extraTasksForUser.map(task => (
+                    <div key={task.id} className="subcard">
+                      <div className="subcard-header">
+                        <div className="subcard-icon">🟦</div>
+                        <h3>{task.title}</h3>
+                      </div>
+                      <div className="subcard-content">
+                        <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
+                        <p><strong>👤 Asignado por:</strong> {task.created_by || 'Manager'}</p>
+                        <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
+                          {task.completed ? '✅ Completada' : '⏳ Pendiente'}
+                        </span>
+                      </div>
+                      <div className="subcard-actions">
+                        {!task.completed && (
+                          <button
+                            className="dashboard-btn main"
+                            onClick={async () => {
+                              await realtimeService.updateTask(task.id, { completed: true });
+                            }}
+                          >
+                            ✅ Marcar Completada
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
       {view === 'tasks' && <Tasks
@@ -2141,6 +2197,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <option value="Limpieza general">✨ Limpieza general</option>
                               <option value="Limpieza profunda">🧹 Limpieza profunda</option>
                               <option value="Mantenimiento">🔧 Mantenimiento</option>
+                              <option value="Tarea extra">🟦 Tarea extra</option>
                             </select>
                           </div>
                           
