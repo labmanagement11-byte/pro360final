@@ -132,6 +132,14 @@ const App = () => {
   // Cargar usuarios (profiles) al iniciar la app
   useEffect(() => {
     fetchUsers();
+    
+    // Sincronizar usuarios cada 5 segundos para asegurar que no estén desincronizados
+    const interval = setInterval(() => {
+      console.log('🔄 Sincronizando usuarios...');
+      fetchUsers();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Logout con Supabase Auth
