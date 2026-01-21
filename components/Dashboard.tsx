@@ -812,6 +812,137 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [selectedModalCard, allowedHouseIdx, houses]);
 
+  // Cargar checklist desde Supabase y sincronizar en tiempo real
+  useEffect(() => {
+    if (!houses.length || selectedHouseIdx === -1) return;
+
+    const selectedHouse = houses[selectedHouseIdx];
+    const houseName = selectedHouse?.houseName || selectedHouse?.name;
+    if (!houseName) return;
+
+    const loadChecklistFromSupabase = async () => {
+      try {
+        console.log(`📋 Cargando checklist desde Supabase para: ${houseName}`);
+        const { data, error } = await (supabase as any)
+          .from('checklist')
+          .select('*')
+          .eq('house', houseName);
+        
+        if (error) {
+          console.error('❌ Error cargando checklist:', error);
+          return;
+        }
+
+        // Transformar datos de Supabase al formato esperado
+        const checklistByZona: any = {};
+        
+        // Inicializar con zonas predefinidas
+        Object.keys(LIMPIEZA_REGULAR).forEach(zona => {
+          checklistByZona[zona] = {
+            type: 'regular',
+            tasks: LIMPIEZA_REGULAR[zona as keyof typeof LIMPIEZA_REGULAR].map((task: string) => ({
+              text: task,
+              completed: false
+            }))
+          };
+        });
+        Object.keys(LIMPIEZA_PROFUNDA).forEach(zona => {
+          checklistByZona[zona] = {
+            type: 'profunda',
+            tasks: LIMPIEZA_PROFUNDA[zona as keyof typeof LIMPIEZA_PROFUNDA].map((task: string) => ({
+              text: task,
+              completed: false
+            }))
+          };
+        });
+        Object.keys(MANTENIMIENTO).forEach(zona => {
+          checklistByZona[zona] = {
+            type: 'mantenimiento',
+            tasks: MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO].map((task: string) => ({
+              text: task,
+              completed: false
+            }))
+          };
+        });
+
+        // Agregar/actualizar tareas de Supabase
+        if (data && data.length > 0) {
+          data.forEach((item: any) => {
+            const zona = item.room || 'Sin asignar';
+            if (!checklistByZona[zona]) {
+              checklistByZona[zona] = {
+                type: item.type || 'custom',
+                tasks: []
+              };
+            }
+            
+            // Buscar si ya existe esta tarea en la zona
+            const existingTaskIdx = checklistByZona[zona].tasks.findIndex((t: any) => 
+              t.text === item.item && !t.id
+            );
+            
+            if (existingTaskIdx >= 0) {
+              // Actualizar tarea existente con info de Supabase
+              checklistByZona[zona].tasks[existingTaskIdx] = {
+                ...checklistByZona[zona].tasks[existingTaskIdx],
+                completed: item.complete || false,
+                id: item.id
+              };
+            } else {
+              // Agregar nueva tarea de Supabase
+              checklistByZona[zona].tasks.push({
+                text: item.item,
+                completed: item.complete || false,
+                id: item.id
+              });
+            }
+          });
+          console.log(`✅ Checklist cargado de Supabase para ${houseName}:`, checklistByZona);
+        }
+        
+        setChecklistData(checklistByZona);
+      } catch (error) {
+        console.error('❌ Error en loadChecklistFromSupabase:', error);
+      }
+    };
+
+    loadChecklistFromSupabase();
+
+    // Suscribirse a cambios en tiempo real del checklist
+    let checklistSubscription: any;
+    try {
+      console.log(`🔔 Suscribiendo a cambios de checklist para: ${houseName}`);
+      checklistSubscription = (supabase as any)
+        .channel(`checklist-realtime-${houseName}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'checklist',
+            filter: `house=eq.${houseName}`
+          },
+          async (payload: any) => {
+            console.log(`⚡ Cambio en checklist recibido (${payload.eventType}):`, payload);
+            // Recargar el checklist completo para mantener sincronizado
+            await loadChecklistFromSupabase();
+          }
+        )
+        .subscribe((status: any) => {
+          console.log(`📡 Estado de suscripción checklist (${houseName}):`, status);
+        });
+    } catch (error) {
+      console.error('❌ Error suscribiendo a cambios de checklist:', error);
+    }
+
+    return () => {
+      if (checklistSubscription) {
+        supabase?.removeChannel(checklistSubscription);
+        console.log('❌ Suscripción de checklist removida');
+      }
+    };
+  }, [houses, selectedHouseIdx]);
+
   // Guardar checklist en localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -2146,6 +2277,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   house: selectedHouse,
                                   item: taskText,
                                   room: zona,
+                                  type: checklistType,
                                   complete: false,
                                   assigned_to: null
                                 }])
