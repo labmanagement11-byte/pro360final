@@ -121,6 +121,23 @@ const LIMPIEZA_PROFUNDA = {
   ]
 };
 
+const MANTENIMIENTO = {
+  'PISCINA Y AGUA': [
+    'Mantener la piscina limpia y en funcionamiento.',
+    'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.'
+  ],
+  'SISTEMAS ELÉCTRICOS': [
+    'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
+    'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.'
+  ],
+  'ÁREAS VERDES': [
+    'Cortar el césped cada mes y medio a dos meses, y limpiar restos de césped.',
+    'Mantenimiento de palmeras: remover hojas secas.',
+    'Mantener la matera de la terraza libre de maleza y deshierbar regularmente.',
+    'Regar las plantas vivas según necesidad.'
+  ]
+};
+
 
 export interface User {
   id?: number; // ID de Supabase (opcional)
@@ -199,7 +216,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [editingInventoryIdx, setEditingInventoryIdx] = useState(-1);
 
   // Estado para checklist
-  const [checklistType, setChecklistType] = useState<'regular' | 'profunda'>('regular');
+  const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
+  const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
+  const [taskMaintenanceData, setTaskMaintenanceData] = useState<any>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_task_maintenance') : null;
+    return saved ? JSON.parse(saved) : {};
+  });
   const [checklistData, setChecklistData] = useState<any>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(CHECKLIST_KEY) : null;
     if (saved) return JSON.parse(saved);
@@ -224,6 +246,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         }))
       };
     });
+    Object.keys(MANTENIMIENTO).forEach(zona => {
+      initial[zona] = {
+        type: 'mantenimiento',
+        tasks: MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO].map((task: string) => ({
+          text: task,
+          completed: false
+        }))
+      };
+    });
     return initial;
   });
 
@@ -240,6 +271,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistData));
     }
   }, [checklistData]);
+
+  // Guardar mantenimiento de tareas en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard_task_maintenance', JSON.stringify(taskMaintenanceData));
+    }
+  }, [taskMaintenanceData]);
 
   const showReminders = user.role === 'owner' || user.role === 'manager';
 
@@ -1154,7 +1192,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedModalCard === 'checklist' && (
                 <>
                   {/* Controles de tipo de limpieza */}
-                  <div className="checklist-controls" style={{marginBottom: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center'}}>
+                  <div className="checklist-controls" style={{marginBottom: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap'}}>
                     <button 
                       onClick={() => setChecklistType('regular')}
                       className={`dashboard-btn ${checklistType === 'regular' ? 'main' : ''}`}
@@ -1168,6 +1206,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
                     >
                       🏠 Limpieza Profunda
+                    </button>
+                    <button 
+                      onClick={() => setChecklistType('mantenimiento')}
+                      className={`dashboard-btn ${checklistType === 'mantenimiento' ? 'main' : ''}`}
+                      style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
+                    >
+                      🔧 Mantenimiento
                     </button>
                   </div>
 
@@ -1283,7 +1328,133 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   )}
                 </>
               )}
-              
+              {selectedTaskMaintenance && (
+                <div className="modal-overlay" onClick={() => setSelectedTaskMaintenance(null)}>
+                  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-header">
+                      <h2>🔧 Checklist de Mantenimiento</h2>
+                      <button className="modal-close" onClick={() => setSelectedTaskMaintenance(null)}>✕</button>
+                    </div>
+                    
+                    <div className="modal-body">
+                      <div style={{marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '0.75rem', borderLeft: '4px solid #0284c7'}}>
+                        <p style={{margin: '0.25rem 0'}}><strong>📋 Tarea:</strong> {selectedTaskMaintenance.title}</p>
+                        <p style={{margin: '0.25rem 0'}}><strong>👤 Asignado a:</strong> {selectedTaskMaintenance.assignedTo}</p>
+                        <p style={{margin: '0.25rem 0'}}><strong>📝 Descripción:</strong> {selectedTaskMaintenance.description}</p>
+                      </div>
+
+                      {(() => {
+                        const taskKey = `task_${selectedTaskMaintenance.taskIdx}_maintenance`;
+                        const data = taskMaintenanceData[taskKey] || {};
+                        const stats = Object.entries(data).reduce((acc, [_, zonaData]: any) => {
+                          const total = zonaData.tasks.length;
+                          const completed = zonaData.tasks.filter((t: any) => t.completed).length;
+                          return {
+                            total: acc.total + total,
+                            completed: acc.completed + completed
+                          };
+                        }, { total: 0, completed: 0 });
+
+                        return (
+                          <>
+                            <div className="modal-stats" style={{marginBottom: '2rem'}}>
+                              <div className="stat-box">
+                                <p className="stat-box-number">{stats.total}</p>
+                                <p className="stat-box-label">Tareas totales</p>
+                              </div>
+                              <div className="stat-box">
+                                <p className="stat-box-number">{stats.completed}</p>
+                                <p className="stat-box-label">Completadas</p>
+                              </div>
+                              <div className="stat-box">
+                                <p className="stat-box-number">{stats.total - stats.completed}</p>
+                                <p className="stat-box-label">Pendientes</p>
+                              </div>
+                              <div className="stat-box">
+                                <p className="stat-box-number">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</p>
+                                <p className="stat-box-label">Progreso</p>
+                              </div>
+                            </div>
+
+                            <div className="subcards-grid">
+                              {Object.entries(data).map(([zona, zonaData]: any) => {
+                                const completedCount = zonaData.tasks.filter((t: any) => t.completed).length;
+                                const totalCount = zonaData.tasks.length;
+                                
+                                return (
+                                  <div key={zona} className="subcard" style={{border: '2px solid #e5e7eb'}}>
+                                    <div className="subcard-header" style={{backgroundColor: completedCount === totalCount ? '#dcfce7' : '#fef3c7'}}>
+                                      <h3 style={{flex: 1}}>{zona}</h3>
+                                      <span style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#374151'}}>
+                                        {completedCount}/{totalCount}
+                                      </span>
+                                    </div>
+                                    <div className="subcard-content" style={{padding: '1rem'}}>
+                                      <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                                        {zonaData.tasks.map((task: any, idx: number) => (
+                                          <label key={idx} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: task.completed ? '#f0fdf4' : '#fafafa', transition: 'background-color 0.2s'}}>
+                                            <input
+                                              type="checkbox"
+                                              checked={task.completed}
+                                              onChange={(e) => {
+                                                const updatedZone = {
+                                                  ...zonaData,
+                                                  tasks: zonaData.tasks.map((t: any, i: number) => 
+                                                    i === idx ? { ...t, completed: e.target.checked } : t
+                                                  )
+                                                };
+                                                setTaskMaintenanceData({
+                                                  ...taskMaintenanceData,
+                                                  [taskKey]: {
+                                                    ...data,
+                                                    [zona]: updatedZone
+                                                  }
+                                                });
+                                              }}
+                                              style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
+                                            />
+                                            <span style={{flex: 1, color: task.completed ? '#6b7280' : '#1f2937', textDecoration: task.completed ? 'line-through' : 'none', fontSize: '0.95rem', lineHeight: '1.5'}}>
+                                              {task.text}
+                                            </span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {stats.completed > 0 && (
+                              <div style={{marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center'}}>
+                                <button 
+                                  onClick={() => {
+                                    const resetData = { ...data };
+                                    Object.entries(resetData).forEach(([zona, zonaData]: any) => {
+                                      resetData[zona] = {
+                                        tasks: zonaData.tasks.map((t: any) => ({ ...t, completed: false }))
+                                      };
+                                    });
+                                    setTaskMaintenanceData({
+                                      ...taskMaintenanceData,
+                                      [taskKey]: resetData
+                                    });
+                                  }}
+                                  className="dashboard-btn danger"
+                                  style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
+                                >
+                                  🔄 Resetear Checklist
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {selectedModalCard === 'inventory' && (
                 <>
                   {/* Formulario para agregar inventario (Manager/Owner) */}
@@ -1622,32 +1793,61 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 {task.completed ? '✅ Completada' : '⏳ Pendiente'}
                               </span>
                             </div>
-                            {(user.role === 'owner' || user.role === 'manager') && (
-                              <div className="subcard-actions">
+                            <div className="subcard-actions">
+                              {task.type === 'Mantenimiento' && (user.role === 'empleado' || user.role === 'manager' || user.role === 'owner') && (
                                 <button 
+                                  className="dashboard-btn main"
                                   onClick={() => {
-                                    setNewTask({
-                                      title: task.title,
-                                      description: task.description,
-                                      assignedTo: task.assignedTo,
-                                      type: task.type
-                                    });
-                                    setEditingTaskIdx(idx);
+                                    setSelectedTaskMaintenance({ ...task, taskIdx: idx });
+                                    // Inicializar checklist para esta tarea si no existe
+                                    const taskKey = `task_${idx}_maintenance`;
+                                    if (!taskMaintenanceData[taskKey]) {
+                                      const newData: any = {};
+                                      Object.keys(MANTENIMIENTO).forEach(zona => {
+                                        newData[zona] = {
+                                          tasks: MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO].map((t: string) => ({
+                                            text: t,
+                                            completed: false
+                                          }))
+                                        };
+                                      });
+                                      setTaskMaintenanceData({
+                                        ...taskMaintenanceData,
+                                        [taskKey]: newData
+                                      });
+                                    }
                                   }}
                                 >
-                                  ✏️ Editar
+                                  📋 Ver Checklist
                                 </button>
-                                <button 
-                                  className="danger"
-                                  onClick={() => {
-                                    const updatedTasks = (houses[allowedHouseIdx]?.tasks || []).filter((_: any, i: number) => i !== idx);
-                                    setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks: updatedTasks } : h));
-                                  }}
-                                >
-                                  🗑️ Eliminar
-                                </button>
-                              </div>
-                            )}
+                              )}
+                              {(user.role === 'owner' || user.role === 'manager') && (
+                                <>
+                                  <button 
+                                    onClick={() => {
+                                      setNewTask({
+                                        title: task.title,
+                                        description: task.description,
+                                        assignedTo: task.assignedTo,
+                                        type: task.type
+                                      });
+                                      setEditingTaskIdx(idx);
+                                    }}
+                                  >
+                                    ✏️ Editar
+                                  </button>
+                                  <button 
+                                    className="danger"
+                                    onClick={() => {
+                                      const updatedTasks = (houses[allowedHouseIdx]?.tasks || []).filter((_: any, i: number) => i !== idx);
+                                      setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, tasks: updatedTasks } : h));
+                                    }}
+                                  >
+                                    🗑️ Eliminar
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </>
