@@ -387,14 +387,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const loadCalendarAssignments = async () => {
       try {
         setLoadingCalendar(true);
+        console.log('📅 Cargando asignaciones de calendario...');
+        console.log('👤 Usuario:', { role: user.role, username: user.username });
+        
         // Si es empleado, cargar solo sus asignaciones
         const assignments = user.role === 'empleado' 
           ? await realtimeService.getCalendarAssignments('EPIC D1', user.username)
           : await realtimeService.getCalendarAssignments('EPIC D1');
+        
+        console.log('✅ Asignaciones cargadas:', assignments);
         setCalendarAssignments(assignments || []);
         setLoadingCalendar(false);
       } catch (error) {
-        console.error('Error loading calendar assignments:', error);
+        console.error('❌ Error loading calendar assignments:', error);
         setCalendarAssignments([]);
         setLoadingCalendar(false);
       }
@@ -405,30 +410,52 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
+      console.log('🔔 Suscribiendo a cambios de calendario en tiempo real...');
+      console.log('🏠 House: EPIC D1');
+      if (user.role === 'empleado') {
+        console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
+      }
+      
       subscription = realtimeService.subscribeToCalendarAssignments(
         'EPIC D1',
         (payload: any) => {
+          console.log('⚡ Evento de calendario recibido:', payload);
+          
           if (payload?.eventType === 'INSERT') {
-            setCalendarAssignments(prev => [...prev, payload.new]);
+            console.log('➕ Nueva asignación insertada:', payload.new);
+            // Si es empleado, solo agregar si es su asignación
+            if (user.role === 'empleado' && payload.new?.employee !== user.username) {
+              console.log('⏭️ Asignación no es para este empleado, ignorando');
+              return;
+            }
+            setCalendarAssignments(prev => {
+              console.log('📝 Agregando asignación al estado');
+              return [...prev, payload.new];
+            });
           } else if (payload?.eventType === 'UPDATE') {
+            console.log('✏️ Asignación actualizada:', payload.new);
             setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
           } else if (payload?.eventType === 'DELETE') {
+            console.log('🗑️ Asignación eliminada:', payload.old);
             setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
           }
         },
         user.role === 'empleado' ? user.username : undefined
       );
+      
+      console.log('✅ Suscripción de calendario activa:', subscription);
     } catch (error) {
-      console.error('Error subscribing to calendar assignments:', error);
+      console.error('❌ Error subscribing to calendar assignments:', error);
     }
 
     return () => {
       try {
+        console.log('🔌 Desconectando suscripción de calendario...');
         if (subscription) {
           supabase?.removeChannel(subscription);
         }
       } catch (error) {
-        console.error('Error unsubscribing from calendar:', error);
+        console.error('❌ Error unsubscribing from calendar:', error);
       }
     };
   }, [user.role, user.username]);
@@ -937,14 +964,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {(user.role === 'owner' || user.role === 'manager') && (
                     <div className="modal-assignment-form">
                       <h3>📅 Nueva Asignación de Horario</h3>
-                      <form onSubmit={(e) => {
+                      <form onSubmit={async (e) => {
                         e.preventDefault();
                         if (newAssignment.employee && newAssignment.date && newAssignment.time) {
-                          setCalendarAssignments([...calendarAssignments, {
-                            ...newAssignment,
-                            id: Date.now(),
-                            createdAt: new Date().toISOString()
-                          }]);
+                          console.log('📅 Creando asignación de calendario:', newAssignment);
+                          
+                          const result = await realtimeService.createCalendarAssignment({
+                            employee: newAssignment.employee,
+                            date: newAssignment.date,
+                            time: newAssignment.time,
+                            type: newAssignment.type,
+                            house: 'EPIC D1'
+                          });
+                          
+                          console.log('✅ Asignación creada:', result);
                           setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
                         }
                       }}>

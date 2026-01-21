@@ -369,12 +369,15 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 
 export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callback: (data: any) => void, employee?: string) {
   try {
+    console.log('🔔 [Calendar Service] Iniciando suscripción:', { house, employee });
     const supabase = getSupabaseClient();
     
     let filter = `house=eq.${house}`;
     if (employee) {
       filter += `,employee=eq.${employee}`;
     }
+    
+    console.log('🔍 [Calendar Service] Filtro aplicado:', filter);
     
     const channel = supabase
       .channel('calendar-changes')
@@ -387,19 +390,26 @@ export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callba
           filter: filter
         },
         (payload: any) => {
+          console.log('⚡ [Calendar Service] Evento recibido:', payload);
+          
           const mappedPayload = {
             eventType: payload.eventType,
             new: payload.new,
             old: payload.old
           };
+          
+          console.log('✅ [Calendar Service] Enviando a callback:', mappedPayload);
           callback(mappedPayload);
         }
       )
-      .subscribe();
+      .subscribe((status: any) => {
+        console.log('📡 [Calendar Service] Estado de suscripción:', status);
+      });
     
+    console.log('✅ [Calendar Service] Canal creado:', channel);
     return channel;
   } catch (error) {
-    console.error('Error subscribing to calendar assignments:', error);
+    console.error('❌ [Calendar Service] Error subscribing to calendar assignments:', error);
     return null;
   }
 }
