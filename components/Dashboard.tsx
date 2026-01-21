@@ -250,25 +250,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
 
   // Casas y selección de casa
-  // IMPORTANTE: No cargamos nombres de casas desde localStorage porque puede tener nombres antiguos
-  // Los nombres SIEMPRE se cargan desde Supabase para garantizar consistencia
+  // IMPORTANTE: Limpiamos localStorage de casas para forzar que cargue desde Supabase
+  // Esto garantiza que siempre tenga los nombres correctos, sin nombres antiguos
   const [houses, setHouses] = useState<any[]>(() => {
-    // Limpiar localStorage si tiene nombres antiguos
+    // Limpiar localStorage de casas al iniciar (para forzar carga desde Supabase)
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dashboard_houses');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          // Si encuentra nombres antiguos, limpiar
-          if (parsed.some((h: any) => h.name && h.name.includes('YNTIBA') && !h.name.includes('HYNTIBA'))) {
-            console.log('🧹 Limpiando localStorage con nombres antiguos de casas');
-            localStorage.removeItem('dashboard_houses');
-          }
-        } catch (e) {
-          console.log('Error al parsear localStorage de casas, limpiando');
-          localStorage.removeItem('dashboard_houses');
-        }
-      }
+      localStorage.removeItem('dashboard_houses');
+      console.log('🧹 localStorage de casas limpiado al iniciar');
     }
     return [
       { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: defaultUsers }
