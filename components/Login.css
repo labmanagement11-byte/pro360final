@@ -70,11 +70,12 @@
   width: 150px;
   height: 150px;
   object-fit: contain;
-  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.28));
   animation: float 3s ease-in-out infinite;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35));
-  border-radius: 18px;
-  padding: 10px;
+  border-radius: 20px;
+  padding: 12px;
+  background: radial-gradient(circle at 40% 30%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)),
+              linear-gradient(145deg, #0f172a 0%, #111827 60%, #0b1221 100%);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .login-logo-image {
