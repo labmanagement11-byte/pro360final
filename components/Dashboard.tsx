@@ -289,88 +289,133 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   // Cargar tareas desde Supabase con suscripción en tiempo real
   useEffect(() => {
     const loadTasks = async () => {
-      setLoadingTasks(true);
-      const tasks = await realtimeService.getTasks('EPIC D1');
-      setTasksList(tasks);
-      setLoadingTasks(false);
+      try {
+        setLoadingTasks(true);
+        const tasks = await realtimeService.getTasks('EPIC D1');
+        setTasksList(tasks || []);
+        setLoadingTasks(false);
+      } catch (error) {
+        console.error('Error loading tasks:', error);
+        setTasksList([]);
+        setLoadingTasks(false);
+      }
     };
 
     loadTasks();
 
     // Suscribirse a cambios en tiempo real
-    const subscription = realtimeService.subscribeToTasks('EPIC D1', (payload: any) => {
-      if (payload?.eventType === 'INSERT') {
-        setTasksList(prev => [...prev, payload.new]);
-      } else if (payload?.eventType === 'UPDATE') {
-        setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
-      } else if (payload?.eventType === 'DELETE') {
-        setTasksList(prev => prev.filter(t => t.id !== payload.old?.id));
-      }
-    });
+    let subscription: any;
+    try {
+      subscription = realtimeService.subscribeToTasks('EPIC D1', (payload: any) => {
+        if (payload?.eventType === 'INSERT') {
+          setTasksList(prev => [...prev, payload.new]);
+        } else if (payload?.eventType === 'UPDATE') {
+          setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
+        } else if (payload?.eventType === 'DELETE') {
+          setTasksList(prev => prev.filter(t => t.id !== payload.old?.id));
+        }
+      });
+    } catch (error) {
+      console.error('Error subscribing to tasks:', error);
+    }
 
     return () => {
-      subscription?.unsubscribe?.();
+      try {
+        subscription?.unsubscribe?.();
+      } catch (error) {
+        console.error('Error unsubscribing from tasks:', error);
+      }
     };
   }, []);
 
   // Cargar inventario desde Supabase con suscripción en tiempo real
   useEffect(() => {
     const loadInventory = async () => {
-      setLoadingInventory(true);
-      const items = await realtimeService.getInventoryItems('EPIC D1');
-      setInventoryList(items);
-      setLoadingInventory(false);
+      try {
+        setLoadingInventory(true);
+        const items = await realtimeService.getInventoryItems('EPIC D1');
+        setInventoryList(items || []);
+        setLoadingInventory(false);
+      } catch (error) {
+        console.error('Error loading inventory:', error);
+        setInventoryList([]);
+        setLoadingInventory(false);
+      }
     };
 
     loadInventory();
 
     // Suscribirse a cambios en tiempo real
-    const subscription = realtimeService.subscribeToInventory('EPIC D1', (payload: any) => {
-      if (payload?.eventType === 'INSERT') {
-        setInventoryList(prev => [...prev, payload.new]);
-      } else if (payload?.eventType === 'UPDATE') {
-        setInventoryList(prev => prev.map(i => i.id === payload.new?.id ? payload.new : i));
-      } else if (payload?.eventType === 'DELETE') {
-        setInventoryList(prev => prev.filter(i => i.id !== payload.old?.id));
-      }
-    });
+    let subscription: any;
+    try {
+      subscription = realtimeService.subscribeToInventory('EPIC D1', (payload: any) => {
+        if (payload?.eventType === 'INSERT') {
+          setInventoryList(prev => [...prev, payload.new]);
+        } else if (payload?.eventType === 'UPDATE') {
+          setInventoryList(prev => prev.map(i => i.id === payload.new?.id ? payload.new : i));
+        } else if (payload?.eventType === 'DELETE') {
+          setInventoryList(prev => prev.filter(i => i.id !== payload.old?.id));
+        }
+      });
+    } catch (error) {
+      console.error('Error subscribing to inventory:', error);
+    }
 
     return () => {
-      subscription?.unsubscribe?.();
+      try {
+        subscription?.unsubscribe?.();
+      } catch (error) {
+        console.error('Error unsubscribing from inventory:', error);
+      }
     };
   }, []);
 
   // Cargar asignaciones de calendario desde Supabase con suscripción en tiempo real
   useEffect(() => {
     const loadCalendarAssignments = async () => {
-      setLoadingCalendar(true);
-      // Si es empleado, cargar solo sus asignaciones
-      const assignments = user.role === 'empleado' 
-        ? await realtimeService.getCalendarAssignments('EPIC D1', user.username)
-        : await realtimeService.getCalendarAssignments('EPIC D1');
-      setCalendarAssignments(assignments);
-      setLoadingCalendar(false);
+      try {
+        setLoadingCalendar(true);
+        // Si es empleado, cargar solo sus asignaciones
+        const assignments = user.role === 'empleado' 
+          ? await realtimeService.getCalendarAssignments('EPIC D1', user.username)
+          : await realtimeService.getCalendarAssignments('EPIC D1');
+        setCalendarAssignments(assignments || []);
+        setLoadingCalendar(false);
+      } catch (error) {
+        console.error('Error loading calendar assignments:', error);
+        setCalendarAssignments([]);
+        setLoadingCalendar(false);
+      }
     };
 
     loadCalendarAssignments();
 
     // Suscribirse a cambios en tiempo real
-    const subscription = realtimeService.subscribeToCalendarAssignments(
-      'EPIC D1',
-      (payload: any) => {
-        if (payload?.eventType === 'INSERT') {
-          setCalendarAssignments(prev => [...prev, payload.new]);
-        } else if (payload?.eventType === 'UPDATE') {
-          setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
-        } else if (payload?.eventType === 'DELETE') {
-          setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
-        }
-      },
-      user.role === 'empleado' ? user.username : undefined
-    );
+    let subscription: any;
+    try {
+      subscription = realtimeService.subscribeToCalendarAssignments(
+        'EPIC D1',
+        (payload: any) => {
+          if (payload?.eventType === 'INSERT') {
+            setCalendarAssignments(prev => [...prev, payload.new]);
+          } else if (payload?.eventType === 'UPDATE') {
+            setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+          } else if (payload?.eventType === 'DELETE') {
+            setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
+          }
+        },
+        user.role === 'empleado' ? user.username : undefined
+      );
+    } catch (error) {
+      console.error('Error subscribing to calendar assignments:', error);
+    }
 
     return () => {
-      subscription?.unsubscribe?.();
+      try {
+        subscription?.unsubscribe?.();
+      } catch (error) {
+        console.error('Error unsubscribing from calendar:', error);
+      }
     };
   }, [user.role, user.username]);
 

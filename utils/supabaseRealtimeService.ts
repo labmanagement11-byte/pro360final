@@ -25,18 +25,23 @@ export async function createTask(task: any) {
 }
 
 export async function getTasks(house: string = 'EPIC D1') {
-  const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('tasks') as any)
-    .select('*')
-    .eq('house', house)
-    .order('createdAt', { ascending: false });
-  
-  if (error) {
-    console.error('Error fetching tasks:', error);
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('tasks') as any)
+      .select('*')
+      .eq('house', house)
+      .order('createdAt', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching tasks:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching tasks:', error);
     return [];
   }
-  return data || [];
 }
 
 export async function updateTask(taskId: string, updates: any) {
@@ -195,17 +200,22 @@ export async function updateInventoryItem(itemId: string, updates: any) {
 }
 
 export async function getInventoryItems(house: string = 'EPIC D1') {
-  const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('inventory') as any)
-    .select('*')
-    .eq('house', house);
-  
-  if (error) {
-    console.error('Error fetching inventory:', error);
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory') as any)
+      .select('*')
+      .eq('house', house);
+    
+    if (error) {
+      console.error('Error fetching inventory:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching inventory:', error);
     return [];
   }
-  return data || [];
 }
 
 export async function deleteInventoryItem(itemId: string) {
@@ -259,23 +269,28 @@ export async function createCalendarAssignment(assignment: any) {
 }
 
 export async function getCalendarAssignments(house: string = 'EPIC D1', employee?: string) {
-  const supabase = getSupabaseClient();
-  let query = (supabase
-    .from('calendar_assignments') as any)
-    .select('*')
-    .eq('house', house);
-  
-  if (employee) {
-    query = query.eq('employee', employee);
-  }
-  
-  const { data, error } = await query.order('date', { ascending: true });
-  
-  if (error) {
-    console.error('Error fetching calendar assignments:', error);
+  try {
+    const supabase = getSupabaseClient();
+    let query = (supabase
+      .from('calendar_assignments') as any)
+      .select('*')
+      .eq('house', house);
+    
+    if (employee) {
+      query = query.eq('employee', employee);
+    }
+    
+    const { data, error } = await query.order('date', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching calendar assignments:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching calendar assignments:', error);
     return [];
   }
-  return data || [];
 }
 
 export async function updateCalendarAssignment(assignmentId: string, updates: any) {
@@ -327,19 +342,24 @@ export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callba
 
 // ==================== SHOPPING LIST ====================
 export async function getShoppingList(house: string = 'EPIC D1') {
-  const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('shopping_list') as any)
-    .select('*')
-    .eq('house', house)
-    .eq('completed', false)
-    .order('createdAt', { ascending: false });
-  
-  if (error) {
-    console.error('Error fetching shopping list:', error);
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('shopping_list') as any)
+      .select('*')
+      .eq('house', house)
+      .eq('completed', false)
+      .order('createdAt', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching shopping list:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching shopping list:', error);
     return [];
   }
-  return data || [];
 }
 
 export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
