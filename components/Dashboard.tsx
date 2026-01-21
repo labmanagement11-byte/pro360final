@@ -290,29 +290,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [selectedHouseIdx]);
 
-  // LIMPIEZA AGRESIVA de localStorage para usuarios que tengan datos cacheados incorrectos
-  // Esto es especialmente importante para Sandra y Chava que tenían "YNTIBA 2" en el caché
+  // LIMPIEZA SELECTIVA de localStorage para usuario - SOLO keys de casas
+  // No tocamos SESSION_KEY para mantener el usuario logueado
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      console.log('🧹 Ejecutando limpieza agresiva de localStorage para:', user?.username);
+      console.log('🧹 Limpieza selectiva de localStorage para:', user?.username);
       
-      // Limpiar TODOS los keys que empiecen con 'dashboard'
-      const keysToDelete = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('dashboard')) {
-          keysToDelete.push(key);
-        }
-      }
+      // Limpiar SOLO los keys relacionados con casas
+      const keysToDelete = ['dashboard_houses', 'dashboard_selected_house_idx'];
       
       keysToDelete.forEach(key => {
-        console.log(`  Borrando: ${key}`);
-        localStorage.removeItem(key);
+        if (localStorage.getItem(key)) {
+          console.log(`  Borrando: ${key}`);
+          localStorage.removeItem(key);
+        }
       });
       
-      if (keysToDelete.length > 0) {
-        console.log(`✅ Limpiados ${keysToDelete.length} keys de localStorage`);
-      }
+      console.log('✅ Limpieza selectiva completada');
     }
   }, [user?.username]); // Ejecutar cada vez que cambie el usuario
   
