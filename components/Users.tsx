@@ -118,7 +118,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           // Usar Supabase para jonathan
           const editedUser = users[editIdx];
           if (editedUser?.id) {
-            await realtimeService.updateUser(editedUser.id, {
+            await realtimeService.updateUser(String(editedUser.id), {
               username: editData.username,
               password: editData.password || '',
               role: editData.role,
@@ -144,7 +144,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         // Usar Supabase para jonathan
         const userToDelete = users[idx];
         if (userToDelete?.id) {
-          await realtimeService.deleteUser(userToDelete.id);
+          await realtimeService.deleteUser(String(userToDelete.id));
         }
       } else if (deleteUser) {
         // Fallback para owner
