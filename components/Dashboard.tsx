@@ -939,10 +939,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Cargar lista de compras desde Supabase
   useEffect(() => {
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
     const loadShopping = async () => {
       setLoadingShopping(true);
-      const pending = await realtimeService.getShoppingList('EPIC D1', false);
-      const purchased = await realtimeService.getShoppingList('EPIC D1', true);
+      const pending = await realtimeService.getShoppingList(selectedHouse, false);
+      const purchased = await realtimeService.getShoppingList(selectedHouse, true);
       setShoppingList(pending);
       setShoppingHistory(purchased.filter((i: any) => i.is_purchased));
       setLoadingShopping(false);
@@ -950,7 +951,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     loadShopping();
     
     // Suscribirse a cambios en tiempo real
-    const subscription = realtimeService.subscribeToShoppingList('EPIC D1', (payload: any) => {
+    const subscription = realtimeService.subscribeToShoppingList(selectedHouse, (payload: any) => {
       if (payload.eventType === 'INSERT') {
         if (!payload.new.is_purchased) {
           setShoppingList(prev => [payload.new, ...prev]);
@@ -975,18 +976,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         supabase?.removeChannel(subscription);
       }
     };
-  }, []);
+  }, [allowedHouseIdx, houses]);
 
   // Agregar producto (actualizado para realtime)
   const addShoppingItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newShoppingItem.item_name.trim()) return;
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
     await realtimeService.addShoppingListItem({
       item_name: newShoppingItem.item_name,
       quantity: newShoppingItem.quantity,
       category: newShoppingItem.category,
       added_by: user.username
-    }, 'EPIC D1');
+    }, selectedHouse);
     setNewShoppingItem({ item_name: '', quantity: '', category: 'General' });
   };
 
@@ -1475,6 +1477,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           addUser={addUser}
           editUser={editUser}
           deleteUser={deleteUser}
+          selectedHouse={houses[allowedHouseIdx]?.name || 'EPIC D1'}
         />
       )}
       
@@ -1506,13 +1509,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         e.preventDefault();
                         if (newAssignment.employee && newAssignment.date && newAssignment.time) {
                           console.log('📅 Creando asignación de calendario:', newAssignment);
-                          
+                          const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
                           const result = await realtimeService.createCalendarAssignment({
                             employee: newAssignment.employee,
                             date: newAssignment.date,
                             time: newAssignment.time,
                             type: newAssignment.type,
-                            house: 'EPIC D1'
+                            house: selectedHouse
                           });
                           
                           if (result && result.id) {
@@ -1524,7 +1527,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               result.id,
                               newAssignment.employee,
                               newAssignment.type,  // Pasar el tipo de limpieza
-                              'EPIC D1'
+                              selectedHouse
                             );
                             console.log('✅ Checklist creado con', checklistItems.length, 'items');
 
@@ -1532,7 +1535,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             const inventoryItems = await realtimeService.createAssignmentInventory(
                               result.id,
                               newAssignment.employee,
-                              'EPIC D1'
+                              selectedHouse
                             );
                             console.log('✅ Inventario creado con', inventoryItems.length, 'items');
                           }

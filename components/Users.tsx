@@ -10,10 +10,11 @@ interface UsersProps {
   addUser?: (user: User) => void;
   editUser?: (idx: number, user: User) => void;
   deleteUser?: (idx: number) => void;
+  selectedHouse?: string;
 }
 
 
-const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouses, addUser, editUser, deleteUser }) => {
+const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouses, addUser, editUser, deleteUser, selectedHouse }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
@@ -203,7 +204,20 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       </form>
       <ul className="users-list">
         {users && users.length > 0 ? (
-          users.map((u, idx) => (
+          users
+            .filter(u => {
+              // Jonathan ve todos los usuarios o solo los de la casa seleccionada
+              if (user?.username.toLowerCase() === 'jonathan' && selectedHouse) {
+                return u.house === selectedHouse;
+              }
+              // Managers solo ven usuarios de su propia casa
+              if (user?.role === 'manager' && user.house) {
+                return u.house === user.house;
+              }
+              // Dueño ve todos
+              return true;
+            })
+            .map((u, idx) => (
             <li key={idx}>
               {editIdx === idx ? (
                 <form onSubmit={handleEditUser} className="users-edit-form">
