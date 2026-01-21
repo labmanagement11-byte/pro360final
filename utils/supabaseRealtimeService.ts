@@ -1,7 +1,8 @@
-import { supabase } from './supabaseClient';
+import { getSupabaseClient } from './supabaseClient';
 
 // ==================== TAREAS ====================
 export async function createTask(task: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('tasks')
     .insert([{
@@ -38,6 +39,7 @@ export async function getTasks(house: string = 'EPIC D1') {
 }
 
 export async function updateTask(taskId: string, updates: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('tasks')
     .update(updates)
@@ -52,6 +54,7 @@ export async function updateTask(taskId: string, updates: any) {
 }
 
 export async function deleteTask(taskId: string) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('tasks')
     .delete()
@@ -65,6 +68,7 @@ export async function deleteTask(taskId: string) {
 }
 
 export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any[]) => void) {
+  const supabase = getSupabaseClient();
   const subscription = supabase
     .from('tasks')
     .on('*', (payload) => {
@@ -79,6 +83,7 @@ export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any
 
 // ==================== CHECKLIST ITEMS ====================
 export async function createChecklistItem(item: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('checklist_items')
     .insert([{
@@ -101,6 +106,7 @@ export async function createChecklistItem(item: any) {
 }
 
 export async function updateChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('checklist_items')
     .update({
@@ -119,6 +125,7 @@ export async function updateChecklistItem(itemId: string, completed: boolean, co
 }
 
 export async function getChecklistItems(taskId: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('checklist_items')
     .select('*')
@@ -132,6 +139,7 @@ export async function getChecklistItems(taskId: string) {
 }
 
 export function subscribeToChecklistItems(taskId: string, callback: (data: any) => void) {
+  const supabase = getSupabaseClient();
   const subscription = supabase
     .from('checklist_items')
     .on('*', (payload) => {
@@ -146,6 +154,7 @@ export function subscribeToChecklistItems(taskId: string, callback: (data: any) 
 
 // ==================== INVENTARIO ====================
 export async function createInventoryItem(item: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('inventory')
     .insert([{
@@ -167,6 +176,7 @@ export async function createInventoryItem(item: any) {
 }
 
 export async function updateInventoryItem(itemId: string, updates: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('inventory')
     .update({
@@ -184,6 +194,7 @@ export async function updateInventoryItem(itemId: string, updates: any) {
 }
 
 export async function getInventoryItems(house: string = 'EPIC D1') {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('inventory')
     .select('*')
@@ -197,6 +208,7 @@ export async function getInventoryItems(house: string = 'EPIC D1') {
 }
 
 export async function deleteInventoryItem(itemId: string) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('inventory')
     .delete()
@@ -210,6 +222,7 @@ export async function deleteInventoryItem(itemId: string) {
 }
 
 export function subscribeToInventory(house: string = 'EPIC D1', callback: (data: any) => void) {
+  const supabase = getSupabaseClient();
   const subscription = supabase
     .from('inventory')
     .on('*', (payload) => {
@@ -224,6 +237,7 @@ export function subscribeToInventory(house: string = 'EPIC D1', callback: (data:
 
 // ==================== CALENDAR ASSIGNMENTS ====================
 export async function createCalendarAssignment(assignment: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('calendar_assignments')
     .insert([{
@@ -244,6 +258,7 @@ export async function createCalendarAssignment(assignment: any) {
 }
 
 export async function getCalendarAssignments(house: string = 'EPIC D1', employee?: string) {
+  const supabase = getSupabaseClient();
   let query = supabase
     .from('calendar_assignments')
     .select('*')
@@ -263,6 +278,7 @@ export async function getCalendarAssignments(house: string = 'EPIC D1', employee
 }
 
 export async function updateCalendarAssignment(assignmentId: string, updates: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('calendar_assignments')
     .update(updates)
@@ -277,6 +293,7 @@ export async function updateCalendarAssignment(assignmentId: string, updates: an
 }
 
 export async function deleteCalendarAssignment(assignmentId: string) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('calendar_assignments')
     .delete()
@@ -290,6 +307,7 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 }
 
 export function subscribeToCalendarAssignments(house: string = 'EPIC D1', employee?: string, callback: (data: any) => void) {
+  const supabase = getSupabaseClient();
   const subscription = supabase
     .from('calendar_assignments')
     .on('*', (payload) => {
@@ -308,6 +326,7 @@ export function subscribeToCalendarAssignments(house: string = 'EPIC D1', employ
 
 // ==================== SHOPPING LIST ====================
 export async function getShoppingList(house: string = 'EPIC D1') {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('shopping_list')
     .select('*')
@@ -323,6 +342,7 @@ export async function getShoppingList(house: string = 'EPIC D1') {
 }
 
 export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
+  const supabase = getSupabaseClient();
   const subscription = supabase
     .from('shopping_list')
     .on('*', (payload) => {
@@ -339,7 +359,7 @@ export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (da
 export function unsubscribeFromAll(subscriptions: any[]) {
   subscriptions.forEach(sub => {
     if (sub) {
-      supabase.removeSubscription(sub);
+      sub?.unsubscribe?.();
     }
   });
 }
