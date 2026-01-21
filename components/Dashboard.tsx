@@ -683,7 +683,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'inventory',
       title: 'Inventario',
       desc: 'Controla y revisa el inventario de la propiedad.',
-      show: true,
+      show: false, // Deshabilitado - ahora el inventario está en las asignaciones
     },
     {
       key: 'shopping',
