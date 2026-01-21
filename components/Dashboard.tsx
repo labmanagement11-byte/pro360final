@@ -1073,7 +1073,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       <div className="dashboard-header-row">
         <div className="dashboard-title-block">
           <img 
-            src="/limpieza360pro-logo.png" 
+            src="/limpieza360pro-logo.svg" 
             alt="Limpieza 360Pro" 
             className="dashboard-logo"
             style={{ width: '50px', height: '50px', objectFit: 'contain', marginRight: '15px' }}

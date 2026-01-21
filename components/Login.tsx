@@ -88,7 +88,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       <div className="login-card">
         <div className="login-logo360pro">
           <img 
-            src="/limpieza360pro-logo.png" 
+            src="/limpieza360pro-logo.svg" 
             alt="Limpieza 360Pro" 
             className="login-logo-image"
             style={{ width: '120px', height: '120px', objectFit: 'contain' }}
