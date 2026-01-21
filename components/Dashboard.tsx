@@ -25,11 +25,11 @@ const cardStyles = {
 };
 
 
-// Usuarios por defecto para la casa EPIC D1
+// Usuarios por defecto para la casa HYNTIBA 2 APTO 406
 const defaultUsers: User[] = [
-  { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'EPIC D1' },
-  { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'EPIC D1' },
-  { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'EPIC D1' },
+  { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'HYNTIBA 2 APTO 406' },
+  { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'HYNTIBA 2 APTO 406' },
+  { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'HYNTIBA 2 APTO 406' },
 ];
 
 const defaultReminders = [
@@ -253,7 +253,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [houses, setHouses] = useState<any[]>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
     return saved ? JSON.parse(saved) : [
-      { name: 'EPIC D1', tasks: [], inventory: [], users: defaultUsers }
+      { name: 'HYNTIBA 2 APTO 406', tasks: [], inventory: [], users: defaultUsers }
     ];
   });
   // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
@@ -345,7 +345,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Cargar tareas desde Supabase con suscripción en tiempo real
   useEffect(() => {
-    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406';
     
     const loadTasks = async () => {
       try {
@@ -406,7 +406,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Cargar inventario desde Supabase con suscripción en tiempo real
   useEffect(() => {
-    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406';
     
     const loadInventory = async () => {
       try {
@@ -452,7 +452,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Cargar recordatorios desde Supabase con suscripción en tiempo real
   useEffect(() => {
-    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406';
     
     const loadReminders = async () => {
       try {
@@ -982,7 +982,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const addShoppingItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newShoppingItem.item_name.trim()) return;
-    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406';
     await realtimeService.addShoppingListItem({
       item_name: newShoppingItem.item_name,
       quantity: newShoppingItem.quantity,
@@ -1253,7 +1253,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {view === 'inventory' && (
         <Inventory
           user={user}
-          houseName={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name || 'EPIC D1'}
+          houseName={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406'}
           inventory={houses[allowedHouseIdx]?.inventory || []}
           setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
         />
@@ -1477,7 +1477,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           addUser={addUser}
           editUser={editUser}
           deleteUser={deleteUser}
-          selectedHouse={houses[allowedHouseIdx]?.name || 'EPIC D1'}
+          selectedHouse={houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406'}
         />
       )}
       
@@ -1509,7 +1509,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         e.preventDefault();
                         if (newAssignment.employee && newAssignment.date && newAssignment.time) {
                           console.log('📅 Creando asignación de calendario:', newAssignment);
-                          const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+                          const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406';
                           const result = await realtimeService.createCalendarAssignment({
                             employee: newAssignment.employee,
                             date: newAssignment.date,
@@ -2420,7 +2420,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           item_name: newTemplateItem.item_name,
                           quantity: parseInt(newTemplateItem.quantity),
                           category: newTemplateItem.category
-                        }, 'EPIC D1');
+                        }, 'HYNTIBA 2 APTO 406');
                       }
                       
                       setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
@@ -2609,7 +2609,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             type: newTask.type,
                             createdBy: user.username
                           });
-                            const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+                            const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA 2 APTO 406';
                           const result = await realtimeService.createTask({
                             title: newTask.title,
                             description: newTask.description,

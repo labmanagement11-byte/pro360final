@@ -20,7 +20,7 @@ export async function createTask(task: any) {
       description: task.description,
       assigned_to: task.assignedTo,
       type: task.type,
-      house: task.house || 'EPIC D1',
+      house: task.house || 'HYNTIBA 2 APTO 406',
       completed: false,
       created_by: task.createdBy,
       created_at: new Date().toISOString()
@@ -34,7 +34,7 @@ export async function createTask(task: any) {
   return data?.[0] ? normalizeTask(data[0]) : null;
 }
 
-export async function getTasks(house: string = 'EPIC D1') {
+export async function getTasks(house: string = 'HYNTIBA 2 APTO 406') {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
@@ -95,7 +95,7 @@ export async function deleteTask(taskId: string) {
   return true;
 }
 
-export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any) => void) {
+export function subscribeToTasks(house: string = 'HYNTIBA 2 APTO 406', callback: (data: any) => void) {
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a tasks para house:', house);
     const supabase = getSupabaseClient();
@@ -146,7 +146,7 @@ export async function createChecklistItem(item: any) {
       zona: item.zona,
       text: item.text,
       completed: false,
-      house: item.house || 'EPIC D1',
+      house: item.house || 'HYNTIBA 2 APTO 406',
       type: item.type,
       completedBy: null,
       completedAt: null
@@ -218,7 +218,7 @@ export async function createInventoryItem(item: any) {
       location: item.location,
       complete: true,
       notes: '',
-      house: item.house || 'EPIC D1',
+      house: item.house || 'HYNTIBA 2 APTO 406',
       created_at: new Date().toISOString()
     }])
     .select();
@@ -248,7 +248,7 @@ export async function updateInventoryItem(itemId: string, updates: any) {
   return data?.[0] || null;
 }
 
-export async function getInventoryItems(house: string = 'EPIC D1') {
+export async function getInventoryItems(house: string = 'HYNTIBA 2 APTO 406') {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
@@ -281,7 +281,7 @@ export async function deleteInventoryItem(itemId: string) {
   return true;
 }
 
-export function subscribeToInventory(house: string = 'EPIC D1', callback: (data: any) => void) {
+export function subscribeToInventory(house: string = 'HYNTIBA 2 APTO 406', callback: (data: any) => void) {
   try {
     const supabase = getSupabaseClient();
     
@@ -323,7 +323,7 @@ export async function createCalendarAssignment(assignment: any) {
       date: assignment.date,
       time: assignment.time,
       type: assignment.type,
-      house: assignment.house || 'EPIC D1',
+      house: assignment.house || 'HYNTIBA 2 APTO 406',
       created_at: new Date().toISOString()
     }])
     .select();
@@ -335,7 +335,7 @@ export async function createCalendarAssignment(assignment: any) {
   return data?.[0] || null;
 }
 
-export async function getCalendarAssignments(house: string = 'EPIC D1', employee?: string) {
+export async function getCalendarAssignments(house: string = 'HYNTIBA 2 APTO 406', employee?: string) {
   try {
     const supabase = getSupabaseClient();
     let query = (supabase
@@ -389,7 +389,7 @@ export async function deleteCalendarAssignment(assignmentId: string) {
   return true;
 }
 
-export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callback: (data: any) => void, employee?: string) {
+export function subscribeToCalendarAssignments(house: string = 'HYNTIBA 2 APTO 406', callback: (data: any) => void, employee?: string) {
   try {
     console.log('🔔 [Calendar Service] Iniciando suscripción:', { house, employee });
     const supabase = getSupabaseClient();
@@ -437,7 +437,7 @@ export function subscribeToCalendarAssignments(house: string = 'EPIC D1', callba
 }
 
 // ==================== CLEANING CHECKLIST ====================
-export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'EPIC D1') {
+export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'HYNTIBA 2 APTO 406') {
   const supabase = getSupabaseClient();
   
   console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId, 'Tipo:', assignmentType);
@@ -688,7 +688,7 @@ export function subscribeToChecklist(assignmentId: string, callback: (data: any)
 // ==================== ASSIGNMENT INVENTORY (Inventario por Asignación) ====================
 
 // Obtener template de inventario
-export async function getInventoryTemplate(house: string = 'EPIC D1') {
+export async function getInventoryTemplate(house: string = 'HYNTIBA 2 APTO 406') {
   try {
     console.log('📦 [Inventory Template] Obteniendo template para:', house);
     const supabase = getSupabaseClient();
@@ -712,7 +712,7 @@ export async function getInventoryTemplate(house: string = 'EPIC D1') {
 }
 
 // Crear inventario para una asignación (copia del template)
-export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'EPIC D1') {
+export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'HYNTIBA 2 APTO 406') {
   const supabase = getSupabaseClient();
   
   console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId);
@@ -839,7 +839,7 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
 }
 
 // CRUD para inventory_template (manager edita el template)
-export async function createInventoryTemplateItem(item: any, house: string = 'EPIC D1') {
+export async function createInventoryTemplateItem(item: any, house: string = 'HYNTIBA 2 APTO 406') {
   const supabase = getSupabaseClient();
   const { data, error } = await (supabase
     .from('inventory_template') as any)
@@ -890,7 +890,7 @@ export async function deleteInventoryTemplateItem(itemId: string) {
   return true;
 }
 
-export function subscribeToInventoryTemplate(house: string = 'EPIC D1', callback: (data: any) => void) {
+export function subscribeToInventoryTemplate(house: string = 'HYNTIBA 2 APTO 406', callback: (data: any) => void) {
   try {
     const supabase = getSupabaseClient();
     const channel = supabase
@@ -924,7 +924,7 @@ export function subscribeToInventoryTemplate(house: string = 'EPIC D1', callback
 // ==================== SHOPPING LIST (Lista de Compras) ====================
 
 // Obtener lista de compras
-export async function getShoppingList(house: string = 'EPIC D1', includePurchased: boolean = false) {
+export async function getShoppingList(house: string = 'HYNTIBA 2 APTO 406', includePurchased: boolean = false) {
   try {
     const supabase = getSupabaseClient();
     let query = (supabase
@@ -951,7 +951,7 @@ export async function getShoppingList(house: string = 'EPIC D1', includePurchase
 }
 
 // Agregar item a la lista de compras
-export async function addShoppingListItem(item: any, house: string = 'EPIC D1') {
+export async function addShoppingListItem(item: any, house: string = 'HYNTIBA 2 APTO 406') {
   const supabase = getSupabaseClient();
   const { data, error } = await (supabase
     .from('shopping_list') as any)
@@ -1028,7 +1028,7 @@ export async function deleteShoppingListItem(itemId: string) {
 }
 
 // Suscribirse a cambios en la lista de compras
-export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
+export function subscribeToShoppingList(house: string = 'HYNTIBA 2 APTO 406', callback: (data: any) => void) {
   try {
     const supabase = getSupabaseClient();
     const channel = supabase
@@ -1069,7 +1069,7 @@ export async function createReminder(reminder: any) {
       bank: reminder.bank,
       account: reminder.account,
       invoice_number: reminder.invoiceNumber || null,
-      house: reminder.house || 'EPIC D1',
+      house: reminder.house || 'HYNTIBA 2 APTO 406',
       created_at: new Date().toISOString()
     }])
     .select();
@@ -1086,7 +1086,7 @@ export async function createReminder(reminder: any) {
   return result;
 }
 
-export async function getReminders(house: string = 'EPIC D1') {
+export async function getReminders(house: string = 'HYNTIBA 2 APTO 406') {
   try {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -1162,7 +1162,7 @@ export async function deleteReminder(reminderId: string) {
   return true;
 }
 
-export function subscribeToReminders(house: string = 'EPIC D1', callback: (data: any) => void) {
+export function subscribeToReminders(house: string = 'HYNTIBA 2 APTO 406', callback: (data: any) => void) {
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a reminders para house:', house);
     const supabase = getSupabaseClient();

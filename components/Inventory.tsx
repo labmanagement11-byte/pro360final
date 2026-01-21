@@ -43,7 +43,7 @@ interface InventoryProps {
   setInventory?: (inventory: InventoryItem[]) => void;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'EPIC D1', inventory: externalInventory, setInventory: setExternalInventory }) => {
+const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA 2 APTO 406', inventory: externalInventory, setInventory: setExternalInventory }) => {
   const airbnbExample: InventoryItem[] = [
     // Cocina
     { name: 'Cucharas', room: 'Cocina', quantity: 8 },
