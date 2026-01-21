@@ -53,16 +53,16 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     // Suscribirse a cambios en tiempo real
     if (user?.username.toLowerCase() === 'jonathan') {
-      const unsubscribeUsers = realtimeService.subscribeToUsers((updatedUsers) => {
+      const channelUsers = realtimeService.subscribeToUsers((updatedUsers) => {
         setUsers(updatedUsers || []);
       });
-      const unsubscribeHouses = realtimeService.subscribeToHouses((updatedHouses) => {
+      const channelHouses = realtimeService.subscribeToHouses((updatedHouses) => {
         setHouses(updatedHouses || []);
       });
 
       return () => {
-        unsubscribeUsers?.();
-        unsubscribeHouses?.();
+        channelUsers?.unsubscribe?.();
+        channelHouses?.unsubscribe?.();
       };
     }
   }, [user, propUsers, propHouses]);
