@@ -1244,7 +1244,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   try {
                     if (user.username.toLowerCase() === 'jonathan') {
                       // Usar Supabase para jonathan
-                      await realtimeService.createHouse({ houseName: newHouseName.trim() });
+                      const newHouse = await realtimeService.createHouse({ houseName: newHouseName.trim() });
+                      // Agregar la casa al estado local inmediatamente
+                      if (newHouse) {
+                        setHouses(prev => [...prev, { 
+                          name: newHouse.name || newHouse.houseName, 
+                          id: newHouse.id, 
+                          houseName: newHouse.name || newHouse.houseName,
+                          tasks: [], 
+                          inventory: [], 
+                          users: [] 
+                        }]);
+                      }
                     } else {
                       // Fallback para owner
                       setHouses([...houses, { name: newHouseName.trim(), houseName: newHouseName.trim(), tasks: [], inventory: [] }]);

@@ -101,7 +101,11 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       try {
         if (user?.username.toLowerCase() === 'jonathan') {
           // Usar Supabase para jonathan
-          await realtimeService.createUser({ username, password: password || '', role, house });
+          const newUser = await realtimeService.createUser({ username, password: password || '', role, house });
+          // Agregar el usuario al estado local inmediatamente
+          if (newUser) {
+            setUsers(prev => [...prev, newUser]);
+          }
         } else if (addUser) {
           // Fallback para owner
           await addUser({ username, password: password || '', role, house });
