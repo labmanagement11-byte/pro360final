@@ -880,89 +880,85 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 )}
                 {shoppingList.map((item, idx) => (
                   <div className="dashboard-inventory-card" key={item.id || idx}>
-                    {editShoppingIdx === idx ? (
-                      <form className="dashboard-inventory-edit-form" onSubmit={e => saveEditProduct(e, idx)}>
-                        <input
-                          type="text"
-                          value={newProduct.name}
-                          onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
-                          placeholder="Producto"
-                          required
-                          className="dashboard-inventory-input"
-                        />
-                        <input
-                          type="number"
-                          value={newProduct.qty}
-                          min={1}
-                          onChange={e => setNewProduct({ ...newProduct, qty: Number(e.target.value) })}
-                          className="dashboard-inventory-input"
-                          style={{ width: 60 }}
-                        />
-                        <button type="submit" className="dashboard-btn main">Guardar</button>
-                        <button type="button" className="dashboard-btn danger" onClick={() => setEditShoppingIdx(-1)}>Cancelar</button>
-                      </form>
-                    ) : (
-                      <>
-                        <span className="dashboard-inventory-name">{item.name}</span>
-                        <span className="dashboard-inventory-qty">x{item.qty}</span>
-                        <div className="dashboard-inventory-actions">
-                          {(user.role === 'owner' || user.role === 'manager') && (
-                            <>
-                              <button className="dashboard-btn" onClick={() => { setEditShoppingIdx(idx); setNewProduct({ name: item.name, qty: item.qty }); }}>Editar</button>
-                              <button className="dashboard-btn danger" onClick={() => deleteProduct(idx)}>Eliminar</button>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    <span className="dashboard-inventory-name">{item.item_name}</span>
+                    {item.quantity && <span className="dashboard-inventory-qty">{item.quantity}</span>}
+                    <div className="dashboard-inventory-meta">
+                      <small>🏷️ {item.category}</small>
+                      <small>👤 {item.added_by}</small>
+                    </div>
+                    <div className="dashboard-inventory-actions">
+                      {(user.role === 'owner' || user.role === 'manager') && (
+                        <>
+                          <button className="dashboard-btn" onClick={async () => {
+                            await realtimeService.markAsPurchased(item.id, user.username);
+                          }}>✅ Comprado</button>
+                          <button className="dashboard-btn danger" onClick={async () => {
+                            if (confirm('¿Eliminar este producto?')) {
+                              await realtimeService.deleteShoppingListItem(item.id);
+                            }
+                          }}>🗑️ Eliminar</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
+
               <div className="dashboard-inventory-add-row">
-                {(user.role === 'empleado' || user.role === 'owner' || user.role === 'manager') && (
-                  <form className="dashboard-inventory-add-form" onSubmit={addProduct}>
-                    <input
-                      type="text"
-                      value={newProduct.name}
-                      onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
-                      placeholder="Producto por comprar"
-                      required
-                      className="dashboard-inventory-input"
-                    />
-                    <input
-                      type="number"
-                      value={newProduct.qty}
-                      min={1}
-                      onChange={e => setNewProduct({ ...newProduct, qty: Number(e.target.value) })}
-                      className="dashboard-inventory-input"
-                      style={{ width: 60 }}
-                    />
-                    <button type="submit" className="dashboard-btn main">Agregar</button>
-                  </form>
-                )}
+                <form className="dashboard-inventory-add-form" onSubmit={addShoppingItem}>
+                  <input
+                    type="text"
+                    value={newShoppingItem.item_name}
+                    onChange={e => setNewShoppingItem({ ...newShoppingItem, item_name: e.target.value })}
+                    placeholder="Producto por comprar"
+                    required
+                    className="dashboard-inventory-input"
+                  />
+                  <input
+                    type="text"
+                    value={newShoppingItem.quantity}
+                    onChange={e => setNewShoppingItem({ ...newShoppingItem, quantity: e.target.value })}
+                    placeholder="Cantidad (opcional)"
+                    className="dashboard-inventory-input"
+                    style={{ width: 140 }}
+                  />
+                  <select
+                    value={newShoppingItem.category}
+                    onChange={e => setNewShoppingItem({ ...newShoppingItem, category: e.target.value })}
+                    className="dashboard-inventory-input"
+                    style={{ width: 140 }}
+                  >
+                    <option value="General">General</option>
+                    <option value="Alimentos">Alimentos</option>
+                    <option value="Limpieza">Limpieza</option>
+                    <option value="Baño">Baño</option>
+                    <option value="Cocina">Cocina</option>
+                  </select>
+                  <button type="submit" className="dashboard-btn main">Agregar</button>
+                </form>
               </div>
-              {(user.role === 'owner' || user.role === 'manager') && shoppingList.length > 0 && (
-                <button
-                  className="dashboard-btn main"
-                  style={{ marginTop: 16 }}
-                  onClick={completeShopping}
-                >
-                  Marcar compra como completada
-                </button>
-              )}
+
               {(user.role === 'owner' || user.role === 'manager') && shoppingHistory.length > 0 && (
-                <div className="dashboard-inventory-history">
+                <div className="dashboard-inventory-history" style={{ marginTop: 24 }}>
                   <h3>Historial de compras</h3>
                   <div className="dashboard-inventory-list">
                     {shoppingHistory.map((h, idx) => (
                       <div className="dashboard-inventory-card" key={h.id || idx}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span style={{ fontWeight: 600, color: '#2563eb', fontSize: '1.05rem' }}>{h.completed_at ? new Date(h.completed_at).toLocaleString() : ''}</span>
-                          <button className="dashboard-btn danger" style={{ fontSize: '0.95rem', padding: '0.2rem 0.7rem' }} onClick={() => deleteHistory(idx)}>Eliminar</button>
+                        <span className="dashboard-inventory-name">{h.item_name}</span>
+                        {h.quantity && <span className="dashboard-inventory-qty">{h.quantity}</span>}
+                        <div className="dashboard-inventory-meta">
+                          <small>🏷️ {h.category}</small>
+                          <small>👤 Agregado por {h.added_by}</small>
+                          <small>✅ Comprado por {h.purchased_by || 'N/A'}</small>
+                          <small>📅 {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-ES') : ''}</small>
                         </div>
-                        <ul style={{ margin: '0.5rem 0 0 0.5rem', padding: 0 }}>
-                          <li style={{ fontSize: '0.98rem', color: '#23272f' }}>{h.name} x{h.qty}</li>
-                        </ul>
+                        <div className="dashboard-inventory-actions">
+                          <button className="dashboard-btn danger" onClick={async () => {
+                            if (confirm('¿Eliminar del historial?')) {
+                              await realtimeService.deleteShoppingListItem(h.id);
+                            }
+                          }}>🗑️ Eliminar</button>
+                        </div>
                       </div>
                     ))}
                   </div>
