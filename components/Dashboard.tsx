@@ -467,9 +467,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       }
     };
   }, [allowedHouseIdx, houses]);
-      }
-    };
-  }, []);
 
   // Cargar casas y usuarios desde Supabase con suscripción en tiempo real (solo para jonathan)
   useEffect(() => {
