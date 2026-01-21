@@ -999,7 +999,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </div>
                       <div className="subcard-content">
                         <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
-                        <p><strong>👤 Asignado por:</strong> {task.created_by || 'Manager'}</p>
+                        <p><strong>👤 Asignado por:</strong> {task.createdBy || task.created_by || 'Manager'}</p>
                         <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
                           {task.completed ? '✅ Completada' : '⏳ Pendiente'}
                         </span>
@@ -2264,7 +2264,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <div className="subcard-header">
                               <div className="subcard-icon">
                                 {task.type === 'Limpieza profunda' ? '🧹' : 
-                                 task.type === 'Limpieza general' ? '✨' : '🔧'}
+                                 task.type === 'Limpieza general' ? '✨' : 
+                                 task.type === 'Tarea extra' ? '🟦' : '🔧'}
                               </div>
                               <h3>{task.title || 'Sin título'}</h3>
                             </div>
@@ -2306,23 +2307,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               )}
                               {(user.role === 'owner' || user.role === 'manager') && (
                                 <>
-                                  <button 
+                                  <button
+                                    className="dashboard-btn"
                                     onClick={() => {
                                       setNewTask({
-                                        title: task.title,
-                                        description: task.description,
-                                        assignedTo: task.assignedTo,
-                                        type: task.type
+                                        title: task.title || '',
+                                        description: task.description || '',
+                                        assignedTo: task.assignedTo || '',
+                                        type: task.type || 'Limpieza general'
                                       });
                                       setEditingTaskIdx(idx);
                                     }}
                                   >
                                     ✏️ Editar
                                   </button>
-                                  <button 
-                                    className="danger"
+                                  <button
+                                    className="dashboard-btn danger"
                                     onClick={async () => {
-                                      await realtimeService.deleteTask(task.id);
+                                      if (confirm('¿Eliminar esta tarea?')) {
+                                        await realtimeService.deleteTask(task.id);
+                                      }
                                     }}
                                   >
                                     🗑️ Eliminar

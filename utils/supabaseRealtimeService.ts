@@ -1,5 +1,15 @@
 import { getSupabaseClient } from './supabaseClient';
 
+// Helper para normalizar campos snake_case -> camelCase
+function normalizeTask(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    assignedTo: row.assigned_to ?? row.assignedTo ?? '',
+    createdBy: row.created_by ?? row.createdBy ?? '',
+  };
+}
+
 // ==================== TAREAS ====================
 export async function createTask(task: any) {
   const supabase = getSupabaseClient();
@@ -21,7 +31,7 @@ export async function createTask(task: any) {
     console.error('Error creating task:', error);
     return null;
   }
-  return data?.[0] || null;
+  return data?.[0] ? normalizeTask(data[0]) : null;
 }
 
 export async function getTasks(house: string = 'EPIC D1') {
@@ -37,7 +47,7 @@ export async function getTasks(house: string = 'EPIC D1') {
       console.error('Error fetching tasks:', error);
       return [];
     }
-    return data || [];
+    return (data || []).map(normalizeTask);
   } catch (error) {
     console.error('Exception fetching tasks:', error);
     return [];
@@ -46,9 +56,21 @@ export async function getTasks(house: string = 'EPIC D1') {
 
 export async function updateTask(taskId: string, updates: any) {
   const supabase = getSupabaseClient();
+  const mappedUpdates: any = { ...updates };
+  
+  // Map camelCase to snake_case
+  if ('assignedTo' in mappedUpdates) {
+    mappedUpdates.assigned_to = mappedUpdates.assignedTo;
+    delete mappedUpdates.assignedTo;
+  }
+  if ('createdBy' in mappedUpdates) {
+    mappedUpdates.created_by = mappedUpdates.createdBy;
+    delete mappedUpdates.createdBy;
+  }
+  
   const { data, error } = await (supabase
     .from('tasks') as any)
-    .update(updates)
+    .update(mappedUpdates)
     .eq('id', taskId)
     .select();
   
@@ -56,7 +78,7 @@ export async function updateTask(taskId: string, updates: any) {
     console.error('Error updating task:', error);
     return null;
   }
-  return data?.[0] || null;
+  return data?.[0] ? normalizeTask(data[0]) : null;
 }
 
 export async function deleteTask(taskId: string) {
@@ -94,8 +116,8 @@ export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any
           // Mapear el evento al formato esperado
           const mappedPayload = {
             eventType: payload.eventType,
-            new: payload.new,
-            old: payload.old
+            new: normalizeTask(payload.new),
+            old: normalizeTask(payload.old)
           };
           
           console.log('✅ [Realtime Service] Ejecutando callback con:', mappedPayload);
