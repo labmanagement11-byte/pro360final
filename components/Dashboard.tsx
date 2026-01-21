@@ -259,8 +259,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       localStorage.removeItem('dashboard_selected_house_idx');
       console.log('🧹 localStorage limpiado completamente al iniciar (casas + índice)');
     }
-    // Iniciar con array vacío, loadHousesAndUsers llenará esto desde Supabase
-    return [];
+    // Iniciar con las dos casas correctas (para evitar Hydration errors)
+    // Estos valores serán reemplazados por getHouses() tan pronto cargue desde Supabase
+    return [
+      { name: 'EPIC D1', tasks: [], inventory: [], users: [] },
+      { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] }
+    ];
   });
   // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
   const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
