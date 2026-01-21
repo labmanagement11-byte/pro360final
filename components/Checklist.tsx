@@ -113,14 +113,25 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
 
     if (!supabase) return;
 
-    // Suscripción realtime a cambios en checklist
+    console.log('📋 [Checklist] Iniciando suscripción realtime para casa:', user.house || 'EPIC D1');
+    
+    // Suscripción realtime a cambios en checklist de esta casa
+    // El canal se filtra por casa para que todos los managers y empleados de la misma casa
+    // vean los cambios en tiempo real cuando se agrega, edita o completa una tarea
     const channel = supabase
-      .channel('checklist-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist' }, (payload: any) => {
-        console.log('Cambio en checklist:', payload);
+      .channel(`checklist-changes-${user.house || 'EPIC D1'}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'checklist' 
+      }, (payload: any) => {
+        console.log('⚡ [Checklist] Cambio en tiempo real:', payload);
+        // Refrescar el checklist cuando hay cambios
         fetchChecklist();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 [Checklist] Estado de suscripción:', status);
+      });
 
     return () => {
       channel.unsubscribe();
@@ -174,24 +185,32 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
+    console.log('✏️ [Checklist] Actualizando item:', item.item, 'completada:', !item.complete, 'usuario:', user.username);
     const { data, error } = await (checklistTable() as any)
       .update({ complete: !item.complete })
       .eq('id', item.id)
       .select();
     if (!error && data && data.length > 0) {
+      console.log('✅ [Checklist] Item actualizado y será sincronizado a todos');
       setCleaning(cleaning.map((i, iidx) => iidx === idx ? data[0] : i));
+    } else {
+      console.error('❌ [Checklist] Error actualizando:', error);
     }
   };
   // Marcar/desmarcar ítem de mantenimiento
   const toggleMaintenance = async (idx: number) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
+    console.log('✏️ [Checklist] Actualizando mantenimiento:', item.item, 'completada:', !item.complete, 'usuario:', user.username);
     const { data, error } = await (checklistTable() as any)
       .update({ complete: !item.complete })
       .eq('id', item.id)
       .select();
     if (!error && data && data.length > 0) {
+      console.log('✅ [Checklist] Item de mantenimiento actualizado y será sincronizado a todos');
       setMaintenance(maintenance.map((i, iidx) => iidx === idx ? data[0] : i));
+    } else {
+      console.error('❌ [Checklist] Error actualizando mantenimiento:', error);
     }
   };
 

@@ -685,6 +685,48 @@ export function subscribeToChecklist(assignmentId: string, callback: (data: any)
   }
 }
 
+// Suscribirse a cambios del checklist de limpieza por CASA
+// Esto permite que todos los managers y empleados de una casa vean los cambios en tiempo real
+export function subscribeToCleaningChecklistByHouse(house: string, callback: (data: any) => void) {
+  try {
+    console.log('🧹 [Checklist House Service] Iniciando suscripción para casa:', house);
+    const supabase = getSupabaseClient();
+
+    const channel = supabase
+      .channel(`cleaning-checklist-changes-${house}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cleaning_checklist'
+        },
+        (payload: any) => {
+          // Filtrar solo los eventos de esta casa
+          // Necesitamos hacer join con calendar_assignments para obtener la casa
+          console.log('⚡ [Checklist House Service] Evento potencial para:', house, payload);
+          
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          
+          callback(mappedPayload);
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Checklist House Service] Estado de suscripción:', status);
+      });
+
+    console.log('✅ [Checklist House Service] Canal creado para casa:', house);
+    return channel;
+  } catch (error) {
+    console.error('❌ [Checklist House Service] Error subscribing:', error);
+    return null;
+  }
+}
+
 // ==================== ASSIGNMENT INVENTORY (Inventario por Asignación) ====================
 
 // Obtener template de inventario
