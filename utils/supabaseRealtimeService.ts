@@ -469,7 +469,7 @@ export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (da
 }
 
 // ==================== CLEANING CHECKLIST ====================
-export async function createChecklistItems(assignmentId: string, employee: string, house: string = 'EPIC D1') {
+export async function createCleaningChecklistItems(assignmentId: string, employee: string, house: string = 'EPIC D1') {
   const supabase = getSupabaseClient();
   
   // Items predeterminados del checklist por zona
@@ -517,7 +517,7 @@ export async function createChecklistItems(assignmentId: string, employee: strin
   return data || [];
 }
 
-export async function getChecklistItems(assignmentId: string) {
+export async function getCleaningChecklistItems(assignmentId: string) {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
@@ -538,7 +538,7 @@ export async function getChecklistItems(assignmentId: string) {
   }
 }
 
-export async function updateChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
+export async function updateCleaningChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await (supabase
     .from('cleaning_checklist') as any)

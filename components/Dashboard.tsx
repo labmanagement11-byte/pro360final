@@ -472,7 +472,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const loadChecklist = async () => {
       try {
         console.log('🧹 Cargando checklist para asignación:', selectedAssignmentForChecklist);
-        const items = await realtimeService.getChecklistItems(selectedAssignmentForChecklist);
+        const items = await realtimeService.getCleaningChecklistItems(selectedAssignmentForChecklist);
         console.log('✅ Checklist cargado:', items);
         setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
       } catch (error) {
@@ -1062,7 +1062,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             
                             // Crear los items del checklist para esta asignación
                             console.log('🧹 Creando items del checklist para asignación:', result.id);
-                            const checklistItems = await realtimeService.createChecklistItems(
+                            const checklistItems = await realtimeService.createCleaningChecklistItems(
                               result.id,
                               newAssignment.employee,
                               'EPIC D1'
@@ -2250,7 +2250,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                       checked={item.completed}
                                       onChange={async (e) => {
                                         console.log('📝 Actualizando item:', item.id, 'a', e.target.checked);
-                                        await realtimeService.updateChecklistItem(
+                                        await realtimeService.updateCleaningChecklistItem(
                                           item.id,
                                           e.target.checked,
                                           user.username
