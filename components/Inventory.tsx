@@ -38,11 +38,12 @@ interface User {
 
 interface InventoryProps {
   user: User;
+  houseName?: string;
   inventory?: InventoryItem[];
   setInventory?: (inventory: InventoryItem[]) => void;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventory, setInventory: setExternalInventory }) => {
+const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'EPIC D1', inventory: externalInventory, setInventory: setExternalInventory }) => {
   const airbnbExample: InventoryItem[] = [
     // Cocina
     { name: 'Cucharas', room: 'Cocina', quantity: 8 },
@@ -141,7 +142,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     const { data, error } = await supabase!
       .from('inventory')
       .select('*')
-      .eq('house', 'EPIC D1');
+      .eq('house', houseName);
     if (!error && data) {
       setItemsState(data);
     } else {
@@ -158,8 +159,8 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
 
     // Suscripción realtime a cambios en inventory
     const channel = supabase
-      .channel('inventory-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload: any) => {
+      .channel(`inventory-changes-${houseName}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, (payload: any) => {
         console.log('Cambio en inventory:', payload);
         fetchInventory();
       })
@@ -168,7 +169,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
     return () => {
       channel.unsubscribe();
     };
-  }, []);
+  }, [houseName]);
 
   // Sync with external inventory if provided
   // No externalInventory ni setInventory: todo es cloud
@@ -185,7 +186,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
   // Agregar item a Supabase
   const addItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const newItem = { ...form, complete: false, missing: 0, house: 'EPIC D1' };
+    const newItem = { ...form, complete: false, missing: 0, house: houseName };
     // @ts-expect-error
     const { data, error } = await supabase!.from('inventory').insert([newItem]).select();
     if (!error && data && data.length > 0) {
@@ -292,7 +293,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
 
   return (
     <div className="inventory-list ultra-checklist">
-      <h2 className="ultra-checklist-title">Inventario EPIC D1</h2>
+      <h2 className="ultra-checklist-title">Inventario {houseName}</h2>
       {loading && <p className="ultra-task-text" style={{textAlign:'center'}}>Cargando inventario...</p>}
       {!loading && (user.role === 'owner' || user.role === 'manager') && (
         <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}>
@@ -318,7 +319,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, inventory: externalInventor
                 <div key={idx} className={`ultra-task-card${it.complete ? ' done' : ''}`} style={{marginBottom:'0.5rem',background:'#fff',color:'#23272f',padding:'0.7rem 1rem',boxShadow:'0 1px 6px #0001',display:'flex',alignItems:'center',gap:'0.7rem'}}>
                   <span className="ultra-task-icon">📦</span>
                   <span className="ultra-task-text" style={{flex:1}}>{it.name} <span style={{opacity:0.7}}>({it.quantity})</span></span>
-                  {(user.role === 'dueno' || user.role === 'manager') && (
+                  {(user.role === 'owner' || user.role === 'manager') && (
                     <>
                       <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
                       <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>

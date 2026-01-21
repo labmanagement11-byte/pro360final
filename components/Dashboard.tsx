@@ -515,84 +515,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [user.username]);
 
-  // Cargar asignaciones de calendario desde Supabase con suscripción en tiempo real
-  useEffect(() => {
-    const loadCalendarAssignments = async () => {
-      try {
-        setLoadingCalendar(true);
-        console.log('📅 Cargando asignaciones de calendario...');
-        console.log('👤 Usuario:', { role: user.role, username: user.username });
-        
-        // Si es empleado, cargar solo sus asignaciones
-        const assignments = user.role === 'empleado' 
-          ? await realtimeService.getCalendarAssignments('EPIC D1', user.username)
-          : await realtimeService.getCalendarAssignments('EPIC D1');
-        
-        console.log('✅ Asignaciones cargadas:', assignments);
-        setCalendarAssignments(assignments || []);
-        setLoadingCalendar(false);
-      } catch (error) {
-        console.error('❌ Error loading calendar assignments:', error);
-        setCalendarAssignments([]);
-        setLoadingCalendar(false);
-      }
-    };
-
-    loadCalendarAssignments();
-
-    // Suscribirse a cambios en tiempo real
-    let subscription: any;
-    try {
-      console.log('🔔 Suscribiendo a cambios de calendario en tiempo real...');
-      console.log('🏠 House: EPIC D1');
-      if (user.role === 'empleado') {
-        console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
-      }
-      
-      subscription = realtimeService.subscribeToCalendarAssignments(
-        'EPIC D1',
-        (payload: any) => {
-          console.log('⚡ Evento de calendario recibido:', payload);
-          
-          if (payload?.eventType === 'INSERT') {
-            console.log('➕ Nueva asignación insertada:', payload.new);
-            // Si es empleado, solo agregar si es su asignación
-            if (user.role === 'empleado' && payload.new?.employee !== user.username) {
-              console.log('⏭️ Asignación no es para este empleado, ignorando');
-              return;
-            }
-            setCalendarAssignments(prev => {
-              console.log('📝 Agregando asignación al estado');
-              return [...prev, payload.new];
-            });
-          } else if (payload?.eventType === 'UPDATE') {
-            console.log('✏️ Asignación actualizada:', payload.new);
-            setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
-          } else if (payload?.eventType === 'DELETE') {
-            console.log('🗑️ Asignación eliminada:', payload.old);
-            setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
-          }
-        },
-        user.role === 'empleado' ? user.username : undefined
-      );
-      
-      console.log('✅ Suscripción de calendario activa:', subscription);
-    } catch (error) {
-      console.error('❌ Error subscribing to calendar assignments:', error);
-    }
-
-    return () => {
-      try {
-        console.log('🔌 Desconectando suscripción de calendario...');
-        if (subscription) {
-          supabase?.removeChannel(subscription);
-        }
-      } catch (error) {
-        console.error('❌ Error unsubscribing from calendar:', error);
-      }
-    };
-  }, [user.role, user.username]);
-
   // Cargar y sincronizar checklist cuando se selecciona una asignación
   useEffect(() => {
     if (!selectedAssignmentForChecklist) return;
@@ -807,8 +729,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const employeeHouseIdx = isRestrictedUser && user.house
     ? houses.findIndex(h => h.name === user.house)
     : -1;
-  const [selectedHouseIdx, setSelectedHouseIdx] = useState(employeeHouseIdx >= 0 ? employeeHouseIdx : 0);
-    // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
+  const [selectedHouseIdx, setSelectedHouseIdx] = useState(() => {
+    if (employeeHouseIdx >= 0) return employeeHouseIdx;
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  
+  // Guardar casa seleccionada en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard_selected_house_idx', selectedHouseIdx.toString());
+    }
+  }, [selectedHouseIdx]);
+  
+  // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
     const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
   const [newHouseName, setNewHouseName] = useState('');
 
@@ -833,6 +767,96 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     console.log('📋 Todas las tareas cargadas:', tasksList);
     console.log('🟦 Tareas extra para este usuario:', extraTasksForUser);
   }, [tasksList, user.username]);
+
+  // Cargar tareas de la casa seleccionada
+  useEffect(() => {
+    if (!houses.length || selectedHouseIdx === -1) return;
+
+    const selectedHouse = houses[selectedHouseIdx];
+    const houseName = selectedHouse?.houseName || selectedHouse?.name;
+    if (!houseName) return;
+
+    const loadTasks = async () => {
+      try {
+        setLoadingTasks(true);
+        console.log(`📋 Cargando tareas para casa: ${houseName}`);
+        const tasks = await realtimeService.getTasks(houseName);
+        console.log(`✅ Tareas cargadas para ${houseName}:`, tasks);
+        setTasksList(tasks || []);
+      } catch (error) {
+        console.error(`❌ Error cargando tareas para ${houseName}:`, error);
+        setTasksList([]);
+      } finally {
+        setLoadingTasks(false);
+      }
+    };
+
+    loadTasks();
+
+    // Suscribirse a cambios en tiempo real de tareas
+    let tasksSubscription: any;
+    try {
+      tasksSubscription = realtimeService.subscribeToTasks(houseName, (tasks: any) => {
+        console.log(`⚡ Tareas actualizadas (realtime) para ${houseName}:`, tasks);
+        setTasksList(tasks || []);
+      });
+    } catch (error) {
+      console.error(`❌ Error suscribiendo a tareas para ${houseName}:`, error);
+    }
+
+    return () => {
+      try {
+        if (tasksSubscription) supabase?.removeChannel(tasksSubscription);
+      } catch (error) {
+        console.error('Error unsubscribing from tasks:', error);
+      }
+    };
+  }, [houses, selectedHouseIdx]);
+
+  // Cargar inventario de la casa seleccionada
+  useEffect(() => {
+    if (!houses.length || selectedHouseIdx === -1) return;
+
+    const selectedHouse = houses[selectedHouseIdx];
+    const houseName = selectedHouse?.houseName || selectedHouse?.name;
+    if (!houseName) return;
+
+    const loadInventory = async () => {
+      try {
+        setLoadingInventory(true);
+        console.log(`📦 Cargando inventario para casa: ${houseName}`);
+        const inventory = await realtimeService.getInventoryItems(houseName);
+        console.log(`✅ Inventario cargado para ${houseName}:`, inventory);
+        setInventoryList(inventory || []);
+      } catch (error) {
+        console.error(`❌ Error cargando inventario para ${houseName}:`, error);
+        setInventoryList([]);
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+
+    loadInventory();
+
+    // Suscribirse a cambios en tiempo real de inventario
+    let inventorySubscription: any;
+    try {
+      inventorySubscription = realtimeService.subscribeToInventory(houseName, (inventory: any) => {
+        console.log(`⚡ Inventario actualizado (realtime) para ${houseName}:`, inventory);
+        setInventoryList(inventory || []);
+      });
+    } catch (error) {
+      console.error(`❌ Error suscribiendo a inventario para ${houseName}:`, error);
+    }
+
+    return () => {
+      try {
+        if (inventorySubscription) supabase?.removeChannel(inventorySubscription);
+      } catch (error) {
+        console.error('Error unsubscribing from inventory:', error);
+      }
+    };
+  }, [houses, selectedHouseIdx]);
 
   const cards = [
     {
@@ -958,11 +982,99 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // --- END Shopping List State ---
 
+  // Cargar asignaciones de calendario desde Supabase con suscripción en tiempo real
+  useEffect(() => {
+    if (!houses.length || selectedHouseIdx === -1) return;
+
+    const selectedHouse = houses[selectedHouseIdx];
+    const houseName = selectedHouse?.houseName || selectedHouse?.name;
+    if (!houseName) return;
+
+    const loadCalendarAssignments = async () => {
+      try {
+        setLoadingCalendar(true);
+        console.log('📅 Cargando asignaciones de calendario...');
+        console.log('👤 Usuario:', { role: user.role, username: user.username });
+        console.log('🏠 Casa:', houseName);
+        
+        // Si es empleado, cargar solo sus asignaciones de su casa
+        const assignments = user.role === 'empleado' 
+          ? await realtimeService.getCalendarAssignments(houseName, user.username)
+          : await realtimeService.getCalendarAssignments(houseName);
+        
+        console.log('✅ Asignaciones cargadas:', assignments);
+        setCalendarAssignments(assignments || []);
+        setLoadingCalendar(false);
+      } catch (error) {
+        console.error('❌ Error loading calendar assignments:', error);
+        setCalendarAssignments([]);
+        setLoadingCalendar(false);
+      }
+    };
+
+    loadCalendarAssignments();
+
+    // Suscribirse a cambios en tiempo real
+    let subscription: any;
+    try {
+      console.log('🔔 Suscribiendo a cambios de calendario en tiempo real...');
+      console.log('🏠 House:', houseName);
+      if (user.role === 'empleado') {
+        console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
+      }
+      
+      subscription = realtimeService.subscribeToCalendarAssignments(
+        houseName,
+        (payload: any) => {
+          console.log('⚡ Evento de calendario recibido:', payload);
+          
+          if (payload?.eventType === 'INSERT') {
+            console.log('➕ Nueva asignación insertada:', payload.new);
+            // Si es empleado, solo agregar si es su asignación
+            if (user.role === 'empleado' && payload.new?.employee !== user.username) {
+              console.log('⏭️ Asignación no es para este empleado, ignorando');
+              return;
+            }
+            setCalendarAssignments(prev => {
+              console.log('📝 Agregando asignación al estado');
+              return [...prev, payload.new];
+            });
+          } else if (payload?.eventType === 'UPDATE') {
+            console.log('✏️ Asignación actualizada:', payload.new);
+            setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+          } else if (payload?.eventType === 'DELETE') {
+            console.log('🗑️ Asignación eliminada:', payload.old);
+            setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
+          }
+        },
+        user.role === 'empleado' ? user.username : undefined
+      );
+      
+      console.log('✅ Suscripción de calendario activa:', subscription);
+    } catch (error) {
+      console.error('❌ Error subscribing to calendar assignments:', error);
+    }
+
+    return () => {
+      try {
+        console.log('🔌 Desconectando suscripción de calendario...');
+        if (subscription) {
+          supabase?.removeChannel(subscription);
+        }
+      } catch (error) {
+        console.error('❌ Error unsubscribing from calendar:', error);
+      }
+    };
+  }, [user.role, user.username, houses, selectedHouseIdx]);
+
   return (
     <div className="dashboard-container">
       {/* Logo eliminado, restaurado a versión previa */}
       <div className="dashboard-header-row">
-        <h1>Dashboard</h1>
+        <div className="dashboard-title-block">
+          <h1>Dashboard</h1>
+          <span className="dashboard-user-pill" aria-label="Usuario en sesión">👤 {user.username}</span>
+        </div>
         {onLogout && (
           <button className="dashboard-btn danger dashboard-logout-btn" onClick={onLogout}>
             Cerrar sesión
@@ -1106,6 +1218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {view === 'inventory' && (
         <Inventory
           user={user}
+          houseName={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name || 'EPIC D1'}
           inventory={houses[allowedHouseIdx]?.inventory || []}
           setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
         />
