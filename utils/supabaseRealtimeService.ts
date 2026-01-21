@@ -1058,6 +1058,126 @@ export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (da
   }
 }
 
+// ==================== RECORDATORIOS ====================
+export async function createReminder(reminder: any) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('reminders') as any)
+    .insert([{
+      name: reminder.name,
+      due_date: reminder.due,
+      bank: reminder.bank,
+      account: reminder.account,
+      house: reminder.house || 'EPIC D1',
+      created_at: new Date().toISOString()
+    }])
+    .select();
+  
+  if (error) {
+    console.error('Error creating reminder:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+export async function getReminders(house: string = 'EPIC D1') {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('reminders') as any)
+      .select('*')
+      .eq('house', house)
+      .order('due_date', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching reminders:', error);
+      return [];
+    }
+    // Mapear campos snake_case a camelCase
+    return (data || []).map((r: any) => ({
+      ...r,
+      due: r.due_date
+    }));
+  } catch (error) {
+    console.error('Exception fetching reminders:', error);
+    return [];
+  }
+}
+
+export async function updateReminder(reminderId: string, updates: any) {
+  const supabase = getSupabaseClient();
+  const mappedUpdates: any = { ...updates };
+  
+  // Map camelCase to snake_case
+  if ('due' in mappedUpdates) {
+    mappedUpdates.due_date = mappedUpdates.due;
+    delete mappedUpdates.due;
+  }
+  
+  const { data, error } = await (supabase
+    .from('reminders') as any)
+    .update(mappedUpdates)
+    .eq('id', reminderId)
+    .select();
+  
+  if (error) {
+    console.error('Error updating reminder:', error);
+    return null;
+  }
+  const result = data?.[0] || null;
+  if (result) {
+    result.due = result.due_date;
+  }
+  return result;
+}
+
+export async function deleteReminder(reminderId: string) {
+  const supabase = getSupabaseClient();
+  const { error } = await (supabase
+    .from('reminders') as any)
+    .delete()
+    .eq('id', reminderId);
+  
+  if (error) {
+    console.error('Error deleting reminder:', error);
+    return false;
+  }
+  return true;
+}
+
+export function subscribeToReminders(house: string = 'EPIC D1', callback: (data: any) => void) {
+  try {
+    console.log('🔔 [Realtime Service] Iniciando suscripción a reminders para house:', house);
+    const supabase = getSupabaseClient();
+    
+    const channel = supabase
+      .channel('reminders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reminders',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          console.log('📨 [Realtime Service] Cambio en reminders:', payload);
+          const mappedPayload = {
+            ...payload,
+            new: payload.new ? { ...payload.new, due: payload.new.due_date } : null,
+            old: payload.old ? { ...payload.old, due: payload.old.due_date } : null
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to reminders:', error);
+    return null;
+  }
+}
+
 // ==================== Unsubscribe Helper ====================
 export function unsubscribeFromAll(subscriptions: any[]) {
   subscriptions.forEach(sub => {

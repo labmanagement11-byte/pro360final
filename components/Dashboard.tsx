@@ -180,10 +180,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const [editIdx, setEditIdx] = useState(-1);
   const [view, setView] = useState('home');
   const [selectedModalCard, setSelectedModalCard] = useState<string | null>(null);
-  const [reminders, setReminders] = useState<any[]>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem(REMINDERS_KEY) : null;
-    return saved ? JSON.parse(saved) : defaultReminders;
-  });
+  
+  // Estado para recordatorios - AHORA CON SUPABASE
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [loadingReminders, setLoadingReminders] = useState(true);
 
   // Estado para asignaciones de calendario - AHORA CON SUPABASE
   const CALENDAR_KEY = 'dashboard_calendar_assignments';
@@ -405,6 +405,58 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         }
       } catch (error) {
         console.error('Error unsubscribing from inventory:', error);
+      }
+    };
+  }, []);
+
+  // Cargar recordatorios desde Supabase con suscripción en tiempo real
+  useEffect(() => {
+    const loadReminders = async () => {
+      try {
+        setLoadingReminders(true);
+        const items = await realtimeService.getReminders('EPIC D1');
+        console.log('✅ Recordatorios cargados:', items);
+        setReminders(items || []);
+        setLoadingReminders(false);
+      } catch (error) {
+        console.error('❌ Error loading reminders:', error);
+        setReminders([]);
+        setLoadingReminders(false);
+      }
+    };
+
+    loadReminders();
+
+    // Suscribirse a cambios en tiempo real
+    let subscription: any;
+    try {
+      console.log('🔔 Suscribiendo a cambios en tiempo real de recordatorios...');
+      subscription = realtimeService.subscribeToReminders('EPIC D1', (payload: any) => {
+        console.log('⚡ Evento de recordatorios recibido:', payload);
+        if (payload?.eventType === 'INSERT') {
+          console.log('➕ Nuevo recordatorio insertado:', payload.new);
+          setReminders(prev => [...prev, payload.new]);
+        } else if (payload?.eventType === 'UPDATE') {
+          console.log('✏️ Recordatorio actualizado:', payload.new);
+          setReminders(prev => prev.map(r => r.id === payload.new?.id ? payload.new : r));
+        } else if (payload?.eventType === 'DELETE') {
+          console.log('🗑️ Recordatorio eliminado:', payload.old);
+          setReminders(prev => prev.filter(r => r.id !== payload.old?.id));
+        }
+      });
+      console.log('✅ Suscripción activa:', subscription);
+    } catch (error) {
+      console.error('❌ Error subscribing to reminders:', error);
+    }
+
+    return () => {
+      try {
+        console.log('🔌 Desconectando suscripción de recordatorios...');
+        if (subscription) {
+          supabase?.removeChannel(subscription);
+        }
+      } catch (error) {
+        console.error('❌ Error unsubscribing from reminders:', error);
       }
     };
   }, []);
@@ -1502,13 +1554,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {(user.role === 'owner' || user.role === 'manager') && (
                     <div className="modal-assignment-form">
                       <h3>🔔 {editingReminderIdx >= 0 ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h3>
-                      <form onSubmit={(e) => {
+                      <form onSubmit={async (e) => {
                         e.preventDefault();
                         if (editingReminderIdx >= 0) {
-                          setReminders(reminders.map((r, i) => i === editingReminderIdx ? newReminder : r));
+                          // Editar recordatorio existente
+                          const reminder = reminders[editingReminderIdx];
+                          await realtimeService.updateReminder(reminder.id, {
+                            name: newReminder.name,
+                            due: newReminder.due,
+                            bank: newReminder.bank,
+                            account: newReminder.account
+                          });
                           setEditingReminderIdx(-1);
                         } else {
-                          setReminders([...reminders, newReminder]);
+                          // Agregar nuevo recordatorio
+                          await realtimeService.createReminder({
+                            name: newReminder.name,
+                            due: newReminder.due,
+                            bank: newReminder.bank,
+                            account: newReminder.account,
+                            house: 'EPIC D1'
+                          });
                         }
                         setNewReminder({ name: '', due: '', bank: '', account: '' });
                       }}>
@@ -1583,13 +1649,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   )}
                   
                   <div className="subcards-grid">
-                    <div className="modal-stats">
-                      <div className="stat-box">
-                        <p className="stat-box-number">{reminders.length}</p>
-                        <p className="stat-box-label">Recordatorios activos</p>
-                      </div>
-                    </div>
-                    {reminders.length > 0 ? (
+                    {loadingReminders ? (
+                      <div className="modal-body-empty"><p>Cargando recordatorios...</p></div>
+                    ) : (
+                      <>
+                        <div className="modal-stats">
+                          <div className="stat-box">
+                            <p className="stat-box-number">{reminders.length}</p>
+                            <p className="stat-box-label">Recordatorios activos</p>
+                          </div>
+                        </div>
+                        {reminders.length > 0 ? (
                       reminders.map((item, idx) => (
                         <div key={idx} className="subcard">
                           <div className="subcard-header">
@@ -1614,8 +1684,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               </button>
                               <button 
                                 className="danger"
-                                onClick={() => {
-                                  setReminders(reminders.filter((_, i) => i !== idx));
+                                onClick={async () => {
+                                  if (confirm('¿Eliminar este recordatorio?')) {
+                                    await realtimeService.deleteReminder(item.id);
+                                  }
                                 }}
                               >
                                 🗑️ Eliminar
@@ -1624,10 +1696,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           )}
                         </div>
                       ))
-                    ) : (
-                      <div className="modal-body-empty">
-                        <p>✨ No hay recordatorios pendientes</p>
-                      </div>
+                        ) : (
+                          <div className="modal-body-empty">
+                            <p>✨ No hay recordatorios pendientes</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                     )}
                   </div>
                 </>
