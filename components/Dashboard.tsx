@@ -472,7 +472,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         const housesData = await realtimeService.getHouses();
         console.log('🏠 Casas cargadas:', housesData);
         if (housesData.length > 0) {
-          setHouses(housesData.map(h => ({ name: h.name, id: h.id, tasks: [], inventory: [], users: [] })));
+          setHouses(housesData.map((h: any) => ({ name: h.name, id: h.id, tasks: [], inventory: [], users: [] })));
         }
 
         // Cargar usuarios
