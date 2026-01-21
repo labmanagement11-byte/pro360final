@@ -3,8 +3,8 @@ import { getSupabaseClient } from './supabaseClient';
 // ==================== TAREAS ====================
 export async function createTask(task: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('tasks')
+  const { data, error } = await (supabase
+    .from('tasks') as any)
     .insert([{
       title: task.title,
       description: task.description,
@@ -25,8 +25,9 @@ export async function createTask(task: any) {
 }
 
 export async function getTasks(house: string = 'EPIC D1') {
-  const { data, error } = await supabase
-    .from('tasks')
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('tasks') as any)
     .select('*')
     .eq('house', house)
     .order('createdAt', { ascending: false });
@@ -40,8 +41,8 @@ export async function getTasks(house: string = 'EPIC D1') {
 
 export async function updateTask(taskId: string, updates: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('tasks')
+  const { data, error } = await (supabase
+    .from('tasks') as any)
     .update(updates)
     .eq('id', taskId)
     .select();
@@ -55,8 +56,8 @@ export async function updateTask(taskId: string, updates: any) {
 
 export async function deleteTask(taskId: string) {
   const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('tasks')
+  const { error } = await (supabase
+    .from('tasks') as any)
     .delete()
     .eq('id', taskId);
   
@@ -69,10 +70,10 @@ export async function deleteTask(taskId: string) {
 
 export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any[]) => void) {
   const supabase = getSupabaseClient();
-  const subscription = supabase
-    .from('tasks')
-    .on('*', (payload) => {
-      if (payload.new?.house === house || payload.old?.house === house) {
+  const subscription = (supabase
+    .from('tasks') as any)
+    .on('*', (payload: any) => {
+      if (payload?.new?.house === house || payload?.old?.house === house) {
         callback(payload);
       }
     })
@@ -84,8 +85,8 @@ export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any
 // ==================== CHECKLIST ITEMS ====================
 export async function createChecklistItem(item: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('checklist_items')
+  const { data, error } = await (supabase
+    .from('checklist_items') as any)
     .insert([{
       taskId: item.taskId,
       zona: item.zona,
@@ -107,8 +108,8 @@ export async function createChecklistItem(item: any) {
 
 export async function updateChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('checklist_items')
+  const { data, error } = await (supabase
+    .from('checklist_items') as any)
     .update({
       completed,
       completedBy: completed ? completedBy : null,
@@ -126,8 +127,8 @@ export async function updateChecklistItem(itemId: string, completed: boolean, co
 
 export async function getChecklistItems(taskId: string) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('checklist_items')
+  const { data, error } = await (supabase
+    .from('checklist_items') as any)
     .select('*')
     .eq('taskId', taskId);
   
@@ -140,10 +141,10 @@ export async function getChecklistItems(taskId: string) {
 
 export function subscribeToChecklistItems(taskId: string, callback: (data: any) => void) {
   const supabase = getSupabaseClient();
-  const subscription = supabase
-    .from('checklist_items')
-    .on('*', (payload) => {
-      if (payload.new?.taskId === taskId || payload.old?.taskId === taskId) {
+  const subscription = (supabase
+    .from('checklist_items') as any)
+    .on('*', (payload: any) => {
+      if (payload?.new?.taskId === taskId || payload?.old?.taskId === taskId) {
         callback(payload);
       }
     })
@@ -155,8 +156,8 @@ export function subscribeToChecklistItems(taskId: string, callback: (data: any) 
 // ==================== INVENTARIO ====================
 export async function createInventoryItem(item: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('inventory')
+  const { data, error } = await (supabase
+    .from('inventory') as any)
     .insert([{
       name: item.name,
       quantity: item.quantity,
@@ -177,8 +178,8 @@ export async function createInventoryItem(item: any) {
 
 export async function updateInventoryItem(itemId: string, updates: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('inventory')
+  const { data, error } = await (supabase
+    .from('inventory') as any)
     .update({
       ...updates,
       updatedAt: new Date().toISOString()
@@ -195,8 +196,8 @@ export async function updateInventoryItem(itemId: string, updates: any) {
 
 export async function getInventoryItems(house: string = 'EPIC D1') {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('inventory')
+  const { data, error } = await (supabase
+    .from('inventory') as any)
     .select('*')
     .eq('house', house);
   
@@ -209,8 +210,8 @@ export async function getInventoryItems(house: string = 'EPIC D1') {
 
 export async function deleteInventoryItem(itemId: string) {
   const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('inventory')
+  const { error } = await (supabase
+    .from('inventory') as any)
     .delete()
     .eq('id', itemId);
   
@@ -223,10 +224,10 @@ export async function deleteInventoryItem(itemId: string) {
 
 export function subscribeToInventory(house: string = 'EPIC D1', callback: (data: any) => void) {
   const supabase = getSupabaseClient();
-  const subscription = supabase
-    .from('inventory')
-    .on('*', (payload) => {
-      if (payload.new?.house === house || payload.old?.house === house) {
+  const subscription = (supabase
+    .from('inventory') as any)
+    .on('*', (payload: any) => {
+      if (payload?.new?.house === house || payload?.old?.house === house) {
         callback(payload);
       }
     })
@@ -238,8 +239,8 @@ export function subscribeToInventory(house: string = 'EPIC D1', callback: (data:
 // ==================== CALENDAR ASSIGNMENTS ====================
 export async function createCalendarAssignment(assignment: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('calendar_assignments')
+  const { data, error } = await (supabase
+    .from('calendar_assignments') as any)
     .insert([{
       employee: assignment.employee,
       date: assignment.date,
@@ -259,8 +260,8 @@ export async function createCalendarAssignment(assignment: any) {
 
 export async function getCalendarAssignments(house: string = 'EPIC D1', employee?: string) {
   const supabase = getSupabaseClient();
-  let query = supabase
-    .from('calendar_assignments')
+  let query = (supabase
+    .from('calendar_assignments') as any)
     .select('*')
     .eq('house', house);
   
@@ -279,8 +280,8 @@ export async function getCalendarAssignments(house: string = 'EPIC D1', employee
 
 export async function updateCalendarAssignment(assignmentId: string, updates: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('calendar_assignments')
+  const { data, error } = await (supabase
+    .from('calendar_assignments') as any)
     .update(updates)
     .eq('id', assignmentId)
     .select();
@@ -294,8 +295,8 @@ export async function updateCalendarAssignment(assignmentId: string, updates: an
 
 export async function deleteCalendarAssignment(assignmentId: string) {
   const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('calendar_assignments')
+  const { error } = await (supabase
+    .from('calendar_assignments') as any)
     .delete()
     .eq('id', assignmentId);
   
@@ -308,12 +309,12 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 
 export function subscribeToCalendarAssignments(house: string = 'EPIC D1', employee?: string, callback: (data: any) => void) {
   const supabase = getSupabaseClient();
-  const subscription = supabase
-    .from('calendar_assignments')
-    .on('*', (payload) => {
-      const newHouse = payload.new?.house === house;
-      const oldHouse = payload.old?.house === house;
-      const matchesEmployee = !employee || payload.new?.employee === employee || payload.old?.employee === employee;
+  const subscription = (supabase
+    .from('calendar_assignments') as any)
+    .on('*', (payload: any) => {
+      const newHouse = payload?.new?.house === house;
+      const oldHouse = payload?.old?.house === house;
+      const matchesEmployee = !employee || payload?.new?.employee === employee || payload?.old?.employee === employee;
       
       if ((newHouse || oldHouse) && matchesEmployee) {
         callback(payload);
@@ -327,8 +328,8 @@ export function subscribeToCalendarAssignments(house: string = 'EPIC D1', employ
 // ==================== SHOPPING LIST ====================
 export async function getShoppingList(house: string = 'EPIC D1') {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('shopping_list')
+  const { data, error } = await (supabase
+    .from('shopping_list') as any)
     .select('*')
     .eq('house', house)
     .eq('completed', false)
@@ -343,10 +344,10 @@ export async function getShoppingList(house: string = 'EPIC D1') {
 
 export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
   const supabase = getSupabaseClient();
-  const subscription = supabase
-    .from('shopping_list')
-    .on('*', (payload) => {
-      if (payload.new?.house === house || payload.old?.house === house) {
+  const subscription = (supabase
+    .from('shopping_list') as any)
+    .on('*', (payload: any) => {
+      if (payload?.new?.house === house || payload?.old?.house === house) {
         callback(payload);
       }
     })
