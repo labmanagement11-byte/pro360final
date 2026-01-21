@@ -51,25 +51,27 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         return;
       }
 
-      // Obtener perfil desde tabla profiles
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+      // Obtener perfil desde tabla users (no profiles que está vacía)
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .select('*')
-        .eq('id', authData.user.id)
+        .eq('username', email.split('@')[0].toLowerCase())
         .single();
 
-      if (profileError || !profileData) {
-        setError('Perfil no encontrado');
+      if (userError || !userData) {
+        setError('Usuario no encontrado en base de datos');
         setLoading(false);
         return;
       }
 
       const user: User = {
-        username: (profileData as any).username,
+        username: (userData as any).username,
         password: '',
-        role: (profileData as any).role,
-        house: (profileData as any).house || 'EPIC D1',
+        role: (userData as any).role,
+        house: (userData as any).house || 'EPIC D1',
       };
+
+      console.log('✅ [Login] Usuario cargado desde tabla users:', user);
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));

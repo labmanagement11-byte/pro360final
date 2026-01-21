@@ -546,8 +546,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       try {
         // Cargar casas (para TODOS los usuarios, para sincronizar nombres correctos)
         const housesData = await realtimeService.getHouses();
-        console.log('🏠 Casas cargadas desde Supabase (RAW):', housesData);
-        console.log('🏠 Casas cargadas - nombres específicamente:', housesData.map((h: any) => `id=${h.id}, name="${h.name}", houseName="${h.houseName}"`));
+        console.log('🏠 [getHouses] Datos crudos de Supabase:', JSON.stringify(housesData, null, 2));
+        
         if (housesData.length > 0) {
           const mappedHouses = housesData.map((h: any) => ({ 
             name: h.name, 
@@ -557,12 +557,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             inventory: [], 
             users: [] 
           }));
-          console.log('🏠 Casas mapeadas para estado:', mappedHouses);
+          console.log('🏠 [mapeo] Casas después de mapear:', JSON.stringify(mappedHouses, null, 2));
+          console.log('🏠 [setHouses] Estableciendo state con:', mappedHouses.map(h => h.name));
           setHouses(mappedHouses);
+          
           // Guardar en localStorage con los nombres correctos de Supabase
           if (typeof window !== 'undefined') {
-            localStorage.setItem('dashboard_houses', JSON.stringify(mappedHouses));
-            console.log('💾 Casas guardadas en localStorage');
+            const toSave = JSON.stringify(mappedHouses);
+            console.log('💾 [localStorage.setItem] Guardando:', toSave);
+            localStorage.setItem('dashboard_houses', toSave);
           }
         }
 
@@ -572,7 +575,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           console.log('👥 Usuarios cargados:', usersData);
         }
       } catch (error) {
-        console.error('Error loading houses/users:', error);
+        console.error('❌ Error loading houses/users:', error);
       }
     };
 
@@ -583,7 +586,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     let usersSubscription: any;
     try {
       housesSubscription = realtimeService.subscribeToHouses((housesArray: any) => {
-        console.log('🏠 Casas actualizadas (realtime):', housesArray);
+        console.log('🏠 [realtime] Casas actualizadas:', housesArray);
         // subscribeToHouses ahora devuelve el array completo de casas
         if (Array.isArray(housesArray) && housesArray.length > 0) {
           const mappedHouses = housesArray.map((h: any) => ({ 
@@ -594,7 +597,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             inventory: [], 
             users: [] 
           }));
-          console.log('🏠 Casas mapeadas desde realtime:', mappedHouses);
+          console.log('🏠 [realtime.mapeo] Casas mapeadas desde realtime:', mappedHouses);
           setHouses(mappedHouses);
           // Guardar en localStorage con los nombres correctos
           if (typeof window !== 'undefined') {
