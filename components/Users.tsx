@@ -1,38 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Users.css';
 import type { User } from './Dashboard';
+import * as realtimeService from '../utils/supabaseRealtimeService';
 
 interface UsersProps {
   user: User;
   users: User[];
-  addUser: (user: User) => void;
-  editUser: (idx: number, user: User) => void;
-  deleteUser: (idx: number) => void;
+  houses?: { id: string; houseName: string }[];
+  addUser?: (user: User) => void;
+  editUser?: (idx: number, user: User) => void;
+  deleteUser?: (idx: number) => void;
 }
 
 
-const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUser }) => {
+const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouses, addUser, editUser, deleteUser }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
   const [house, setHouse] = useState('');
   const [editIdx, setEditIdx] = useState(-1);
   const [editData, setEditData] = useState({ username: '', password: '', role: 'empleado', house: '' });
+  const [users, setUsers] = useState<User[]>([]);
+  const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Obtener casas desde localStorage (igual que Dashboard)
-  const [houses, setHouses] = useState<{ name: string }[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dashboard_houses');
-      if (saved) return JSON.parse(saved);
+  // Cargar usuarios y casas desde Supabase si es jonathan
+  useEffect(() => {
+    const loadData = async () => {
+      if (user?.username.toLowerCase() !== 'jonathan') {
+        setUsers(propUsers || []);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const [fetchedUsers, fetchedHouses] = await Promise.all([
+          realtimeService.getUsers(),
+          realtimeService.getHouses()
+        ]);
+        setUsers(fetchedUsers || []);
+        setHouses(fetchedHouses || propHouses || []);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setUsers(propUsers || []);
+        setHouses(propHouses || []);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Suscribirse a cambios en tiempo real
+    if (user?.username.toLowerCase() === 'jonathan') {
+      const unsubscribeUsers = realtimeService.subscribeToUsers((updatedUsers) => {
+        setUsers(updatedUsers || []);
+      });
+      const unsubscribeHouses = realtimeService.subscribeToHouses((updatedHouses) => {
+        setHouses(updatedHouses || []);
+      });
+
+      return () => {
+        unsubscribeUsers?.();
+        unsubscribeHouses?.();
+      };
     }
-    return [{ name: 'EPIC D1' }];
-  });
+  }, [user, propUsers, propHouses]);
 
-  if (!user || user.role !== 'dueno') {
+  if (!user || (user.role !== 'dueno' && (user.role !== 'manager' || user.username.toLowerCase() !== 'jonathan'))) {
     return (
       <div className="users-container">
         <h2>Gestión de Usuarios</h2>
-        <p>Solo el dueño puede gestionar usuarios.</p>
+        <p>No tienes permiso para gestionar usuarios.</p>
         <ul className="users-list">
           {users && users.length > 0 ? (
             users.map((u, idx) => (
@@ -52,26 +91,75 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
   const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (username && role && house) {
-      await addUser({ username, password: password || '', role, house });
-      setUsername('');
-      setPassword('');
-      setRole('empleado');
-      setHouse('');
+      try {
+        if (user?.username.toLowerCase() === 'jonathan') {
+          // Usar Supabase para jonathan
+          await realtimeService.createUser({ username, password: password || '', role, house });
+        } else if (addUser) {
+          // Fallback para owner
+          await addUser({ username, password: password || '', role, house });
+        }
+        setUsername('');
+        setPassword('');
+        setRole('empleado');
+        setHouse('');
+      } catch (error) {
+        console.error('Error adding user:', error);
+        alert('Error al agregar usuario');
+      }
     }
   };
 
   const handleEditUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editData.username && editData.role) {
-      await editUser(editIdx, { ...editData, password: editData.password || '' });
-      setEditIdx(-1);
-      setEditData({ username: '', password: '', role: 'empleado', house: '' });
+      try {
+        if (user?.username.toLowerCase() === 'jonathan') {
+          // Usar Supabase para jonathan
+          const editedUser = users[editIdx];
+          if (editedUser?.id) {
+            await realtimeService.updateUser(editedUser.id, {
+              username: editData.username,
+              password: editData.password || '',
+              role: editData.role,
+              house: editData.house
+            });
+          }
+        } else if (editUser) {
+          // Fallback para owner
+          await editUser(editIdx, { ...editData, password: editData.password || '' });
+        }
+        setEditIdx(-1);
+        setEditData({ username: '', password: '', role: 'empleado', house: '' });
+      } catch (error) {
+        console.error('Error editing user:', error);
+        alert('Error al editar usuario');
+      }
+    }
+  };
+
+  const handleDeleteUser = async (idx: number) => {
+    try {
+      if (user?.username.toLowerCase() === 'jonathan') {
+        // Usar Supabase para jonathan
+        const userToDelete = users[idx];
+        if (userToDelete?.id) {
+          await realtimeService.deleteUser(userToDelete.id);
+        }
+      } else if (deleteUser) {
+        // Fallback para owner
+        await deleteUser(idx);
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Error al eliminar usuario');
     }
   };
 
   return (
     <div className="users-container">
       <h2>Gestión de Usuarios</h2>
+      {loading && <p>Cargando datos...</p>}
       <form onSubmit={handleAddUser} className="users-add-form">
         <input
           type="text"
@@ -95,9 +183,10 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
         <label htmlFor="house-select" className="users-label">Casa asignada:</label>
         <select id="house-select" value={house} onChange={e => setHouse(e.target.value)} required>
           <option value="" disabled>Selecciona una casa</option>
-          {houses.map((h, idx) => (
-            <option key={idx} value={h.name}>{h.name}</option>
-          ))}
+          {houses.map((h, idx) => {
+            const houseName = h.houseName || h.name || '';
+            return <option key={idx} value={houseName}>{houseName}</option>;
+          })}
         </select>
         <button type="submit">Agregar Usuario</button>
       </form>
@@ -125,6 +214,13 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
                     <option value="manager">Manager</option>
                     <option value="empleado">Empleado</option>
                   </select>
+                  <select value={editData.house} onChange={e => setEditData({ ...editData, house: e.target.value })} title="Casa asignada">
+                    <option value="" disabled>Selecciona una casa</option>
+                    {houses.map((h, idx) => {
+                      const houseName = h.houseName || h.name || '';
+                      return <option key={idx} value={houseName}>{houseName}</option>;
+                    })}
+                  </select>
                   <button type="submit">Guardar</button>
                   <button type="button" onClick={() => setEditIdx(-1)}>Cancelar</button>
                 </form>
@@ -132,13 +228,14 @@ const Users: React.FC<UsersProps> = ({ user, users, addUser, editUser, deleteUse
                 <>
                   <span>{u.username}</span>
                   <strong>{u.role}</strong>
+                  <span className="users-house">{u.house}</span>
                   {u.role !== 'dueno' && (
                     <>
                       <button onClick={() => {
                         setEditIdx(idx);
                         setEditData({ username: u.username, password: u.password || '', role: u.role, house: u.house || '' });
                       }}>Editar</button>
-                      <button onClick={async () => await deleteUser(idx)} className="users-delete-btn">Eliminar</button>
+                      <button onClick={() => handleDeleteUser(idx)} className="users-delete-btn">Eliminar</button>
                     </>
                   )}
                 </>

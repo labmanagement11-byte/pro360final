@@ -132,7 +132,17 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.users-house {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .users-list li:hover {

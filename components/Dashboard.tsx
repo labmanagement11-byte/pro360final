@@ -891,7 +891,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'users',
       title: 'Usuarios',
       desc: 'Administra roles: dueño, manager, empleado.',
-      show: user.role === 'owner',
+      show: user.role === 'owner' || (user.role === 'manager' && user.username.toLowerCase() === 'jonathan'),
     },
   ];
 
@@ -1195,16 +1195,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 onClick={() => setSelectedHouseIdx(idx)}
               >
                 <span className="house-icon">🏠</span>
-                <span className="house-name">{house.name}</span>
+                <span className="house-name">{house.houseName || house.name}</span>
               </div>
             ))}
             <div className="house-card add">
               <span className="house-icon">➕</span>
-              <form className="dashboard-add-house-form" onSubmit={e => {
+              <form className="dashboard-add-house-form" onSubmit={async (e) => {
                 e.preventDefault();
                 if (newHouseName.trim()) {
-                  setHouses([...houses, { name: newHouseName.trim(), tasks: [], inventory: [] }]);
-                  setNewHouseName('');
+                  try {
+                    if (user.username.toLowerCase() === 'jonathan') {
+                      // Usar Supabase para jonathan
+                      await realtimeService.createHouse({ houseName: newHouseName.trim() });
+                    } else {
+                      // Fallback para owner
+                      setHouses([...houses, { name: newHouseName.trim(), houseName: newHouseName.trim(), tasks: [], inventory: [] }]);
+                    }
+                    setNewHouseName('');
+                  } catch (error) {
+                    console.error('Error adding house:', error);
+                    alert('Error al agregar casa');
+                  }
                 }
               }}>
                 <input
@@ -1221,7 +1232,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             </div>
           </div>
           <div className="dashboard-selected-house-info">
-            <strong>Casa seleccionada:</strong> {houses[selectedHouseIdx]?.name}
+            <strong>Casa seleccionada:</strong> {houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name}
             <div className="dashboard-selected-house-desc">
               Cada casa tiene su propia lista de tareas e inventario.
             </div>
@@ -1232,6 +1243,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         <Users
           user={user}
           users={users}
+          houses={houses}
           addUser={addUser}
           editUser={editUser}
           deleteUser={deleteUser}
