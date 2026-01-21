@@ -45,12 +45,16 @@ const App = () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles').select('*');
     if (data) {
+      console.log('📥 Usuarios cargados desde Supabase:', data);
       setUsers(data.map((p: any) => ({
+        id: p.id,
         username: p.username,
         password: '',
         role: p.role,
-        house: 'EPIC D1',
+        house: p.house || 'EPIC D1',
       })));
+    } else if (error) {
+      console.error('❌ Error al cargar usuarios:', error);
     }
   };
 
