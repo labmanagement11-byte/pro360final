@@ -249,6 +249,42 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     category: 'Cocina',
   });
 
+  // Casas y selección de casa
+  const [houses, setHouses] = useState<any[]>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
+    return saved ? JSON.parse(saved) : [
+      { name: 'EPIC D1', tasks: [], inventory: [], users: defaultUsers }
+    ];
+  });
+  // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
+  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
+  const employeeHouseIdx = isRestrictedUser && user.house
+    ? houses.findIndex(h => h.name === user.house)
+    : -1;
+  const [selectedHouseIdx, setSelectedHouseIdx] = useState(() => {
+    if (employeeHouseIdx >= 0) return employeeHouseIdx;
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  
+  // Guardar casa seleccionada en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard_selected_house_idx', selectedHouseIdx.toString());
+    }
+  }, [selectedHouseIdx]);
+  
+  // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
+  const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
+  const [newHouseName, setNewHouseName] = useState('');
+  
+  // Guardar casas en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard_houses', JSON.stringify(houses));
+    }
+  }, [houses]);
+
   // Estado para checklist
   const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
   const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
@@ -726,40 +762,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const showReminders = user.role === 'owner' || user.role === 'manager';
 
   // Estado para casas dinámicas y usuarios sincronizados
-  const [houses, setHouses] = useState<any[]>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_houses') : null;
-    return saved ? JSON.parse(saved) : [
-      { name: 'EPIC D1', tasks: [], inventory: [], users: defaultUsers }
-    ];
-  });
-  // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
-  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
-  const employeeHouseIdx = isRestrictedUser && user.house
-    ? houses.findIndex(h => h.name === user.house)
-    : -1;
-  const [selectedHouseIdx, setSelectedHouseIdx] = useState(() => {
-    if (employeeHouseIdx >= 0) return employeeHouseIdx;
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  
-  // Guardar casa seleccionada en localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboard_selected_house_idx', selectedHouseIdx.toString());
-    }
-  }, [selectedHouseIdx]);
-  
-  // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
-    const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
-  const [newHouseName, setNewHouseName] = useState('');
-
-  // Guardar casas en localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboard_houses', JSON.stringify(houses));
-    }
-  }, [houses]);
   // Ensure all users have a username string
   useEffect(() => {
     if (users) {
