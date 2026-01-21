@@ -90,7 +90,9 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
   // Cargar checklist desde Supabase
   const fetchChecklist = async () => {
     setLoading(true);
-    let query = checklistTable().select('*').eq('house', 'EPIC D1');
+    const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
+    console.log('📋 [Checklist] Cargando checklist para casa:', selectedHouse, 'usuario:', user.username);
+    let query = checklistTable().select('*').eq('house', selectedHouse);
     // Si es empleado, solo ve tareas asignadas a él o no asignadas
     if (user.role === 'empleado') {
       query = query.in('assigned_to', [user.username, null]);
@@ -100,9 +102,11 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
       const items = data as ChecklistItem[];
       setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
       setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
+      console.log('✅ [Checklist] Cargados:', items.length, 'items para', selectedHouse);
     } else {
       setCleaning([]);
       setMaintenance([]);
+      console.error('❌ [Checklist] Error cargando:', error);
     }
     setLoading(false);
   };
