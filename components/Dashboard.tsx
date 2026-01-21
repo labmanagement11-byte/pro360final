@@ -585,7 +585,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {/* Formulario de asignación */}
                   {(user.role === 'owner' || user.role === 'manager') && (
                     <div className="modal-assignment-form">
-                      <h3>Nueva Asignación</h3>
+                      <h3>📅 Nueva Asignación de Horario</h3>
                       <form onSubmit={(e) => {
                         e.preventDefault();
                         if (newAssignment.employee && newAssignment.date && newAssignment.time) {
@@ -599,54 +599,62 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
-                            <label>Empleado</label>
+                            <label>👤 Empleado</label>
                             <select 
                               value={newAssignment.employee}
                               onChange={(e) => setNewAssignment({...newAssignment, employee: e.target.value})}
                               required
+                              title="Seleccionar empleado"
                             >
-                              <option value="">Seleccionar empleado</option>
-                              {users.filter(u => u.role === 'empleado' || u.role === 'manager').map((u, idx) => (
-                                <option key={idx} value={u.username}>{u.username}</option>
-                              ))}
+                              <option value="">Seleccionar empleado...</option>
+                              {users && users.length > 0 ? (
+                                users.filter(u => u.role === 'empleado' || u.role === 'manager').map((u, idx) => (
+                                  <option key={u.id || idx} value={u.username}>{u.username} ({u.role})</option>
+                                ))
+                              ) : (
+                                <option value="" disabled>No hay empleados disponibles</option>
+                              )}
                             </select>
                           </div>
                           
                           <div className="form-group">
-                            <label>Fecha</label>
+                            <label>📅 Fecha</label>
                             <input
                               type="date"
                               value={newAssignment.date}
                               onChange={(e) => setNewAssignment({...newAssignment, date: e.target.value})}
                               required
+                              title="Seleccionar fecha"
                             />
                           </div>
                           
                           <div className="form-group">
-                            <label>Hora</label>
+                            <label>🕐 Hora</label>
                             <input
                               type="time"
                               value={newAssignment.time}
                               onChange={(e) => setNewAssignment({...newAssignment, time: e.target.value})}
                               required
+                              title="Seleccionar hora"
                             />
                           </div>
                           
                           <div className="form-group">
-                            <label>Tipo de servicio</label>
+                            <label>🏠 Tipo de servicio</label>
                             <select
                               value={newAssignment.type}
                               onChange={(e) => setNewAssignment({...newAssignment, type: e.target.value})}
                               required
+                              title="Tipo de servicio"
                             >
-                              <option value="Limpieza regular">Limpieza regular</option>
-                              <option value="Limpieza profunda">Limpieza profunda</option>
-                              <option value="Mantenimiento">Mantenimiento</option>
+                              <option value="Limpieza regular">✨ Limpieza regular</option>
+                              <option value="Limpieza profunda">🧹 Limpieza profunda</option>
+                              <option value="Mantenimiento">🔧 Mantenimiento</option>
                             </select>
                           </div>
                         </div>
                         
-                        <button type="submit" className="dashboard-btn main">Asignar Horario</button>
+                        <button type="submit" className="dashboard-btn main">✅ Asignar Horario</button>
                       </form>
                     </div>
                   )}

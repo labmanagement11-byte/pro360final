@@ -45,7 +45,6 @@ const App = () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles').select('*');
     if (data) {
-      console.log('📥 Usuarios cargados desde Supabase:', data);
       setUsers(data.map((p: any) => ({
         id: p.id,
         username: p.username,
