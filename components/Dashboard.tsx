@@ -766,103 +766,66 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // --- Shopping List State ---
   // --- Shopping List State (Supabase) ---
-  const [shoppingList, setShoppingList] = useState<any[]>([]);
-  const [shoppingHistory, setShoppingHistory] = useState<any[]>([]);
-  const [editShoppingIdx, setEditShoppingIdx] = useState(-1);
-  const [newProduct, setNewProduct] = useState({ name: '', qty: 1 });
+  const [shoppingList, setShoppingList] = useState<any[]>([]);  // Items pendientes
+  const [shoppingHistory, setShoppingHistory] = useState<any[]>([]);  // Items comprados
   const [loadingShopping, setLoadingShopping] = useState(true);
+  const [newShoppingItem, setNewShoppingItem] = useState({
+    item_name: '',
+    quantity: '',
+    category: 'General'
+  });
 
   // Cargar lista de compras desde Supabase
   useEffect(() => {
-    const fetchShopping = async () => {
+    const loadShopping = async () => {
       setLoadingShopping(true);
-      const { data, error } = await supabase!
-        .from('shopping_list')
-        .select('*')
-        .eq('house', 'EPIC D1');
-      if (!error && data) {
-        // @ts-expect-error
-        setShoppingList(data.filter(i => !i.completed));
-        // @ts-expect-error
-        setShoppingHistory(data.filter(i => i.completed).sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')));
-      } else {
-        setShoppingList([]);
-        setShoppingHistory([]);
-      }
+      const pending = await realtimeService.getShoppingList('EPIC D1', false);
+      const purchased = await realtimeService.getShoppingList('EPIC D1', true);
+      setShoppingList(pending);
+      setShoppingHistory(purchased.filter((i: any) => i.is_purchased));
       setLoadingShopping(false);
     };
-    fetchShopping();
+    loadShopping();
+    
+    // Suscribirse a cambios en tiempo real
+    const subscription = realtimeService.subscribeToShoppingList('EPIC D1', (payload: any) => {
+      if (payload.eventType === 'INSERT') {
+        if (!payload.new.is_purchased) {
+          setShoppingList(prev => [payload.new, ...prev]);
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        if (payload.new.is_purchased) {
+          // Movido a comprado
+          setShoppingList(prev => prev.filter(i => i.id !== payload.new.id));
+          setShoppingHistory(prev => [payload.new, ...prev]);
+        } else {
+          // Actualizado
+          setShoppingList(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
+        }
+      } else if (payload.eventType === 'DELETE') {
+        setShoppingList(prev => prev.filter(i => i.id !== payload.old.id));
+        setShoppingHistory(prev => prev.filter(i => i.id !== payload.old.id));
+      }
+    });
+    
+    return () => {
+      if (subscription) {
+        supabase?.removeChannel(subscription);
+      }
+    };
   }, []);
 
-  // Agregar producto a Supabase
-  const addProduct = async (e: React.FormEvent<HTMLFormElement>) => {
+  // Agregar producto (actualizado para realtime)
+  const addShoppingItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!newProduct.name.trim() || newProduct.qty < 1) return;
-    const { data, error } = await supabase!
-      .from('shopping_list')
-      // @ts-expect-error
-      .insert([{ name: newProduct.name, qty: newProduct.qty, completed: false, house: 'EPIC D1' }])
-      .select();
-    if (!error && data && data.length > 0) {
-      setShoppingList([...shoppingList, data[0]]);
-      setNewProduct({ name: '', qty: 1 });
-    }
-  };
-
-  // Editar producto en Supabase
-  const saveEditProduct = async (e: React.FormEvent<HTMLFormElement>, idx: number) => {
-    e.preventDefault();
-    const item = shoppingList[idx];
-    if (!item || !item.id) return;
-    const { data, error } = await supabase!
-      .from('shopping_list')
-      // @ts-expect-error
-      .update({ name: newProduct.name, qty: newProduct.qty })
-      .eq('id', item.id)
-      .select();
-    if (!error && data && data.length > 0) {
-      setShoppingList(shoppingList.map((prod, i) => i === idx ? data[0] : prod));
-      setEditShoppingIdx(-1);
-    }
-  };
-
-  // Eliminar producto en Supabase
-  const deleteProduct = async (idx: number) => {
-    const item = shoppingList[idx];
-    if (!item || !item.id) return;
-    const { error } = await supabase!.from('shopping_list').delete().eq('id', item.id);
-    if (!error) {
-      setShoppingList(shoppingList.filter((_, i) => i !== idx));
-    }
-  };
-
-  // Marcar compra como completada (mueve todos los productos a historial)
-  const completeShopping = async () => {
-    const ids = shoppingList.map(i => i.id);
-    if (!ids.length) return;
-    const { data, error } = await supabase!
-      .from('shopping_list')
-      // @ts-expect-error
-       .update({ completed: true, completed_at: new Date().toISOString() })
-      .in('id', ids)
-      .select();
-    if (!error && data) {
-      setShoppingHistory([
-        { items: shoppingList, date: new Date().toISOString() },
-        ...shoppingHistory,
-      ]);
-      setShoppingList([]);
-    }
-  };
-
-  // Eliminar historial de compras
-  const deleteHistory = async (idx: number) => {
-    const item = shoppingHistory[idx];
-    if (!item || !item.id) return;
-    const { error } = await supabase!.from('shopping_list').delete().eq('id', item.id);
-    if (!error) {
-      setShoppingHistory(shoppingHistory.filter((_, i) => i !== idx));
-    }
+    if (!newShoppingItem.item_name.trim()) return;
+    await realtimeService.addShoppingListItem({
+      item_name: newShoppingItem.item_name,
+      quantity: newShoppingItem.quantity,
+      category: newShoppingItem.category,
+      added_by: user.username
+    }, 'EPIC D1');
+    setNewShoppingItem({ item_name: '', quantity: '', category: 'General' });
   };
 
   // --- END Shopping List State ---
@@ -1365,43 +1328,52 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               
               {selectedModalCard === 'shopping' && (
                 <>
-                  {/* Formulario para empleados agregar productos */}
-                  {(user.role === 'empleado' || user.role === 'manager' || user.role === 'owner') && (
-                    <div className="modal-assignment-form">
-                      <h3>🛒 Agregar a Lista de Compras</h3>
-                      <form onSubmit={addProduct}>
-                        <div className="assignment-form-grid">
-                          <div className="form-group">
-                            <label>📝 Producto</label>
-                            <input
-                              type="text"
-                              value={newProduct.name}
-                              onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                              required
-                              placeholder="Ej: Papel higiénico"
-                              title="Nombre del producto"
-                            />
-                          </div>
-                          
-                          <div className="form-group">
-                            <label>🔢 Cantidad</label>
-                            <input
-                              type="number"
-                              value={newProduct.qty}
-                              min={1}
-                              onChange={(e) => setNewProduct({ ...newProduct, qty: Number(e.target.value) })}
-                              title="Cantidad"
-                              style={{width: '100%'}}
-                            />
-                          </div>
+                  {/* Formulario para agregar productos */}
+                  <div className="modal-assignment-form">
+                    <h3>🛒 Agregar a Lista de Compras</h3>
+                    <form onSubmit={addShoppingItem}>
+                      <div className="assignment-form-grid">
+                        <div className="form-group">
+                          <label>📝 Producto</label>
+                          <input
+                            type="text"
+                            value={newShoppingItem.item_name}
+                            onChange={(e) => setNewShoppingItem({ ...newShoppingItem, item_name: e.target.value })}
+                            required
+                            placeholder="Ej: Papel higiénico"
+                          />
                         </div>
                         
-                        <button type="submit" className="dashboard-btn main" style={{width: '100%'}}>
-                          ➕ Agregar a la Lista
-                        </button>
+                        <div className="form-group">
+                          <label>🔢 Cantidad</label>
+                          <input
+                            type="text"
+                            value={newShoppingItem.quantity}
+                            onChange={(e) => setNewShoppingItem({ ...newShoppingItem, quantity: e.target.value })}
+                            placeholder="Ej: 2 unidades, 3 kg"
+                          />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label>🏷️ Categoría</label>
+                          <select
+                            value={newShoppingItem.category}
+                            onChange={(e) => setNewShoppingItem({ ...newShoppingItem, category: e.target.value })}
+                          >
+                            <option value="General">General</option>
+                            <option value="Alimentos">Alimentos</option>
+                            <option value="Limpieza">Limpieza</option>
+                            <option value="Baño">Baño</option>
+                            <option value="Cocina">Cocina</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <button type="submit" className="dashboard-btn main" style={{width: '100%'}}>
+                        ➕ Agregar a la Lista
+                      </button>
                       </form>
-                    </div>
-                  )}
+                  </div>
                   
                   <div className="subcards-grid">
                     <div className="modal-stats">
@@ -1410,12 +1382,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <p className="stat-box-label">Productos pendientes</p>
                       </div>
                       <div className="stat-box">
-                        <p className="stat-box-number">{shoppingList.reduce((sum, item) => sum + item.qty, 0)}</p>
-                        <p className="stat-box-label">Cantidad total</p>
+                        <p className="stat-box-number">{shoppingHistory.length}</p>
+                        <p className="stat-box-label">Comprados</p>
                       </div>
                       <div className="stat-box">
-                        <p className="stat-box-number">{shoppingHistory.length}</p>
-                        <p className="stat-box-label">Compras realizadas</p>
+                        <p className="stat-box-number">{new Set(shoppingList.map(i => i.category)).size}</p>
+                        <p className="stat-box-label">Categorías</p>
                       </div>
                     </div>
                     
@@ -1424,21 +1396,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div key={item.id || idx} className="subcard">
                           <div className="subcard-header">
                             <div className="subcard-icon">🛒</div>
-                            <h3>{item.name}</h3>
+                            <h3>{item.item_name}</h3>
                           </div>
                           <div className="subcard-content">
-                            <p><strong>🔢 Cantidad:</strong> {item.qty} unidades</p>
-                            <span className="subcard-badge success">✅ Por comprar</span>
+                            {item.quantity && <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>}
+                            <p><strong>🏷️ Categoría:</strong> {item.category}</p>
+                            <p><strong>👤 Agregado por:</strong> {item.added_by}</p>
+                            <span className="subcard-badge success">🛒 Por comprar</span>
                           </div>
                           
                           {/* Botón para manager: marcar como comprado */}
                           {(user.role === 'owner' || user.role === 'manager') && (
                             <div className="subcard-actions">
                               <button 
-                                onClick={() => deleteProduct(idx)}
-                                className="danger"
+                                onClick={async () => {
+                                  await realtimeService.markAsPurchased(item.id, user.username);
+                                }}
                               >
-                                🗑️ Eliminar
+                                ✅ Marcar Comprado
+                                                            <button 
+                                                              onClick={async () => {
+                                                                if (confirm('¿Eliminar este item?')) {
+                                                                  await realtimeService.deleteShoppingListItem(item.id);
+                                                                }
+                                                              }}
+                                                              className="danger"
+                                                            >
+                                                              🗑️ Eliminar
+                                                            </button>
                               </button>
                             </div>
                           )}
@@ -1447,19 +1432,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     ) : (
                       <div className="modal-body-empty">
                         <p>🎉 No hay productos por comprar</p>
-                      </div>
-                    )}
-                    
-                    {/* Botón para manager: Marcar toda la compra como completada */}
-                    {(user.role === 'owner' || user.role === 'manager') && shoppingList.length > 0 && (
-                      <div className="subcard-full-width" style={{padding: '1rem'}}>
-                        <button 
-                          className="dashboard-btn main" 
-                          onClick={completeShopping}
-                          style={{width: '100%', padding: '1rem', fontSize: '1.1rem'}}
-                        >
-                          ✅ Marcar Todo como Comprado
-                        </button>
                       </div>
                     )}
                     
@@ -1474,18 +1446,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <div key={h.id || idx} className="subcard">
                             <div className="subcard-header">
                               <div className="subcard-icon">📦</div>
-                              <h3>{h.completed_at ? new Date(h.completed_at).toLocaleDateString('es-ES') : 'Compra'}</h3>
+                              <h3>{h.item_name}</h3>
                             </div>
                             <div className="subcard-content">
-                              <p><strong>📝 Producto:</strong> {h.name}</p>
-                              <p><strong>🔢 Cantidad:</strong> {h.qty}</p>
-                              <p><strong>📅 Fecha:</strong> {h.completed_at ? new Date(h.completed_at).toLocaleString('es-ES') : 'N/A'}</p>
+                              {h.quantity && <p><strong>🔢 Cantidad:</strong> {h.quantity}</p>}
+                              <p><strong>🏷️ Categoría:</strong> {h.category}</p>
+                              <p><strong>👤 Agregado por:</strong> {h.added_by}</p>
+                              <p><strong>✅ Comprado por:</strong> {h.purchased_by}</p>
+                              <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-ES') : 'N/A'}</p>
                               <span className="subcard-badge">✅ Comprado</span>
                             </div>
                             <div className="subcard-actions">
                               <button 
                                 className="danger"
-                                onClick={() => deleteHistory(idx)}
+                                onClick={async () => {
+                                  if (confirm('¿Eliminar del historial?')) {
+                                    await realtimeService.deleteShoppingListItem(h.id);
+                                  }
+                                }}
                               >
                                 🗑️ Eliminar del Historial
                               </button>

@@ -953,6 +953,144 @@ export function subscribeToInventoryTemplate(house: string = 'EPIC D1', callback
 }
 
 // ==================== Unsubscribe Helper ====================
+// ==================== SHOPPING LIST (Lista de Compras) ====================
+
+// Obtener lista de compras
+export async function getShoppingList(house: string = 'EPIC D1', includePurchased: boolean = false) {
+  try {
+    const supabase = getSupabaseClient();
+    let query = (supabase
+      .from('shopping_list') as any)
+      .select('*')
+      .eq('house', house)
+      .order('created_at', { ascending: false });
+    
+    if (!includePurchased) {
+      query = query.eq('is_purchased', false);
+    }
+    
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('❌ [Shopping List] Error:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('❌ [Shopping List] Exception:', error);
+    return [];
+  }
+}
+
+// Agregar item a la lista de compras
+export async function addShoppingListItem(item: any, house: string = 'EPIC D1') {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('shopping_list') as any)
+    .insert([{
+      house: house,
+      item_name: item.item_name,
+      quantity: item.quantity || '',
+      category: item.category || 'General',
+      added_by: item.added_by,
+      notes: item.notes || ''
+    }])
+    .select();
+
+  if (error) {
+    console.error('Error adding shopping list item:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+// Actualizar item de la lista de compras
+export async function updateShoppingListItem(itemId: string, updates: any) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('shopping_list') as any)
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('Error updating shopping list item:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+// Marcar item como comprado
+export async function markAsPurchased(itemId: string, purchasedBy: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('shopping_list') as any)
+    .update({
+      is_purchased: true,
+      purchased_by: purchasedBy,
+      purchased_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('Error marking as purchased:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+// Eliminar item de la lista de compras
+export async function deleteShoppingListItem(itemId: string) {
+  const supabase = getSupabaseClient();
+  const { error } = await (supabase
+    .from('shopping_list') as any)
+    .delete()
+    .eq('id', itemId);
+
+  if (error) {
+    console.error('Error deleting shopping list item:', error);
+    return false;
+  }
+  return true;
+}
+
+// Suscribirse a cambios en la lista de compras
+export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (data: any) => void) {
+  try {
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel('shopping-list-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shopping_list',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to shopping list:', error);
+    return null;
+  }
+}
+
+// ==================== Unsubscribe Helper ====================
 export function unsubscribeFromAll(subscriptions: any[]) {
   subscriptions.forEach(sub => {
     if (sub) {
