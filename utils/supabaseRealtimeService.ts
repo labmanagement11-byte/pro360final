@@ -1190,6 +1190,218 @@ export function subscribeToReminders(house: string = 'EPIC D1', callback: (data:
   }
 }
 
+// ==================== CASAS ====================
+export async function getHouses() {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('houses') as any)
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching houses:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching houses:', error);
+    return [];
+  }
+}
+
+export async function createHouse(house: any) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('houses') as any)
+    .insert([{
+      name: house.name,
+      created_at: new Date().toISOString()
+    }])
+    .select();
+  
+  if (error) {
+    console.error('Error creating house:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+export async function updateHouse(houseId: string, updates: any) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('houses') as any)
+    .update(updates)
+    .eq('id', houseId)
+    .select();
+  
+  if (error) {
+    console.error('Error updating house:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+export async function deleteHouse(houseId: string) {
+  const supabase = getSupabaseClient();
+  const { error } = await (supabase
+    .from('houses') as any)
+    .delete()
+    .eq('id', houseId);
+  
+  if (error) {
+    console.error('Error deleting house:', error);
+    return false;
+  }
+  return true;
+}
+
+export function subscribeToHouses(callback: (data: any) => void) {
+  try {
+    console.log('🔔 [Realtime Service] Iniciando suscripción a houses');
+    const supabase = getSupabaseClient();
+    
+    const channel = supabase
+      .channel('houses-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'houses'
+        },
+        (payload: any) => {
+          console.log('📨 [Realtime Service] Cambio en houses:', payload);
+          callback(payload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to houses:', error);
+    return null;
+  }
+}
+
+// ==================== USUARIOS ====================
+export async function getUsers() {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('app_users') as any)
+      .select('*')
+      .order('username', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching users:', error);
+      return [];
+    }
+    return (data || []).map((u: any) => ({
+      ...u,
+      house: u.house_name
+    }));
+  } catch (error) {
+    console.error('Exception fetching users:', error);
+    return [];
+  }
+}
+
+export async function createUser(user: any) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('app_users') as any)
+    .insert([{
+      username: user.username,
+      password: user.password,
+      role: user.role,
+      house_name: user.house || null,
+      created_at: new Date().toISOString()
+    }])
+    .select();
+  
+  if (error) {
+    console.error('Error creating user:', error);
+    return null;
+  }
+  const result = data?.[0] || null;
+  if (result) {
+    result.house = result.house_name;
+  }
+  return result;
+}
+
+export async function updateUser(userId: string, updates: any) {
+  const supabase = getSupabaseClient();
+  const mappedUpdates: any = { ...updates };
+  
+  if ('house' in mappedUpdates) {
+    mappedUpdates.house_name = mappedUpdates.house;
+    delete mappedUpdates.house;
+  }
+  
+  const { data, error } = await (supabase
+    .from('app_users') as any)
+    .update(mappedUpdates)
+    .eq('id', userId)
+    .select();
+  
+  if (error) {
+    console.error('Error updating user:', error);
+    return null;
+  }
+  const result = data?.[0] || null;
+  if (result) {
+    result.house = result.house_name;
+  }
+  return result;
+}
+
+export async function deleteUser(userId: string) {
+  const supabase = getSupabaseClient();
+  const { error } = await (supabase
+    .from('app_users') as any)
+    .delete()
+    .eq('id', userId);
+  
+  if (error) {
+    console.error('Error deleting user:', error);
+    return false;
+  }
+  return true;
+}
+
+export function subscribeToUsers(callback: (data: any) => void) {
+  try {
+    console.log('🔔 [Realtime Service] Iniciando suscripción a app_users');
+    const supabase = getSupabaseClient();
+    
+    const channel = supabase
+      .channel('users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'app_users'
+        },
+        (payload: any) => {
+          console.log('📨 [Realtime Service] Cambio en app_users:', payload);
+          const mappedPayload = {
+            ...payload,
+            new: payload.new ? { ...payload.new, house: payload.new.house_name } : null,
+            old: payload.old ? { ...payload.old, house: payload.old.house_name } : null
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to users:', error);
+    return null;
+  }
+}
+
 // ==================== Unsubscribe Helper ====================
 export function unsubscribeFromAll(subscriptions: any[]) {
   subscriptions.forEach(sub => {

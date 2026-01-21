@@ -462,6 +462,62 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, []);
 
+  // Cargar casas y usuarios desde Supabase con suscripción en tiempo real (solo para jonathan)
+  useEffect(() => {
+    if (user.username.toLowerCase() !== 'jonathan') return;
+
+    const loadHousesAndUsers = async () => {
+      try {
+        // Cargar casas
+        const housesData = await realtimeService.getHouses();
+        console.log('🏠 Casas cargadas:', housesData);
+        if (housesData.length > 0) {
+          setHouses(housesData.map(h => ({ name: h.name, id: h.id, tasks: [], inventory: [], users: [] })));
+        }
+
+        // Cargar usuarios
+        const usersData = await realtimeService.getUsers();
+        console.log('👥 Usuarios cargados:', usersData);
+      } catch (error) {
+        console.error('Error loading houses/users:', error);
+      }
+    };
+
+    loadHousesAndUsers();
+
+    // Suscribirse a cambios en tiempo real de casas y usuarios
+    let housesSubscription: any;
+    let usersSubscription: any;
+    try {
+      housesSubscription = realtimeService.subscribeToHouses((payload: any) => {
+        console.log('🏠 Cambio en casas:', payload);
+        if (payload?.eventType === 'INSERT') {
+          setHouses(prev => [...prev, { name: payload.new.name, id: payload.new.id, tasks: [], inventory: [], users: [] }]);
+        } else if (payload?.eventType === 'UPDATE') {
+          setHouses(prev => prev.map(h => h.id === payload.new.id ? { ...h, name: payload.new.name } : h));
+        } else if (payload?.eventType === 'DELETE') {
+          setHouses(prev => prev.filter(h => h.id !== payload.old.id));
+        }
+      });
+
+      usersSubscription = realtimeService.subscribeToUsers((payload: any) => {
+        console.log('👥 Cambio en usuarios:', payload);
+        // Aquí se podría actualizar el estado global de usuarios si fuera necesario
+      });
+    } catch (error) {
+      console.error('Error subscribing to houses/users:', error);
+    }
+
+    return () => {
+      try {
+        if (housesSubscription) supabase?.removeChannel(housesSubscription);
+        if (usersSubscription) supabase?.removeChannel(usersSubscription);
+      } catch (error) {
+        console.error('Error unsubscribing:', error);
+      }
+    };
+  }, [user.username]);
+
   // Cargar asignaciones de calendario desde Supabase con suscripción en tiempo real
   useEffect(() => {
     const loadCalendarAssignments = async () => {
