@@ -228,6 +228,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
   const [editingInventoryIdx, setEditingInventoryIdx] = useState(-1);
 
+  // Estado para checklist sincronizado en tiempo real por asignación
+  const [syncedChecklists, setSyncedChecklists] = useState<Map<string, any[]>>(new Map());
+  const [selectedAssignmentForChecklist, setSelectedAssignmentForChecklist] = useState<string | null>(null);
+  const [checklistSubscriptions, setChecklistSubscriptions] = useState<Map<string, any>>(new Map());
+
   // Estado para checklist
   const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
   const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
@@ -459,6 +464,81 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       }
     };
   }, [user.role, user.username]);
+
+  // Cargar y sincronizar checklist cuando se selecciona una asignación
+  useEffect(() => {
+    if (!selectedAssignmentForChecklist) return;
+    
+    const loadChecklist = async () => {
+      try {
+        console.log('🧹 Cargando checklist para asignación:', selectedAssignmentForChecklist);
+        const items = await realtimeService.getChecklistItems(selectedAssignmentForChecklist);
+        console.log('✅ Checklist cargado:', items);
+        setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
+      } catch (error) {
+        console.error('❌ Error loading checklist:', error);
+      }
+    };
+    
+    loadChecklist();
+    
+    // Suscribirse a cambios en tiempo real
+    let subscription: any;
+    try {
+      console.log('🔔 Suscribiendo a cambios del checklist en tiempo real...');
+      subscription = realtimeService.subscribeToChecklist(
+        selectedAssignmentForChecklist,
+        (payload: any) => {
+          console.log('⚡ Evento de checklist recibido:', payload);
+          
+          if (payload?.eventType === 'INSERT') {
+            console.log('➕ Nuevo item de checklist:', payload.new);
+            setSyncedChecklists(prev => {
+              const newMap = new Map(prev);
+              const items = newMap.get(selectedAssignmentForChecklist) || [];
+              newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
+              return newMap;
+            });
+          } else if (payload?.eventType === 'UPDATE') {
+            console.log('📝 Item de checklist actualizado:', payload.new);
+            setSyncedChecklists(prev => {
+              const newMap = new Map(prev);
+              const items = newMap.get(selectedAssignmentForChecklist) || [];
+              newMap.set(
+                selectedAssignmentForChecklist,
+                items.map(item => item.id === payload.new.id ? payload.new : item)
+              );
+              return newMap;
+            });
+          }
+        }
+      );
+      
+      if (subscription) {
+        console.log('✅ Suscripción de checklist activa:', subscription);
+        setChecklistSubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
+      }
+    } catch (error) {
+      console.error('❌ Error subscribing to checklist:', error);
+    }
+    
+    return () => {
+      try {
+        console.log('🔌 Desconectando suscripción de checklist...');
+        const sub = checklistSubscriptions.get(selectedAssignmentForChecklist);
+        if (sub) {
+          supabase?.removeChannel(sub);
+          setChecklistSubscriptions(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(selectedAssignmentForChecklist);
+            return newMap;
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error unsubscribing from checklist:', error);
+      }
+    };
+  }, [selectedAssignmentForChecklist]);
 
   // Guardar checklist en localStorage
   useEffect(() => {
@@ -977,7 +1057,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             house: 'EPIC D1'
                           });
                           
-                          console.log('✅ Asignación creada:', result);
+                          if (result && result.id) {
+                            console.log('✅ Asignación creada:', result);
+                            
+                            // Crear los items del checklist para esta asignación
+                            console.log('🧹 Creando items del checklist para asignación:', result.id);
+                            const checklistItems = await realtimeService.createChecklistItems(
+                              result.id,
+                              newAssignment.employee,
+                              'EPIC D1'
+                            );
+                            console.log('✅ Checklist creado con', checklistItems.length, 'items');
+                          }
+                          
                           setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
                         }
                       }}>
@@ -1094,18 +1186,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                  assignment.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
                               </span>
                             </div>
-                            {(user.role === 'owner' || user.role === 'manager') && (
-                              <div className="subcard-actions">
+                            <div className="subcard-actions">
+                              <button 
+                                className="dashboard-btn main"
+                                onClick={() => {
+                                  console.log('🧹 Abriendo checklist para asignación:', assignment.id);
+                                  setSelectedAssignmentForChecklist(assignment.id);
+                                }}
+                              >
+                                ✅ Ver Checklist
+                              </button>
+                              {(user.role === 'owner' || user.role === 'manager') && (
                                 <button 
-                                  className="danger"
+                                  className="dashboard-btn danger"
                                   onClick={() => {
                                     setCalendarAssignments(calendarAssignments.filter((_, i) => i !== idx));
                                   }}
                                 >
-                                  Eliminar
+                                  🗑️ Eliminar
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         ))}
                       </>
@@ -2073,6 +2174,108 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     )}
                   </div>
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal para Checklist Sincronizado */}
+      {selectedAssignmentForChecklist && (
+        <div className="modal-overlay" onClick={() => setSelectedAssignmentForChecklist(null)}>
+          <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🧹 Checklist de Limpieza</h2>
+              <button className="modal-close" onClick={() => setSelectedAssignmentForChecklist(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {syncedChecklists.get(selectedAssignmentForChecklist) ? (
+                (() => {
+                  const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
+                  const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
+                  
+                  if (!assignment) return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
+                  
+                  // Agrupar por zona
+                  const zones = new Map<string, any[]>();
+                  checklistItems.forEach(item => {
+                    if (!zones.has(item.zone)) {
+                      zones.set(item.zone, []);
+                    }
+                    zones.get(item.zone)!.push(item);
+                  });
+                  
+                  const totalItems = checklistItems.length;
+                  const completedItems = checklistItems.filter(i => i.completed).length;
+                  const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+                  
+                  return (
+                    <>
+                      <div className="modal-stats" style={{marginBottom: '2rem'}}>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{assignment.employee}</p>
+                          <p className="stat-box-label">Empleado</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{progress}%</p>
+                          <p className="stat-box-label">Progreso</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{completedItems}/{totalItems}</p>
+                          <p className="stat-box-label">Completadas</p>
+                        </div>
+                      </div>
+                      
+                      <div className="progress-bar" style={{marginBottom: '2rem'}}>
+                        <div className="progress-fill" style={{width: `${progress}%`}}></div>
+                      </div>
+                      
+                      <div className="checklist-zones">
+                        {Array.from(zones.entries()).map(([zone, items]) => {
+                          const zoneCompleted = items.filter(i => i.completed).length;
+                          const zoneTotal = items.length;
+                          const zoneProgress = Math.round((zoneCompleted / zoneTotal) * 100);
+                          
+                          return (
+                            <div key={zone} className="checklist-zone-card">
+                              <div className="checklist-zone-header">
+                                <h3>{zone}</h3>
+                                <span className="zone-progress">{zoneCompleted}/{zoneTotal}</span>
+                              </div>
+                              <div className="checklist-items">
+                                {items.map(item => (
+                                  <label key={item.id} className="checklist-item">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.completed}
+                                      onChange={async (e) => {
+                                        console.log('📝 Actualizando item:', item.id, 'a', e.target.checked);
+                                        await realtimeService.updateChecklistItem(
+                                          item.id,
+                                          e.target.checked,
+                                          user.username
+                                        );
+                                      }}
+                                      disabled={user.role === 'manager' && user.username !== assignment.employee}
+                                    />
+                                    <span className={item.completed ? 'completed' : ''}>{item.task}</span>
+                                    {item.completed && item.completed_by && (
+                                      <span className="completed-by">✓ por {item.completed_by}</span>
+                                    )}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()
+              ) : (
+                <div className="modal-body-empty">
+                  <p>Cargando checklist...</p>
+                </div>
               )}
             </div>
           </div>

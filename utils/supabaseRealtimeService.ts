@@ -468,6 +468,135 @@ export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (da
   }
 }
 
+// ==================== CLEANING CHECKLIST ====================
+export async function createChecklistItems(assignmentId: string, employee: string, house: string = 'EPIC D1') {
+  const supabase = getSupabaseClient();
+  
+  // Items predeterminados del checklist por zona
+  const checklistItems = [
+    { zone: 'Cocina', task: 'Limpiar mostrador', order: 1 },
+    { zone: 'Cocina', task: 'Limpiar estufa', order: 2 },
+    { zone: 'Cocina', task: 'Limpiar refrigerador', order: 3 },
+    { zone: 'Cocina', task: 'Barrer y trapear piso', order: 4 },
+    
+    { zone: 'Baños', task: 'Limpiar espejo', order: 1 },
+    { zone: 'Baños', task: 'Limpiar inodoro y urinario', order: 2 },
+    { zone: 'Baños', task: 'Limpiar ducha/tina', order: 3 },
+    { zone: 'Baños', task: 'Trapear piso', order: 4 },
+    
+    { zone: 'Salas', task: 'Limpiar muebles', order: 1 },
+    { zone: 'Salas', task: 'Vaciar basura', order: 2 },
+    { zone: 'Salas', task: 'Trapear piso', order: 3 },
+    { zone: 'Salas', task: 'Desempolvar', order: 4 },
+    
+    { zone: 'Dormitorios', task: 'Cambiar sábanas', order: 1 },
+    { zone: 'Dormitorios', task: 'Desempolvar', order: 2 },
+    { zone: 'Dormitorios', task: 'Pasar aspiradora', order: 3 },
+    { zone: 'Dormitorios', task: 'Limpiar espejos', order: 4 }
+  ];
+
+  const itemsToInsert = checklistItems.map(item => ({
+    calendar_assignment_id: assignmentId,
+    employee: employee,
+    house: house,
+    zone: item.zone,
+    task: item.task,
+    completed: false,
+    order_num: item.order
+  }));
+
+  const { data, error } = await (supabase
+    .from('cleaning_checklist') as any)
+    .insert(itemsToInsert)
+    .select();
+
+  if (error) {
+    console.error('Error creating checklist items:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function getChecklistItems(assignmentId: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('cleaning_checklist') as any)
+      .select('*')
+      .eq('calendar_assignment_id', assignmentId)
+      .order('zone', { ascending: true })
+      .order('order_num', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching checklist items:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching checklist items:', error);
+    return [];
+  }
+}
+
+export async function updateChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('cleaning_checklist') as any)
+    .update({
+      completed: completed,
+      completed_at: completed ? new Date().toISOString() : null,
+      completed_by: completed ? completedBy : null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('Error updating checklist item:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
+export function subscribeToChecklist(assignmentId: string, callback: (data: any) => void) {
+  try {
+    console.log('🧹 [Checklist Service] Iniciando suscripción para assignment:', assignmentId);
+    const supabase = getSupabaseClient();
+
+    const channel = supabase
+      .channel(`checklist-${assignmentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cleaning_checklist',
+          filter: `calendar_assignment_id=eq.${assignmentId}`
+        },
+        (payload: any) => {
+          console.log('⚡ [Checklist Service] Evento recibido:', payload);
+          
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          
+          callback(mappedPayload);
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Checklist Service] Estado de suscripción:', status);
+      });
+
+    console.log('✅ [Checklist Service] Canal creado');
+    return channel;
+  } catch (error) {
+    console.error('❌ [Checklist Service] Error subscribing:', error);
+    return null;
+  }
+}
+
 // ==================== Unsubscribe Helper ====================
 export function unsubscribeFromAll(subscriptions: any[]) {
   subscriptions.forEach(sub => {
