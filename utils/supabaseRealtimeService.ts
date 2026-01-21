@@ -101,7 +101,7 @@ export function subscribeToTasks(house: string = 'HYNTIBA2 APTO 406', callback: 
     const supabase = getSupabaseClient();
     
     const channel = supabase
-      .channel('tasks-changes')
+      .channel(`tasks-changes-${house}`)
       .on(
         'postgres_changes',
         {
@@ -286,7 +286,7 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
     const supabase = getSupabaseClient();
     
     const channel = supabase
-      .channel('inventory-changes')
+      .channel(`inventory-changes-${house}`)
       .on(
         'postgres_changes',
         {
@@ -402,7 +402,7 @@ export function subscribeToCalendarAssignments(house: string = 'HYNTIBA2 APTO 40
     console.log('🔍 [Calendar Service] Filtro aplicado:', filter);
     
     const channel = supabase
-      .channel('calendar-changes')
+      .channel(`calendar-changes-${house}`)
       .on(
         'postgres_changes',
         {
@@ -894,7 +894,7 @@ export function subscribeToInventoryTemplate(house: string = 'HYNTIBA2 APTO 406'
   try {
     const supabase = getSupabaseClient();
     const channel = supabase
-      .channel('inventory-template-changes')
+      .channel(`inventory-template-changes-${house}`)
       .on(
         'postgres_changes',
         {
@@ -1032,7 +1032,7 @@ export function subscribeToShoppingList(house: string = 'HYNTIBA2 APTO 406', cal
   try {
     const supabase = getSupabaseClient();
     const channel = supabase
-      .channel('shopping-list-changes')
+      .channel(`shopping-list-changes-${house}`)
       .on(
         'postgres_changes',
         {
