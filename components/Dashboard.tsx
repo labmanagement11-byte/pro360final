@@ -901,18 +901,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
       show: user.role === 'owner' || user.role === 'manager',
     },
-    // Solo mostrar la tarjeta de seleccionar casa si es owner o si es jonathan (manager especial)
+    // Solo mostrar la tarjeta de seleccionar casa si es owner (no jonathan)
     {
       key: 'house',
       title: 'Seleccionar Casa',
       desc: 'Elige y administra la casa actual.',
-      show: user.role === 'owner' || (user.role === 'manager' && user.username.toLowerCase() === 'jonathan'),
+      show: user.role === 'owner' && user.username.toLowerCase() !== 'jonathan',
     },
     {
       key: 'users',
       title: 'Usuarios',
       desc: 'Administra roles: dueño, manager, empleado.',
-      show: user.role === 'owner' || (user.role === 'manager' && user.username.toLowerCase() === 'jonathan'),
+      show: user.role === 'owner' && user.username.toLowerCase() !== 'jonathan',
     },
   ];
 
@@ -1074,7 +1074,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         <div className="dashboard-title-block">
           <h1>Dashboard</h1>
           <span className="dashboard-user-pill" aria-label="Usuario en sesión">👤 {user.username}</span>
-          {user.house && <span className="dashboard-house-pill" aria-label="Casa asignada">🏠 {user.house}</span>}
+          {user.username.toLowerCase() === 'jonathan' ? (
+            <select
+              value={selectedHouseIdx}
+              onChange={(e) => setSelectedHouseIdx(parseInt(e.target.value, 10))}
+              className="dashboard-house-selector"
+              aria-label="Seleccionar casa"
+            >
+              {houses.map((h, idx) => (
+                <option key={idx} value={idx}>
+                  🏠 {h.houseName || h.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            user.house && <span className="dashboard-house-pill" aria-label="Casa asignada">🏠 {user.house}</span>
+          )}
         </div>
         {onLogout && (
           <button className="dashboard-btn danger dashboard-logout-btn" onClick={onLogout}>

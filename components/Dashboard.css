@@ -386,6 +386,33 @@
   box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35);
 }
 
+.dashboard-house-selector {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35);
+}
+
+.dashboard-house-selector:hover {
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+}
+
+.dashboard-house-selector:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.dashboard-house-selector option {
+  background: #1f2937;
+  color: #fff;
+}
+
 .dashboard-logout-btn {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: #fff;
