@@ -8,12 +8,12 @@ export async function createTask(task: any) {
     .insert([{
       title: task.title,
       description: task.description,
-      assignedTo: task.assignedTo,
+      assigned_to: task.assignedTo,
       type: task.type,
       house: task.house || 'EPIC D1',
       completed: false,
-      createdBy: task.createdBy,
-      createdAt: new Date().toISOString()
+      created_by: task.createdBy,
+      created_at: new Date().toISOString()
     }])
     .select();
   
@@ -31,7 +31,7 @@ export async function getTasks(house: string = 'EPIC D1') {
       .from('tasks') as any)
       .select('*')
       .eq('house', house)
-      .order('createdAt', { ascending: false });
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching tasks:', error);
@@ -197,7 +197,7 @@ export async function createInventoryItem(item: any) {
       complete: true,
       notes: '',
       house: item.house || 'EPIC D1',
-      createdAt: new Date().toISOString()
+      created_at: new Date().toISOString()
     }])
     .select();
   
@@ -214,7 +214,7 @@ export async function updateInventoryItem(itemId: string, updates: any) {
     .from('inventory') as any)
     .update({
       ...updates,
-      updatedAt: new Date().toISOString()
+      updated_at: new Date().toISOString()
     })
     .eq('id', itemId)
     .select();
@@ -302,7 +302,7 @@ export async function createCalendarAssignment(assignment: any) {
       time: assignment.time,
       type: assignment.type,
       house: assignment.house || 'EPIC D1',
-      createdAt: new Date().toISOString()
+      created_at: new Date().toISOString()
     }])
     .select();
   
@@ -423,7 +423,7 @@ export async function getShoppingList(house: string = 'EPIC D1') {
       .select('*')
       .eq('house', house)
       .eq('completed', false)
-      .order('createdAt', { ascending: false });
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching shopping list:', error);
