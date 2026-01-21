@@ -2139,21 +2139,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         // Agregar tarea a Supabase para sincronización en tiempo real
                         (async () => {
                           try {
-                            const { data, error } = await supabase
-                              .from('checklist')
-                              .insert([{
-                                house: selectedHouse,
-                                item: taskText,
-                                room: zona,
-                                complete: false,
-                                assigned_to: null
-                              }])
-                              .select();
-                            
-                            if (error) {
-                              console.error('❌ Error agregando tarea al checklist:', error);
-                            } else {
-                              console.log('✅ Tarea agregada al checklist de', selectedHouse, ':', taskText);
+                            if (supabase) {
+                              const { data, error } = await supabase
+                                .from('checklist')
+                                .insert([{
+                                  house: selectedHouse,
+                                  item: taskText,
+                                  room: zona,
+                                  complete: false,
+                                  assigned_to: null
+                                }])
+                                .select();
+                              
+                              if (error) {
+                                console.error('❌ Error agregando tarea al checklist:', error);
+                              } else {
+                                console.log('✅ Tarea agregada al checklist de', selectedHouse, ':', taskText);
+                              }
                             }
                           } catch (error) {
                             console.error('❌ Error en insert checklist:', error);
