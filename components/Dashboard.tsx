@@ -289,10 +289,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       localStorage.setItem('dashboard_selected_house_idx', selectedHouseIdx.toString());
     }
   }, [selectedHouseIdx]);
-  
-  // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
-  const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
-  const [newHouseName, setNewHouseName] = useState('');
+
+  // LIMPIEZA AGRESIVA de localStorage para usuarios que tengan datos cacheados incorrectos
+  // Esto es especialmente importante para Sandra y Chava que tenían "YNTIBA 2" en el caché
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('🧹 Ejecutando limpieza agresiva de localStorage para:', user?.username);
+      
+      // Limpiar TODOS los keys que empiecen con 'dashboard'
+      const keysToDelete = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('dashboard')) {
+          keysToDelete.push(key);
+        }
+      }
+      
+      keysToDelete.forEach(key => {
+        console.log(`  Borrando: ${key}`);
+        localStorage.removeItem(key);
+      });
+      
+      if (keysToDelete.length > 0) {
+        console.log(`✅ Limpiados ${keysToDelete.length} keys de localStorage`);
+      }
+    }
+  }, [user?.username]); // Ejecutar cada vez que cambie el usuario
   
   // Guardar casas en localStorage
   useEffect(() => {
@@ -300,6 +322,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       localStorage.setItem('dashboard_houses', JSON.stringify(houses));
     }
   }, [houses]);
+
+  // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
+  const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
+  const [newHouseName, setNewHouseName] = useState('');
 
   // Estado para checklist
   const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
