@@ -499,10 +499,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
       usersSubscription = realtimeService.subscribeToUsers((usersArray: any) => {
         console.log('👥 Usuarios actualizados (realtime):', usersArray);
-        // Actualizar estado de usuarios si es necesario
-        if (Array.isArray(usersArray)) {
-          setUsers(usersArray);
-        }
+        // Los usuarios se actualizan a través de los props desde el componente padre
       });
     } catch (error) {
       console.error('Error subscribing to houses/users:', error);
