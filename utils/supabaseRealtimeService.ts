@@ -469,33 +469,142 @@ export function subscribeToShoppingList(house: string = 'EPIC D1', callback: (da
 }
 
 // ==================== CLEANING CHECKLIST ====================
-export async function createCleaningChecklistItems(assignmentId: string, employee: string, house: string = 'EPIC D1') {
+export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'EPIC D1') {
   const supabase = getSupabaseClient();
   
-  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId);
+  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId, 'Tipo:', assignmentType);
   
-  // Items predeterminados del checklist por zona
-  const checklistItems = [
-    { zone: 'Cocina', task: 'Limpiar mostrador', order: 1 },
-    { zone: 'Cocina', task: 'Limpiar estufa', order: 2 },
-    { zone: 'Cocina', task: 'Limpiar refrigerador', order: 3 },
-    { zone: 'Cocina', task: 'Barrer y trapear piso', order: 4 },
-    
-    { zone: 'Baños', task: 'Limpiar espejo', order: 1 },
-    { zone: 'Baños', task: 'Limpiar inodoro y urinario', order: 2 },
-    { zone: 'Baños', task: 'Limpiar ducha/tina', order: 3 },
-    { zone: 'Baños', task: 'Trapear piso', order: 4 },
-    
-    { zone: 'Salas', task: 'Limpiar muebles', order: 1 },
-    { zone: 'Salas', task: 'Vaciar basura', order: 2 },
-    { zone: 'Salas', task: 'Trapear piso', order: 3 },
-    { zone: 'Salas', task: 'Desempolvar', order: 4 },
-    
-    { zone: 'Dormitorios', task: 'Cambiar sábanas', order: 1 },
-    { zone: 'Dormitorios', task: 'Desempolvar', order: 2 },
-    { zone: 'Dormitorios', task: 'Pasar aspiradora', order: 3 },
-    { zone: 'Dormitorios', task: 'Limpiar espejos', order: 4 }
-  ];
+  // Listas de limpieza por tipo
+  const LIMPIEZA_REGULAR: Record<string, string[]> = {
+    'LIMPIEZA GENERAL': [
+      'Barrer y trapear toda la casa.',
+      'Quitar el polvo de todas las superficies y decoración usando un trapo húmedo.',
+      'Limpiar los televisores cuidadosamente sin dejar marcas en la pantalla.',
+      'Revisar zócalos y esquinas para asegurarse de que estén limpios.',
+      'Limpiar telaraña'
+    ],
+    'SALA': [
+      'Limpiar todas las superficies.',
+      'Mover los cojines del sofá y verificar que no haya suciedad ni hormigas debajo.',
+      'Organizar cojines y dejar la sala ordenada.'
+    ],
+    'COMEDOR': [
+      'Limpiar mesa, sillas y superficies.',
+      'Asegurarse de que el área quede limpia y ordenada.'
+    ],
+    'COCINA': [
+      'Limpiar superficies, gabinetes por fuera y por dentro.',
+      'Verificar que los gabinetes estén limpios y organizados y funcionales.',
+      'Limpiar la cafetera y su filtro.',
+      'Verificar que el dispensador de jabón de loza esté lleno.',
+      'Dejar toallas de cocina limpias y disponibles para los visitantes.',
+      'Limpiar microondas por dentro y por fuera.',
+      'Limpiar el filtro de agua.',
+      'Limpiar la nevera por dentro y por fuera (no dejar alimentos).',
+      'Lavar las canecas de basura y colocar bolsas nuevas.'
+    ],
+    'BAÑOS': [
+      'Limpiar ducha (pisos y paredes).',
+      'Limpiar divisiones de vidrio y asegurarse de que no queden marcas.',
+      'Limpiar espejo, sanitario y lavamanos con Clorox.',
+      'Lavar las canecas de basura y colocar bolsas nuevas.',
+      'Verificar disponibilidad de toallas (Máximo 10 toallas blancas de cuerpo en toda la casa, Máximo 4 toallas de mano en total).',
+      'Dejar un rollo de papel higiénico nuevo instalado en cada baño.',
+      'Dejar un rollo extra en el cuarto de lavado.',
+      'Lavar y volver a colocar los tapetes de baño.'
+    ],
+    'HABITACIONES': [
+      'Revisar que no haya objetos dentro de los cajones.',
+      'Lavar sábanas y hacer las camas correctamente.',
+      'Limpiar el polvo de todas las superficies.',
+      'Lavar los tapetes de la habitación y volver a colocarlos limpios.'
+    ],
+    'ZONA DE LAVADO': [
+      'Limpiar el filtro de la lavadora en cada lavada.',
+      'Limpiar el gabinete debajo del lavadero.',
+      'Dejar ganchos de ropa disponibles.',
+      'Dejar toallas disponibles para la piscina.'
+    ],
+    'ÁREA DE BBQ': [
+      'Barrer y trapear el área.',
+      'Limpiar mesa y superficies.',
+      'Limpiar la mini nevera y no dejar ningún alimento dentro.',
+      'Limpiar la parrilla con el cepillo (no usar agua).',
+      'Retirar las cenizas del carbón.',
+      'Dejar toda el área limpia y ordenada.'
+    ],
+    'ÁREA DE PISCINA': [
+      'Barrer y trapear el área.',
+      'Organizar los muebles alrededor de la piscina.'
+    ],
+    'TERRAZA': [
+      'Limpiar el piso de la terraza.',
+      'Limpiar superficies.',
+      'Organizar los cojines de la sala exterior.'
+    ]
+  };
+
+  const LIMPIEZA_PROFUNDA: Record<string, string[]> = {
+    'LIMPIEZA PROFUNDA': [
+      'Lavar los forros de los muebles (sofás, sillas y cojines).',
+      'Limpiar todas las ventanas y ventanales de la casa, por dentro y por fuera.',
+      'Limpiar con hidrolavadora el piso exterior, incluyendo escaleras, terraza y placas vehiculares.',
+      'Lavar la caneca grande de basura ubicada debajo de la escalera.',
+      'Limpiar las paredes y los guardaescobas de toda la casa.'
+    ]
+  };
+
+  const MANTENIMIENTO: Record<string, string[]> = {
+    'PISCINA Y AGUA': [
+      'Mantener la piscina limpia y en funcionamiento.',
+      'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.'
+    ],
+    'SISTEMAS ELÉCTRICOS': [
+      'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
+      'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.'
+    ],
+    'ÁREAS VERDES': [
+      'Cortar el césped cada mes y medio a dos meses, y limpiar restos de césped.',
+      'Mantenimiento de palmeras: remover hojas secas.',
+      'Mantener la matera de la terraza libre de maleza y deshierbar regularmente.',
+      'Regar las plantas vivas según necesidad.'
+    ],
+    'RUTINA DE MANTENIMIENTO': [
+      'Mantener la piscina limpia y en funcionamiento.',
+      'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.',
+      'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
+      'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.',
+      'Cortar el césped cada mes y medio a dos meses, y limpiar restos de césped.',
+      'Mantenimiento de palmeras: remover hojas secas.',
+      'Mantener la matera de la terraza libre de maleza y deshierbar regularmente.',
+      'Regar las plantas vivas según necesidad.'
+    ]
+  };
+
+  // Seleccionar la lista según el tipo de asignación
+  let checklistTemplate: Record<string, string[]> = {};
+  
+  if (assignmentType === 'Limpieza regular') {
+    checklistTemplate = LIMPIEZA_REGULAR;
+  } else if (assignmentType === 'Limpieza profunda') {
+    checklistTemplate = LIMPIEZA_PROFUNDA;
+  } else if (assignmentType === 'Mantenimiento') {
+    checklistTemplate = MANTENIMIENTO;
+  }
+
+  console.log('📋 [Checklist] Usando template:', Object.keys(checklistTemplate).length, 'zonas');
+
+  // Convertir el template a items
+  const checklistItems: { zone: string; task: string; order: number }[] = [];
+  Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
+    tasks.forEach((task, index) => {
+      checklistItems.push({
+        zone: zone,
+        task: task,
+        order: index + 1
+      });
+    });
+  });
 
   console.log('📋 [Checklist] Items a insertar:', checklistItems.length);
 

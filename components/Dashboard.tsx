@@ -1065,6 +1065,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             const checklistItems = await realtimeService.createCleaningChecklistItems(
                               result.id,
                               newAssignment.employee,
+                              newAssignment.type,  // Pasar el tipo de limpieza
                               'EPIC D1'
                             );
                             console.log('✅ Checklist creado con', checklistItems.length, 'items');
@@ -2229,6 +2230,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <div className="progress-bar" style={{marginBottom: '2rem'}}>
                         <div className="progress-fill" style={{width: `${progress}%`}}></div>
                       </div>
+                      
+                      {/* Botón para eliminar asignación cuando esté completa (solo manager/owner) */}
+                      {(user.role === 'manager' || user.role === 'owner') && progress === 100 && (
+                        <div style={{marginBottom: '2rem', textAlign: 'center'}}>
+                          <button 
+                            className="dashboard-btn danger"
+                            style={{fontSize: '1rem', padding: '0.75rem 2rem'}}
+                            onClick={async () => {
+                              if (confirm(`¿Eliminar esta asignación completada de ${assignment.employee}? Esto también eliminará el checklist.`)) {
+                                console.log('🗑️ Eliminando asignación:', selectedAssignmentForChecklist);
+                                await realtimeService.deleteCalendarAssignment(selectedAssignmentForChecklist);
+                                setSelectedAssignmentForChecklist(null);
+                              }
+                            }}
+                          >
+                            ✅ Trabajo Completado - Eliminar Asignación
+                          </button>
+                        </div>
+                      )}
                       
                       <div className="checklist-zones">
                         {Array.from(zones.entries()).map(([zone, items]) => {
