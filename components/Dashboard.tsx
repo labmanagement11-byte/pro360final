@@ -238,6 +238,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [selectedAssignmentForInventory, setSelectedAssignmentForInventory] = useState<string | null>(null);
   const [inventorySubscriptions, setInventorySubscriptions] = useState<Map<string, any>>(new Map());
 
+  // Estado para template de inventario (manager edita el template)
+  const [inventoryTemplate, setInventoryTemplate] = useState<any[]>([]);
+  const [loadingInventoryTemplate, setLoadingInventoryTemplate] = useState(true);
+  const [editingTemplateItemId, setEditingTemplateItemId] = useState<string | null>(null);
+  const [newTemplateItem, setNewTemplateItem] = useState({
+    item_name: '',
+    quantity: '',
+    category: 'Cocina',
+  });
+
   // Estado para checklist
   const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
   const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
@@ -620,6 +630,42 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [selectedAssignmentForInventory]);
 
+  // useEffect para cargar template de inventario cuando se abre el modal
+  useEffect(() => {
+    if (selectedModalCard !== 'inventory') return;
+    
+    const loadTemplate = async () => {
+      try {
+        setLoadingInventoryTemplate(true);
+        const template = await realtimeService.getInventoryTemplate('EPIC D1');
+        setInventoryTemplate(template);
+        setLoadingInventoryTemplate(false);
+      } catch (error) {
+        console.error('Error loading inventory template:', error);
+        setLoadingInventoryTemplate(false);
+      }
+    };
+    
+    loadTemplate();
+    
+    // Suscribirse a cambios en el template
+    const subscription = realtimeService.subscribeToInventoryTemplate('EPIC D1', (payload: any) => {
+      if (payload.eventType === 'INSERT') {
+        setInventoryTemplate(prev => [...prev, payload.new]);
+      } else if (payload.eventType === 'UPDATE') {
+        setInventoryTemplate(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+      } else if (payload.eventType === 'DELETE') {
+        setInventoryTemplate(prev => prev.filter(item => item.id !== payload.old.id));
+      }
+    });
+    
+    return () => {
+      if (subscription) {
+        supabase?.removeChannel(subscription);
+      }
+    };
+  }, [selectedModalCard]);
+
   // Guardar checklist en localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -683,7 +729,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'inventory',
       title: 'Inventario',
       desc: 'Controla y revisa el inventario de la propiedad.',
-      show: false, // Deshabilitado - ahora el inventario está en las asignaciones
+      show: user.role === 'owner' || user.role === 'manager', // Solo manager/owner pueden editar template
     },
     {
       key: 'shopping',
@@ -1857,192 +1903,183 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
               {selectedModalCard === 'inventory' && (
                 <>
-                  {/* Formulario para agregar inventario (Manager/Owner) */}
-                  {(user.role === 'owner' || user.role === 'manager') && (
-                    <div className="modal-assignment-form">
-                      <h3>📦 {editingInventoryIdx >= 0 ? 'Editar Artículo' : 'Agregar al Inventario'}</h3>
-                      <form onSubmit={(e) => {
-                        e.preventDefault();
-                        const currentInventory = houses[allowedHouseIdx]?.inventory || [];
-                        const newItem = { ...newInventoryItem, complete: true, notes: '' };
-                        
-                        if (editingInventoryIdx >= 0) {
-                          const updatedInventory = currentInventory.map((item: any, i: number) => 
-                            i === editingInventoryIdx ? newItem : item
-                          );
-                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
-                          setEditingInventoryIdx(-1);
-                        } else {
-                          setHouses(houses.map((h, i) => i === allowedHouseIdx ? { 
-                            ...h, 
-                            inventory: [...currentInventory, newItem] 
-                          } : h));
-                        }
-                        setNewInventoryItem({ name: '', quantity: '', location: '', complete: true, notes: '' });
-                      }}>
-                        <div className="assignment-form-grid">
-                          <div className="form-group">
-                            <label>📝 Nombre del artículo</label>
-                            <input
-                              type="text"
-                              value={newInventoryItem.name}
-                              onChange={(e) => setNewInventoryItem({...newInventoryItem, name: e.target.value})}
-                              required
-                              placeholder="Ej: Toallas"
-                              title="Nombre del artículo"
-                            />
-                          </div>
-                          
-                          <div className="form-group">
-                            <label>🔢 Cantidad</label>
-                            <input
-                              type="number"
-                              value={newInventoryItem.quantity}
-                              onChange={(e) => setNewInventoryItem({...newInventoryItem, quantity: e.target.value})}
-                              required
-                              min="1"
-                              placeholder="Ej: 10"
-                              title="Cantidad"
-                            />
-                          </div>
-                          
-                          <div className="form-group" style={{gridColumn: '1 / -1'}}>
-                            <label>📍 Ubicación</label>
-                            <input
-                              type="text"
-                              value={newInventoryItem.location}
-                              onChange={(e) => setNewInventoryItem({...newInventoryItem, location: e.target.value})}
-                              required
-                              placeholder="Ej: Baño principal"
-                              title="Ubicación"
-                            />
-                          </div>
+                  {/* Formulario para agregar/editar items del template */}
+                  <div className="modal-assignment-form">
+                    <h3>📦 {editingTemplateItemId ? 'Editar Item del Template' : 'Agregar Item al Template'}</h3>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      
+                      if (editingTemplateItemId) {
+                        // Actualizar item existente
+                        await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
+                          item_name: newTemplateItem.item_name,
+                          quantity: parseInt(newTemplateItem.quantity),
+                          category: newTemplateItem.category
+                        });
+                        setEditingTemplateItemId(null);
+                      } else {
+                        // Crear nuevo item
+                        await realtimeService.createInventoryTemplateItem({
+                          item_name: newTemplateItem.item_name,
+                          quantity: parseInt(newTemplateItem.quantity),
+                          category: newTemplateItem.category
+                        }, 'EPIC D1');
+                      }
+                      
+                      setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
+                    }}>
+                      <div className="assignment-form-grid">
+                        <div className="form-group">
+                          <label>📝 Nombre del artículo</label>
+                          <input
+                            type="text"
+                            value={newTemplateItem.item_name}
+                            onChange={(e) => setNewTemplateItem({...newTemplateItem, item_name: e.target.value})}
+                            required
+                            placeholder="Ej: Tenedores"
+                            title="Nombre del artículo"
+                          />
                         </div>
                         
-                        <div style={{display: 'flex', gap: '1rem'}}>
-                          <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
-                            {editingInventoryIdx >= 0 ? '✏️ Actualizar' : '➕ Agregar al Inventario'}
+                        <div className="form-group">
+                          <label>🔢 Cantidad</label>
+                          <input
+                            type="number"
+                            value={newTemplateItem.quantity}
+                            onChange={(e) => setNewTemplateItem({...newTemplateItem, quantity: e.target.value})}
+                            required
+                            min="1"
+                            placeholder="Ej: 10"
+                            title="Cantidad"
+                          />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label>🏷️ Categoría</label>
+                          <select
+                            value={newTemplateItem.category}
+                            onChange={(e) => setNewTemplateItem({...newTemplateItem, category: e.target.value})}
+                            required
+                          >
+                            <option value="Cocina">Cocina</option>
+                            <option value="Baños">Baños</option>
+                            <option value="Dormitorios">Dormitorios</option>
+                            <option value="Sala">Sala</option>
+                            <option value="Comedor">Comedor</option>
+                            <option value="Lavandería">Lavandería</option>
+                            <option value="Limpieza">Limpieza</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div style={{display: 'flex', gap: '1rem'}}>
+                        <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
+                          {editingTemplateItemId ? '✏️ Actualizar' : '➕ Agregar al Template'}
+                        </button>
+                        {editingTemplateItemId && (
+                          <button 
+                            type="button" 
+                            className="dashboard-btn danger" 
+                            onClick={() => {
+                              setEditingTemplateItemId(null);
+                              setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
+                            }}
+                          >
+                            ❌ Cancelar
                           </button>
-                          {editingInventoryIdx >= 0 && (
-                            <button 
-                              type="button" 
-                              className="dashboard-btn danger" 
-                              onClick={() => {
-                                setEditingInventoryIdx(-1);
-                                setNewInventoryItem({ name: '', quantity: '', location: '', complete: true, notes: '' });
-                              }}
-                            >
-                              ❌ Cancelar
-                            </button>
-                          )}
-                        </div>
-                      </form>
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    </form>
+                  </div>
                   
                   <div className="subcards-grid">
                     <div className="modal-stats">
                       <div className="stat-box">
-                        <p className="stat-box-number">{(houses[allowedHouseIdx]?.inventory || []).length}</p>
-                        <p className="stat-box-label">Artículos totales</p>
+                        <p className="stat-box-number">{inventoryTemplate.length}</p>
+                        <p className="stat-box-label">Items en Template</p>
                       </div>
                       <div className="stat-box">
                         <p className="stat-box-number">
-                          {(houses[allowedHouseIdx]?.inventory || []).filter((item: any) => item.complete).length}
+                          {new Set(inventoryTemplate.map(i => i.category)).size}
                         </p>
-                        <p className="stat-box-label">Completos</p>
+                        <p className="stat-box-label">Categorías</p>
                       </div>
                       <div className="stat-box">
                         <p className="stat-box-number">
-                          {(houses[allowedHouseIdx]?.inventory || []).filter((item: any) => !item.complete).length}
+                          {inventoryTemplate.reduce((sum, i) => sum + i.quantity, 0)}
                         </p>
-                        <p className="stat-box-label">Incompletos</p>
+                        <p className="stat-box-label">Items Totales</p>
                       </div>
                     </div>
-                    {(houses[allowedHouseIdx]?.inventory || []).length > 0 ? (
-                      (houses[allowedHouseIdx]?.inventory || []).map((item: any, idx: number) => (
-                        <div key={idx} className="subcard">
-                          <div className="subcard-header">
-                            <div className="subcard-icon">📦</div>
-                            <h3>{item.name || 'Sin nombre'}</h3>
+                    
+                    {loadingInventoryTemplate ? (
+                      <div className="modal-body-empty">
+                        <p>Cargando template...</p>
+                      </div>
+                    ) : inventoryTemplate.length > 0 ? (
+                      (() => {
+                        // Agrupar por categoría
+                        const categories = new Map<string, any[]>();
+                        inventoryTemplate.forEach(item => {
+                          if (!categories.has(item.category)) {
+                            categories.set(item.category, []);
+                          }
+                          categories.get(item.category)!.push(item);
+                        });
+                        
+                        return (
+                          <div style={{gridColumn: '1 / -1'}}>
+                            {Array.from(categories.entries()).map(([category, items]) => (
+                              <div key={category} style={{marginBottom: '2rem'}}>
+                                <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
+                                  {category} ({items.length} items)
+                                </h3>
+                                <div className="subcards-grid">
+                                  {items.map((item) => (
+                                    <div key={item.id} className="subcard">
+                                      <div className="subcard-header">
+                                        <div className="subcard-icon">📦</div>
+                                        <h3>{item.item_name}</h3>
+                                      </div>
+                                      <div className="subcard-content">
+                                        <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
+                                        <p><strong>🏷️ Categoría:</strong> {item.category}</p>
+                                      </div>
+                                      <div className="subcard-actions">
+                                        <button 
+                                          onClick={() => {
+                                            setNewTemplateItem({
+                                              item_name: item.item_name,
+                                              quantity: item.quantity.toString(),
+                                              category: item.category
+                                            });
+                                            setEditingTemplateItemId(item.id);
+                                          }}
+                                        >
+                                          ✏️ Editar
+                                        </button>
+                                        <button 
+                                          className="danger"
+                                          onClick={async () => {
+                                            if (confirm(`¿Eliminar "${item.item_name}" del template?`)) {
+                                              await realtimeService.deleteInventoryTemplateItem(item.id);
+                                            }
+                                          }}
+                                        >
+                                          🗑️ Eliminar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          <div className="subcard-content">
-                            <p><strong>🔢 Cantidad:</strong> {item.quantity || 0}</p>
-                            <p><strong>📍 Ubicación:</strong> {item.location || 'No especificada'}</p>
-                            {item.notes && (
-                              <p><strong>📝 Notas:</strong> {item.notes}</p>
-                            )}
-                            <span className={`subcard-badge ${item.complete ? 'success' : 'danger'}`}>
-                              {item.complete ? '✅ Completo' : '⚠️ Incompleto'}
-                            </span>
-                          </div>
-                          
-                          {/* Botones para empleados: marcar completo/incompleto */}
-                          {user.role === 'empleado' && (
-                            <div className="subcard-actions">
-                              {item.complete ? (
-                                <button 
-                                  className="danger"
-                                  onClick={() => {
-                                    const reason = prompt('¿Por qué está incompleto o cuántos faltan?');
-                                    if (reason) {
-                                      const updatedInventory = (houses[allowedHouseIdx]?.inventory || []).map((inv: any, i: number) => 
-                                        i === idx ? { ...inv, complete: false, notes: reason } : inv
-                                      );
-                                      setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
-                                    }
-                                  }}
-                                >
-                                  ⚠️ Marcar Incompleto
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => {
-                                    const updatedInventory = (houses[allowedHouseIdx]?.inventory || []).map((inv: any, i: number) => 
-                                      i === idx ? { ...inv, complete: true, notes: '' } : inv
-                                    );
-                                    setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
-                                  }}
-                                >
-                                  ✅ Marcar Completo
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Botones para manager: editar y eliminar */}
-                          {(user.role === 'owner' || user.role === 'manager') && (
-                            <div className="subcard-actions">
-                              <button 
-                                onClick={() => {
-                                  setNewInventoryItem({
-                                    name: item.name,
-                                    quantity: item.quantity.toString(),
-                                    location: item.location,
-                                    complete: item.complete,
-                                    notes: item.notes || ''
-                                  });
-                                  setEditingInventoryIdx(idx);
-                                }}
-                              >
-                                ✏️ Editar
-                              </button>
-                              <button 
-                                className="danger"
-                                onClick={() => {
-                                  const updatedInventory = (houses[allowedHouseIdx]?.inventory || []).filter((_: any, i: number) => i !== idx);
-                                  setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory: updatedInventory } : h));
-                                }}
-                              >
-                                🗑️ Eliminar
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
+                        );
+                      })()
                     ) : (
                       <div className="modal-body-empty">
-                        <p>📭 No hay artículos en el inventario</p>
+                        <p>📭 No hay items en el template de inventario</p>
                       </div>
                     )}
                   </div>
