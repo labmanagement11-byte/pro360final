@@ -73,7 +73,7 @@ export async function deleteTask(taskId: string) {
   return true;
 }
 
-export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any[]) => void) {
+export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any) => void) {
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a tasks para house:', house);
     const supabase = getSupabaseClient();
