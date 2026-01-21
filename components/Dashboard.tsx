@@ -558,7 +558,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             users: [] 
           }));
           console.log('🏠 [mapeo] Casas después de mapear:', JSON.stringify(mappedHouses, null, 2));
-          console.log('🏠 [setHouses] Estableciendo state con:', mappedHouses.map(h => h.name));
+          console.log('🏠 [setHouses] Estableciendo state con:', mappedHouses.map((h: any) => h.name));
           setHouses(mappedHouses);
           
           // Guardar en localStorage con los nombres correctos de Supabase
