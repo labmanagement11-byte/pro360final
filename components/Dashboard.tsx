@@ -1196,6 +1196,47 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               >
                 <span className="house-icon">🏠</span>
                 <span className="house-name">{house.houseName || house.name}</span>
+                {user.username.toLowerCase() === 'jonathan' && (
+                  <div className="house-card-actions" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                      onClick={async () => {
+                        const newName = prompt(`Nuevo nombre para ${house.houseName || house.name}:`, house.houseName || house.name);
+                        if (newName && newName.trim()) {
+                          try {
+                            if (house.id) {
+                              await realtimeService.updateHouse(house.id, { houseName: newName.trim() });
+                            }
+                          } catch (error) {
+                            console.error('Error updating house:', error);
+                            alert('Error al actualizar casa');
+                          }
+                        }
+                      }}
+                      title="Editar casa"
+                      className="house-action-btn edit"
+                    >
+                      ✏️
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        if (confirm(`¿Eliminar ${house.houseName || house.name}?`)) {
+                          try {
+                            if (house.id) {
+                              await realtimeService.deleteHouse(house.id);
+                            }
+                          } catch (error) {
+                            console.error('Error deleting house:', error);
+                            alert('Error al eliminar casa');
+                          }
+                        }
+                      }}
+                      title="Eliminar casa"
+                      className="house-action-btn delete"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <div className="house-card add">
