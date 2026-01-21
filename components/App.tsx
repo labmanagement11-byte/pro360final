@@ -25,20 +25,23 @@ const App = () => {
     if (!supabase) return;
 
     const channel = supabase
-      .channel('profiles')
+      .channel('profiles-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: any) => {
-        console.log('Cambio en profiles:', payload);
+        console.log('🔄 Cambio en profiles detectado:', payload);
         // Refrescar lista de usuarios/perfiles si es necesario
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+          console.log('🔄 Recargando usuarios desde Supabase...');
           fetchUsers();
         }
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('📡 Estado de suscripción a profiles:', status);
+      });
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [supabase]);
 
   // Cargar usuarios desde Supabase
   const fetchUsers = async () => {
