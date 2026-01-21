@@ -1166,14 +1166,8 @@ export function subscribeToReminders(house: string = 'EPIC D1', callback: (data:
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a reminders para house:', house);
     const supabase = getSupabaseClient();
-    
-  const result = data?.[0] || null;
-  if (result) {
-    result.due = result.due_date;
-    result.invoiceNumber = result.invoice_number;
-  }
-  return result;
-      .channel('reminders-changes')
+    const channel = supabase
+      .channel(`reminders-changes-${house}`)
       .on(
         'postgres_changes',
         {
@@ -1182,7 +1176,7 @@ export function subscribeToReminders(house: string = 'EPIC D1', callback: (data:
           table: 'reminders',
           filter: `house=eq.${house}`
         },
-              .channel(`reminders-changes-${house}`)
+        (payload: any) => {
           console.log('📨 [Realtime Service] Cambio en reminders:', payload);
           const mappedPayload = {
             ...payload,
