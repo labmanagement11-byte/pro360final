@@ -39,6 +39,87 @@ const defaultReminders = [
 ];
 
 const REMINDERS_KEY = 'dashboard_reminders';
+const CHECKLIST_KEY = 'dashboard_checklist';
+
+// Tareas de limpieza organizadas por zona y tipo
+const LIMPIEZA_REGULAR = {
+  'LIMPIEZA GENERAL': [
+    'Barrer y trapear toda la casa.',
+    'Quitar el polvo de todas las superficies y decoración usando un trapo húmedo.',
+    'Limpiar los televisores cuidadosamente sin dejar marcas en la pantalla.',
+    'Revisar zócalos y esquinas para asegurarse de que estén limpios.',
+    'Limpiar telaraña'
+  ],
+  'SALA': [
+    'Limpiar todas las superficies.',
+    'Mover los cojines del sofá y verificar que no haya suciedad ni hormigas debajo.',
+    'Organizar cojines y dejar la sala ordenada.'
+  ],
+  'COMEDOR': [
+    'Limpiar mesa, sillas y superficies.',
+    'Asegurarse de que el área quede limpia y ordenada.'
+  ],
+  'COCINA': [
+    'Limpiar superficies, gabinetes por fuera y por dentro.',
+    'Verificar que los gabinetes estén limpios y organizados y funcionales.',
+    'Limpiar la cafetera y su filtro.',
+    'Verificar que el dispensador de jabón de loza esté lleno.',
+    'Dejar toallas de cocina limpias y disponibles para los visitantes.',
+    'Limpiar microondas por dentro y por fuera.',
+    'Limpiar el filtro de agua.',
+    'Limpiar la nevera por dentro y por fuera (no dejar alimentos).',
+    'Lavar las canecas de basura y colocar bolsas nuevas.'
+  ],
+  'BAÑOS': [
+    'Limpiar ducha (pisos y paredes).',
+    'Limpiar divisiones de vidrio y asegurarse de que no queden marcas.',
+    'Limpiar espejo, sanitario y lavamanos con Clorox.',
+    'Lavar las canecas de basura y colocar bolsas nuevas.',
+    'Verificar disponibilidad de toallas (Máximo 10 toallas blancas de cuerpo en toda la casa, Máximo 4 toallas de mano en total).',
+    'Dejar un rollo de papel higiénico nuevo instalado en cada baño.',
+    'Dejar un rollo extra en el cuarto de lavado.',
+    'Lavar y volver a colocar los tapetes de baño.'
+  ],
+  'HABITACIONES': [
+    'Revisar que no haya objetos dentro de los cajones.',
+    'Lavar sábanas y hacer las camas correctamente.',
+    'Limpiar el polvo de todas las superficies.',
+    'Lavar los tapetes de la habitación y volver a colocarlos limpios.'
+  ],
+  'ZONA DE LAVADO': [
+    'Limpiar el filtro de la lavadora en cada lavada.',
+    'Limpiar el gabinete debajo del lavadero.',
+    'Dejar ganchos de ropa disponibles.',
+    'Dejar toallas disponibles para la piscina.'
+  ],
+  'ÁREA DE BBQ': [
+    'Barrer y trapear el área.',
+    'Limpiar mesa y superficies.',
+    'Limpiar la mini nevera y no dejar ningún alimento dentro.',
+    'Limpiar la parrilla con el cepillo (no usar agua).',
+    'Retirar las cenizas del carbón.',
+    'Dejar toda el área limpia y ordenada.'
+  ],
+  'ÁREA DE PISCINA': [
+    'Barrer y trapear el área.',
+    'Organizar los muebles alrededor de la piscina.'
+  ],
+  'TERRAZA': [
+    'Limpiar el piso de la terraza.',
+    'Limpiar superficies.',
+    'Organizar los cojines de la sala exterior.'
+  ]
+};
+
+const LIMPIEZA_PROFUNDA = {
+  'LIMPIEZA PROFUNDA': [
+    'Lavar los forros de los muebles (sofás, sillas y cojines).',
+    'Limpiar todas las ventanas y ventanales de la casa, por dentro y por fuera.',
+    'Limpiar con hidrolavadora el piso exterior, incluyendo escaleras, terraza y placas vehiculares.',
+    'Lavar la caneca grande de basura ubicada debajo de la escalera.',
+    'Limpiar las paredes y los guardaescobas de toda la casa.'
+  ]
+};
 
 
 export interface User {
@@ -117,12 +198,48 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
   const [editingInventoryIdx, setEditingInventoryIdx] = useState(-1);
 
+  // Estado para checklist
+  const [checklistType, setChecklistType] = useState<'regular' | 'profunda'>('regular');
+  const [checklistData, setChecklistData] = useState<any>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(CHECKLIST_KEY) : null;
+    if (saved) return JSON.parse(saved);
+    
+    // Inicializar con estructura vacía
+    const initial: any = {};
+    Object.keys(LIMPIEZA_REGULAR).forEach(zona => {
+      initial[zona] = {
+        type: 'regular',
+        tasks: LIMPIEZA_REGULAR[zona as keyof typeof LIMPIEZA_REGULAR].map((task: string) => ({
+          text: task,
+          completed: false
+        }))
+      };
+    });
+    Object.keys(LIMPIEZA_PROFUNDA).forEach(zona => {
+      initial[zona] = {
+        type: 'profunda',
+        tasks: LIMPIEZA_PROFUNDA[zona as keyof typeof LIMPIEZA_PROFUNDA].map((task: string) => ({
+          text: task,
+          completed: false
+        }))
+      };
+    });
+    return initial;
+  });
+
   // Guardar asignaciones en localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(CALENDAR_KEY, JSON.stringify(calendarAssignments));
     }
   }, [calendarAssignments]);
+
+  // Guardar checklist en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistData));
+    }
+  }, [checklistData]);
 
   const showReminders = user.role === 'owner' || user.role === 'manager';
 
@@ -1035,26 +1152,136 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'checklist' && (
-                <div className="subcards-grid">
-                  <div className="modal-stats">
-                    <div className="stat-box">
-                      <p className="stat-box-number">∞</p>
-                      <p className="stat-box-label">Gestión integral</p>
-                    </div>
+                <>
+                  {/* Controles de tipo de limpieza */}
+                  <div className="checklist-controls" style={{marginBottom: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center'}}>
+                    <button 
+                      onClick={() => setChecklistType('regular')}
+                      className={`dashboard-btn ${checklistType === 'regular' ? 'main' : ''}`}
+                      style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
+                    >
+                      🧹 Limpieza Regular
+                    </button>
+                    <button 
+                      onClick={() => setChecklistType('profunda')}
+                      className={`dashboard-btn ${checklistType === 'profunda' ? 'main' : ''}`}
+                      style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
+                    >
+                      🏠 Limpieza Profunda
+                    </button>
                   </div>
-                  <div className="subcard subcard-full-width">
-                    <div className="subcard-header">
-                      <div className="subcard-icon">✅</div>
-                      <h3>Checklist de Limpieza - EPIC D1</h3>
-                    </div>
-                    <div className="subcard-content">
-                      <p>📋 <strong>Verificación periódica:</strong> Gestiona tareas de limpieza y mantenimiento</p>
-                      <p>👥 <strong>Asignados a:</strong> Todo el equipo de empleados</p>
-                      <p>🔄 <strong>Frecuencia:</strong> Diaria</p>
-                      <span className="subcard-badge success">✅ Sistema activo</span>
-                    </div>
+
+                  {/* Estadísticas generales */}
+                  {(() => {
+                    const stats = Object.entries(checklistData)
+                      .filter(([_, data]: any) => data.type === checklistType)
+                      .reduce((acc, [_, data]: any) => {
+                        const totalTasks = data.tasks.length;
+                        const completedTasks = data.tasks.filter((t: any) => t.completed).length;
+                        return {
+                          total: acc.total + totalTasks,
+                          completed: acc.completed + completedTasks
+                        };
+                      }, { total: 0, completed: 0 });
+                    
+                    return (
+                      <div className="modal-stats" style={{marginBottom: '2rem'}}>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{stats.total}</p>
+                          <p className="stat-box-label">Tareas totales</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{stats.completed}</p>
+                          <p className="stat-box-label">Completadas</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{stats.total - stats.completed}</p>
+                          <p className="stat-box-label">Pendientes</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</p>
+                          <p className="stat-box-label">Progreso</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Zonas con tareas */}
+                  <div className="subcards-grid">
+                    {Object.entries(checklistData)
+                      .filter(([_, data]: any) => data.type === checklistType)
+                      .map(([zona, data]: any) => {
+                        const completedCount = data.tasks.filter((t: any) => t.completed).length;
+                        const totalCount = data.tasks.length;
+                        
+                        return (
+                          <div key={zona} className="subcard" style={{border: '2px solid #e5e7eb'}}>
+                            <div className="subcard-header" style={{backgroundColor: completedCount === totalCount ? '#dcfce7' : '#fef3c7'}}>
+                              <h3 style={{flex: 1}}>{zona}</h3>
+                              <span style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#374151'}}>
+                                {completedCount}/{totalCount}
+                              </span>
+                            </div>
+                            <div className="subcard-content" style={{padding: '1rem'}}>
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                                {data.tasks.map((task: any, idx: number) => (
+                                  <label key={idx} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: task.completed ? '#f0fdf4' : '#fafafa', transition: 'background-color 0.2s'}}>
+                                    <input
+                                      type="checkbox"
+                                      checked={task.completed}
+                                      onChange={(e) => {
+                                        const updatedZone = {
+                                          ...checklistData[zona],
+                                          tasks: checklistData[zona].tasks.map((t: any, i: number) => 
+                                            i === idx ? { ...t, completed: e.target.checked } : t
+                                          )
+                                        };
+                                        setChecklistData({
+                                          ...checklistData,
+                                          [zona]: updatedZone
+                                        });
+                                      }}
+                                      style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
+                                    />
+                                    <span style={{flex: 1, color: task.completed ? '#6b7280' : '#1f2937', textDecoration: task.completed ? 'line-through' : 'none', fontSize: '0.95rem', lineHeight: '1.5'}}>
+                                      {task.text}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    }
                   </div>
-                </div>
+
+                  {/* Botón para limpiar/resetear */}
+                  {Object.entries(checklistData)
+                    .filter(([_, data]: any) => data.type === checklistType)
+                    .some(([_, data]: any) => data.tasks.some((t: any) => t.completed)) && (
+                    <div style={{marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center'}}>
+                      <button 
+                        onClick={() => {
+                          const resetData = { ...checklistData };
+                          Object.entries(resetData).forEach(([zona, data]: any) => {
+                            if (data.type === checklistType) {
+                              resetData[zona] = {
+                                ...data,
+                                tasks: data.tasks.map((t: any) => ({ ...t, completed: false }))
+                              };
+                            }
+                          });
+                          setChecklistData(resetData);
+                        }}
+                        className="dashboard-btn danger"
+                        style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
+                      >
+                        🔄 Resetear Checklist
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
               
               {selectedModalCard === 'inventory' && (
