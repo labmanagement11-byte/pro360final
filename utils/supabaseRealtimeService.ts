@@ -74,17 +74,31 @@ export async function deleteTask(taskId: string) {
 }
 
 export function subscribeToTasks(house: string = 'EPIC D1', callback: (data: any[]) => void) {
-  const supabase = getSupabaseClient();
-  const subscription = (supabase
-    .from('tasks') as any)
-    .on('*', (payload: any) => {
-      if (payload?.new?.house === house || payload?.old?.house === house) {
-        callback(payload);
-      }
-    })
-    .subscribe();
-  
-  return subscription;
+  try {
+    console.log('🔔 [Realtime Service] Iniciando suscripción a tasks para house:', house);
+    const supabase = getSupabaseClient();
+    const subscription = (supabase
+      .from('tasks') as any)
+      .on('*', (payload: any) => {
+        console.log('⚡ [Realtime Service] Evento recibido:', payload);
+        if (payload?.new?.house === house || payload?.old?.house === house) {
+          console.log('✅ [Realtime Service] Evento coincide con house, ejecutando callback');
+          callback(payload);
+        } else {
+          console.log('⚠️ [Realtime Service] Evento no coincide con house:', {
+            payloadHouse: payload?.new?.house || payload?.old?.house,
+            expectedHouse: house
+          });
+        }
+      })
+      .subscribe();
+    
+    console.log('✅ [Realtime Service] Suscripción creada:', subscription);
+    return subscription;
+  } catch (error) {
+    console.error('❌ [Realtime Service] Error al suscribirse:', error);
+    return null;
+  }
 }
 
 // ==================== CHECKLIST ITEMS ====================

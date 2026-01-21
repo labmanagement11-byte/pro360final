@@ -292,10 +292,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       try {
         setLoadingTasks(true);
         const tasks = await realtimeService.getTasks('EPIC D1');
+        console.log('✅ Tareas cargadas:', tasks);
         setTasksList(tasks || []);
         setLoadingTasks(false);
       } catch (error) {
-        console.error('Error loading tasks:', error);
+        console.error('❌ Error loading tasks:', error);
         setTasksList([]);
         setLoadingTasks(false);
       }
@@ -306,24 +307,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
+      console.log('🔔 Suscribiendo a cambios en tiempo real de tareas...');
       subscription = realtimeService.subscribeToTasks('EPIC D1', (payload: any) => {
+        console.log('⚡ Evento recibido en tiempo real:', payload);
         if (payload?.eventType === 'INSERT') {
+          console.log('➕ Nueva tarea insertada:', payload.new);
           setTasksList(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
+          console.log('✏️ Tarea actualizada:', payload.new);
           setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
         } else if (payload?.eventType === 'DELETE') {
+          console.log('🗑️ Tarea eliminada:', payload.old);
           setTasksList(prev => prev.filter(t => t.id !== payload.old?.id));
         }
       });
+      console.log('✅ Suscripción activa:', subscription);
     } catch (error) {
-      console.error('Error subscribing to tasks:', error);
+      console.error('❌ Error subscribing to tasks:', error);
     }
 
     return () => {
       try {
+        console.log('🔌 Desconectando suscripción de tareas...');
         subscription?.unsubscribe?.();
       } catch (error) {
-        console.error('Error unsubscribing from tasks:', error);
+        console.error('❌ Error unsubscribing from tasks:', error);
       }
     };
   }, []);
@@ -1823,7 +1831,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           setEditingTaskIdx(-1);
                         } else {
                           // Agregar nueva tarea
-                          await realtimeService.createTask({
+                          console.log('📝 Creando nueva tarea:', {
+                            title: newTask.title,
+                            assignedTo: newTask.assignedTo,
+                            type: newTask.type,
+                            createdBy: user.username
+                          });
+                          const result = await realtimeService.createTask({
                             title: newTask.title,
                             description: newTask.description,
                             assignedTo: newTask.assignedTo,
@@ -1831,6 +1845,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             house: 'EPIC D1',
                             createdBy: user.username
                           });
+                          console.log('✅ Tarea creada con resultado:', result);
                         }
                         setNewTask({ title: '', description: '', assignedTo: '', type: 'Limpieza general' });
                       }}>
