@@ -55,7 +55,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
       const saved = localStorage.getItem('dashboard_houses');
       if (saved) return JSON.parse(saved);
     }
-    return [{ name: 'HYNTIBA 2 APTO 406' }];
+    return [{ name: 'HYNTIBA2 APTO 406' }];
   });
 
   // Cargar tareas desde Supabase
@@ -64,7 +64,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
     const { data, error } = await supabase!
       .from('tasks')
       .select('*')
-      .eq('house', user.house || 'HYNTIBA 2 APTO 406');
+      .eq('house', user.house || 'HYNTIBA2 APTO 406');
     if (!error && data) {
       setTasksState(data);
     } else {
@@ -96,7 +96,7 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   // Agregar tarea a Supabase
   const addTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const newTask = { ...form, completed: false, house: form.house || user.house || 'HYNTIBA 2 APTO 406' };
+    const newTask = { ...form, completed: false, house: form.house || user.house || 'HYNTIBA2 APTO 406' };
     // @ts-expect-error
     const { data, error } = await supabase!.from('tasks').insert([newTask]).select();
     if (!error && data && data.length > 0) {
