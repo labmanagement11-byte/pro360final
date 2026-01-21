@@ -504,22 +504,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [allowedHouseIdx, houses]);
 
-  // Cargar casas y usuarios desde Supabase con suscripción en tiempo real (solo para jonathan)
+  // Cargar casas y usuarios desde Supabase con suscripción en tiempo real (para todos, especialmente para sincronizar nombres correctos)
   useEffect(() => {
-    if (user.username.toLowerCase() !== 'jonathan') return;
-
     const loadHousesAndUsers = async () => {
       try {
-        // Cargar casas
+        // Cargar casas (para TODOS los usuarios, para sincronizar nombres correctos)
         const housesData = await realtimeService.getHouses();
         console.log('🏠 Casas cargadas:', housesData);
         if (housesData.length > 0) {
           setHouses(housesData.map((h: any) => ({ name: h.name || h.houseName, id: h.id, houseName: h.houseName || h.name, tasks: [], inventory: [], users: [] })));
         }
 
-        // Cargar usuarios
-        const usersData = await realtimeService.getUsers();
-        console.log('👥 Usuarios cargados:', usersData);
+        // Cargar usuarios solo si es jonathan
+        if (user.username.toLowerCase() === 'jonathan') {
+          const usersData = await realtimeService.getUsers();
+          console.log('👥 Usuarios cargados:', usersData);
+        }
       } catch (error) {
         console.error('Error loading houses/users:', error);
       }
