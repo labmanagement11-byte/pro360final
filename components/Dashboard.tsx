@@ -749,14 +749,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       { name: 'EPIC D1', tasks: [], inventory: [], users: defaultUsers }
     ];
   });
-  // Si el usuario es empleado, forzar la casa asignada
-  const employeeHouseIdx = user.role === 'empleado' && user.house
+  // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
+  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
+  const employeeHouseIdx = isRestrictedUser && user.house
     ? houses.findIndex(h => h.name === user.house)
-    : 0;
+    : -1;
   const [selectedHouseIdx, setSelectedHouseIdx] = useState(employeeHouseIdx >= 0 ? employeeHouseIdx : 0);
-    // Si es empleado, solo puede ver su casa y no puede cambiarla
-    const isEmployee = user.role === 'empleado';
-    const allowedHouseIdx = isEmployee ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
+    // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
+    const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
   const [newHouseName, setNewHouseName] = useState('');
 
   // Guardar casas en localStorage
@@ -824,12 +824,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
       show: user.role === 'owner' || user.role === 'manager',
     },
-    // Solo mostrar la tarjeta de seleccionar casa si NO es empleado
+    // Solo mostrar la tarjeta de seleccionar casa si es owner o si es jonathan (manager especial)
     {
       key: 'house',
       title: 'Seleccionar Casa',
       desc: 'Elige y administra la casa actual.',
-      show: user.role !== 'empleado',
+      show: user.role === 'owner' || (user.role === 'manager' && user.username.toLowerCase() === 'jonathan'),
     },
     {
       key: 'users',
