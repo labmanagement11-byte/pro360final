@@ -826,19 +826,48 @@ export async function getAssignmentInventory(assignmentId: string) {
   try {
     console.log('📦 [Assignment Inventory] Obteniendo para asignación:', assignmentId);
     const supabase = getSupabaseClient();
+    
+    // Primero obtener la casa de la asignación
+    const { data: assignment, error: assignmentError } = await (supabase
+      .from('calendar_assignments') as any)
+      .select('house, employee')
+      .eq('id', assignmentId)
+      .single();
+    
+    if (assignmentError || !assignment) {
+      console.error('❌ [Assignment Inventory] Error obteniendo asignación:', assignmentError);
+      return [];
+    }
+    
+    console.log('🏠 [Assignment Inventory] Casa:', assignment.house);
+    
+    // Obtener inventario de la casa desde la tabla inventory
     const { data, error } = await (supabase
-      .from('assignment_inventory') as any)
+      .from('inventory') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignmentId)
-      .order('category', { ascending: true })
-      .order('item_name', { ascending: true });
+      .eq('house', assignment.house)
+      .order('category', { ascending: true });
 
     if (error) {
       console.error('❌ [Assignment Inventory] Error:', error);
       return [];
     }
-    console.log('✅ [Assignment Inventory] Items obtenidos:', data?.length);
-    return data || [];
+    
+    // Mapear campos de inventory a los campos que espera el Dashboard
+    const mappedData = (data || []).map((item: any) => ({
+      id: item.id,
+      item_name: item.name || item.item_name,
+      category: item.category || 'Sin categoría',
+      is_complete: item.complete || false,
+      notes: item.notes || null,
+      checked_by: null,
+      checked_at: null,
+      house: item.house,
+      calendar_assignment_id: assignmentId
+    }));
+    
+    console.log('✅ [Assignment Inventory] Items obtenidos:', mappedData.length);
+    return mappedData;
   } catch (error) {
     console.error('❌ [Assignment Inventory] Exception:', error);
     return [];
@@ -849,12 +878,10 @@ export async function getAssignmentInventory(assignmentId: string) {
 export async function updateAssignmentInventoryItem(itemId: string, isComplete: boolean, notes?: string, checkedBy?: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await (supabase
-    .from('assignment_inventory') as any)
+    .from('inventory') as any)
     .update({
-      is_complete: isComplete,
+      complete: isComplete,
       notes: notes || null,
-      checked_by: isComplete ? checkedBy : null,
-      checked_at: isComplete ? new Date().toISOString() : null,
       updated_at: new Date().toISOString()
     })
     .eq('id', itemId)
