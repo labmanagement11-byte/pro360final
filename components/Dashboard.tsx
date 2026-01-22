@@ -2270,27 +2270,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         // Agregar tarea a Supabase para sincronización en tiempo real
                         (async () => {
                           try {
-                            if (supabase) {
-                              const { data, error } = await (supabase as any)
-                                .from('checklist')
-                                .insert([{
-                                  house: selectedHouse,
-                                  item: taskText,
-                                  room: zona,
-                                  type: checklistType,
-                                  complete: false,
-                                  assigned_to: null
-                                }])
-                                .select();
-                              
-                              if (error) {
-                                console.error('❌ Error agregando tarea al checklist:', error);
-                              } else {
-                                console.log('✅ Tarea agregada al checklist de', selectedHouse, ':', taskText);
-                              }
+                            if (!supabase) {
+                              console.error('❌ Supabase no está disponible');
+                              alert('Error: Supabase no configurado');
+                              return;
                             }
-                          } catch (error) {
+                            
+                            console.log('📝 Insertando tarea en checklist:', {
+                              house: selectedHouse,
+                              item: taskText,
+                              room: zona,
+                              type: checklistType
+                            });
+                            
+                            const { data, error } = await (supabase as any)
+                              .from('checklist')
+                              .insert([{
+                                house: selectedHouse,
+                                item: taskText,
+                                room: zona,
+                                complete: false,
+                                assigned_to: null
+                              }])
+                              .select();
+                            
+                            if (error) {
+                              console.error('❌ Error agregando tarea al checklist:', {
+                                code: error.code,
+                                message: error.message,
+                                details: error.details,
+                                hint: error.hint
+                              });
+                              alert(`❌ Error al guardar: ${error.message}`);
+                            } else {
+                              console.log('✅ Tarea agregada correctamente al checklist:', data);
+                              alert('✅ Tarea guardada en Supabase');
+                            }
+                          } catch (error: any) {
                             console.error('❌ Error en insert checklist:', error);
+                            alert(`❌ Error: ${error?.message || 'Error desconocido'}`);
                           }
                         })();
                         
