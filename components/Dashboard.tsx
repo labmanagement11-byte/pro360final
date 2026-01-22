@@ -3323,6 +3323,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                           item.notes,
                                           user.username
                                         );
+                                        // Actualizar estado local inmediatamente
+                                        setSyncedInventories(prev => {
+                                          const newMap = new Map(prev);
+                                          const items = newMap.get(selectedAssignmentForInventory) || [];
+                                          const updatedItems = items.map(i => 
+                                            i.id === item.id ? {...i, is_complete: e.target.checked} : i
+                                          );
+                                          newMap.set(selectedAssignmentForInventory, updatedItems);
+                                          return newMap;
+                                        });
                                       }}
                                       disabled={user.role === 'manager' && user.username !== assignment.employee}
                                     />
