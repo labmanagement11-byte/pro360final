@@ -100,9 +100,19 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     const { data, error } = await query;
     if (!error && data) {
       const items = data as ChecklistItem[];
-      setCleaning(items.filter(i => !i.room || i.room === 'Limpieza'));
-      setMaintenance(items.filter(i => i.room === 'Mantenimiento'));
-      console.log('✅ [Checklist] Cargados:', items.length, 'items para', selectedHouse);
+      // Separar tareas de limpieza (todas las zonas) vs mantenimiento
+      const maintenanceRooms = ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES'];
+      const deepCleaningRooms = ['LIMPIEZA PROFUNDA'];
+      
+      setCleaning(items.filter(i => 
+        !maintenanceRooms.includes(i.room || '') && !deepCleaningRooms.includes(i.room || '')
+      ));
+      setMaintenance(items.filter(i => 
+        maintenanceRooms.includes(i.room || '') || deepCleaningRooms.includes(i.room || '')
+      ));
+      console.log('✅ [Checklist] Cargados:', items.length, 'items para', selectedHouse, 
+        '(Limpieza:', items.filter(i => !maintenanceRooms.includes(i.room || '') && !deepCleaningRooms.includes(i.room || '')).length,
+        'Mantenimiento:', items.filter(i => maintenanceRooms.includes(i.room || '') || deepCleaningRooms.includes(i.room || '')).length + ')');
     } else {
       setCleaning([]);
       setMaintenance([]);
