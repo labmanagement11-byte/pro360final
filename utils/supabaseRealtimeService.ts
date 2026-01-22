@@ -861,7 +861,7 @@ export async function getAssignmentInventory(assignmentId: string) {
       .from('inventory') as any)
       .select('*')
       .eq('house', assignment.house)
-      .order('category', { ascending: true });
+      .order('location', { ascending: true });
 
     if (error) {
       console.error('❌ [Assignment Inventory] Error:', error);
