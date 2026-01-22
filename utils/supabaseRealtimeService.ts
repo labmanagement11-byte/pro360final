@@ -607,10 +607,10 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentId);
     const supabase = getSupabaseClient();
     
-    // Primero obtener la casa de la asignación
+    // Primero obtener la casa y el tipo de la asignación
     const { data: assignment, error: assignmentError } = await (supabase
       .from('calendar_assignments') as any)
-      .select('house, employee')
+      .select('house, employee, type')
       .eq('id', assignmentId)
       .single();
     
@@ -619,14 +619,29 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       return [];
     }
     
-    console.log('🏠 [Checklist] Casa de la asignación:', assignment.house, 'Empleado:', assignment.employee);
+    console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
-    // Ahora obtener tareas de la tabla checklist filtradas por casa
-    const { data, error } = await (supabase
+    // Obtener tareas de la tabla checklist filtradas por casa
+    let query = (supabase
       .from('checklist') as any)
       .select('*')
-      .eq('house', assignment.house)
-      .order('room', { ascending: true });
+      .eq('house', assignment.house);
+    
+    // Filtrar por tipo de asignación
+    if (assignment.type === 'Limpieza profunda') {
+      // Solo tareas de limpieza profunda
+      query = query.eq('room', 'LIMPIEZA PROFUNDA');
+    } else if (assignment.type === 'Limpieza regular') {
+      // Tareas regulares (excluir profunda y mantenimiento)
+      query = query
+        .neq('room', 'LIMPIEZA PROFUNDA')
+        .notIn('room', ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES']);
+    } else if (assignment.type === 'Mantenimiento') {
+      // Solo tareas de mantenimiento
+      query = query.in('room', ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES']);
+    }
+    
+    const { data, error } = await query.order('room', { ascending: true });
 
     if (error) {
       console.error('❌ [Checklist] Error fetching checklist items:', error);
@@ -647,7 +662,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       assigned_to: item.assigned_to
     }));
     
-    console.log('✅ [Checklist] Items obtenidos:', mappedData.length, 'items para casa', assignment.house);
+    console.log('✅ [Checklist] Items obtenidos:', mappedData.length, 'items para', assignment.type);
     return mappedData;
   } catch (error) {
     console.error('❌ [Checklist] Exception fetching checklist items:', error);
