@@ -872,7 +872,7 @@ export async function getAssignmentInventory(assignmentId: string) {
     const mappedData = (data || []).map((item: any) => ({
       id: item.id,
       item_name: item.name || item.item_name,
-      category: item.category || 'Sin categoría',
+      category: item.category || item.location || 'Sin categoría',
       is_complete: item.complete || false,
       notes: item.notes || null,
       checked_by: null,
