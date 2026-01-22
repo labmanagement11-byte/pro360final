@@ -3316,23 +3316,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                       type="checkbox"
                                       checked={item.is_complete}
                                       onChange={async (e) => {
-                                        console.log('📝 Actualizando item inventario:', item.id, 'a', e.target.checked);
-                                        await realtimeService.updateAssignmentInventoryItem(
-                                          item.id,
-                                          e.target.checked,
-                                          item.notes,
-                                          user.username
-                                        );
-                                        // Actualizar estado local inmediatamente
+                                        const newCheckedState = e.target.checked;
+                                        console.log('📝 Actualizando item inventario:', item.id, 'a', newCheckedState);
+                                        
+                                        // Actualizar estado local PRIMERO para respuesta inmediata
                                         setSyncedInventories(prev => {
                                           const newMap = new Map(prev);
                                           const items = newMap.get(selectedAssignmentForInventory) || [];
                                           const updatedItems = items.map(i => 
-                                            i.id === item.id ? {...i, is_complete: e.target.checked} : i
+                                            i.id === item.id ? {
+                                              ...i,
+                                              is_complete: newCheckedState,
+                                              complete: newCheckedState  // También actualizar complete por si acaso
+                                            } : i
                                           );
                                           newMap.set(selectedAssignmentForInventory, updatedItems);
                                           return newMap;
                                         });
+                                        
+                                        // Luego actualizar en Supabase
+                                        await realtimeService.updateAssignmentInventoryItem(
+                                          item.id,
+                                          newCheckedState,
+                                          item.notes,
+                                          user.username
+                                        );
                                       }}
                                       disabled={user.role === 'manager' && user.username !== assignment.employee}
                                     />
