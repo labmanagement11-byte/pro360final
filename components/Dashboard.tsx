@@ -1876,8 +1876,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               {(user.role === 'owner' || user.role === 'manager') && (
                                 <button 
                                   className="dashboard-btn danger"
-                                  onClick={() => {
-                                    setCalendarAssignments(calendarAssignments.filter((_, i) => i !== idx));
+                                  onClick={async () => {
+                                    if (confirm(`¿Eliminar la asignación de ${assignment.employee} para ${assignment.type}?`)) {
+                                      console.log('🗑️ Eliminando asignación del calendario:', assignment.id);
+                                      await realtimeService.deleteCalendarAssignment(assignment.id);
+                                      // Actualizar estado local
+                                      setCalendarAssignments(calendarAssignments.filter(a => a.id !== assignment.id));
+                                    }
                                   }}
                                 >
                                   🗑️ Eliminar
