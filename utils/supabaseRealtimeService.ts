@@ -606,19 +606,33 @@ export async function getCleaningChecklistItems(assignmentId: string) {
   try {
     console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentId);
     const supabase = getSupabaseClient();
+    
+    // Primero obtener la casa de la asignación
+    const { data: assignment, error: assignmentError } = await (supabase
+      .from('calendar_assignments') as any)
+      .select('house, employee')
+      .eq('id', assignmentId)
+      .single();
+    
+    if (assignmentError || !assignment) {
+      console.error('❌ [Checklist] Error obteniendo asignación:', assignmentError);
+      return [];
+    }
+    
+    console.log('🏠 [Checklist] Casa de la asignación:', assignment.house, 'Empleado:', assignment.employee);
+    
+    // Ahora obtener tareas de la tabla checklist filtradas por casa
     const { data, error } = await (supabase
-      .from('cleaning_checklist') as any)
+      .from('checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignmentId)
-      .order('zone', { ascending: true })
-      .order('order_num', { ascending: true });
+      .eq('house', assignment.house)
+      .order('room', { ascending: true });
 
     if (error) {
       console.error('❌ [Checklist] Error fetching checklist items:', error);
       return [];
     }
-    console.log('✅ [Checklist] Items obtenidos:', data?.length, 'items');
-    console.log('📋 [Checklist] Items:', data);
+    console.log('✅ [Checklist] Items obtenidos:', data?.length, 'items para casa', assignment.house);
     return data || [];
   } catch (error) {
     console.error('❌ [Checklist] Exception fetching checklist items:', error);
