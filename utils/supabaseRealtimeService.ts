@@ -632,8 +632,23 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       console.error('❌ [Checklist] Error fetching checklist items:', error);
       return [];
     }
-    console.log('✅ [Checklist] Items obtenidos:', data?.length, 'items para casa', assignment.house);
-    return data || [];
+    
+    // Mapear campos de checklist a los campos que espera el Dashboard
+    const mappedData = (data || []).map((item: any) => ({
+      id: item.id,
+      zone: item.room || 'Sin zona',
+      task: item.item,
+      completed: item.complete || false,
+      completed_by: null, // checklist no tiene este campo
+      completed_at: null,
+      order_num: 0,
+      calendar_assignment_id: assignmentId,
+      house: item.house,
+      assigned_to: item.assigned_to
+    }));
+    
+    console.log('✅ [Checklist] Items obtenidos:', mappedData.length, 'items para casa', assignment.house);
+    return mappedData;
   } catch (error) {
     console.error('❌ [Checklist] Exception fetching checklist items:', error);
     return [];
@@ -643,11 +658,9 @@ export async function getCleaningChecklistItems(assignmentId: string) {
 export async function updateCleaningChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await (supabase
-    .from('cleaning_checklist') as any)
+    .from('checklist') as any)
     .update({
-      completed: completed,
-      completed_at: completed ? new Date().toISOString() : null,
-      completed_by: completed ? completedBy : null,
+      complete: completed,
       updated_at: new Date().toISOString()
     })
     .eq('id', itemId)
