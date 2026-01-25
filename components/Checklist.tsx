@@ -317,7 +317,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
 
       {/* Formulario para agregar/editar tareas solo para managers de HYNTIBA2 */}
       {!loading && user.house === 'HYNTIBA2 APTO 406' && (user.role === 'manager' || user.role === 'owner') && (
-        // ...existing code...
+        <></>
       )}
 
       {/* Mostrar solo lo que corresponde según tipo de asignación activa para empleados */}
