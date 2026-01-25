@@ -1732,6 +1732,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 selectedHouse
                               );
                               console.log('✅ Checklist creado con', checklistItems.length, 'items');
+
+                              // Guardar inmediatamente en el estado sincronizado para visibilidad instantánea
+                              try {
+                                setSyncedChecklists(prev => new Map(prev).set(String(result.id), checklistItems));
+                                console.log('✅ Synced checklists actualizado en estado local para assignment', result.id);
+                              } catch (err) {
+                                console.warn('⚠️ No se pudo actualizar synced checklists localmente:', err);
+                              }
                             } catch (err) {
                               console.error('❌ Error creando checklist items:', err);
                               alert('Error creando items del checklist. Revisa la consola.');
@@ -1746,6 +1754,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   selectedHouse
                                 );
                                 console.log('✅ Inventario creado con', inventoryItems.length, 'items');
+
+                                // Guardar inventario en estado sincronizado para visibilidad instantánea
+                                try {
+                                  setSyncedInventories(prev => new Map(prev).set(String(result.id), inventoryItems));
+                                  console.log('✅ Synced inventories actualizado en estado local para assignment', result.id);
+                                } catch (err) {
+                                  console.warn('⚠️ No se pudo actualizar synced inventories localmente:', err);
+                                }
                               } catch (err) {
                                 console.error('❌ Error creando inventario:', err);
                                 alert('Error creando inventario para la asignación. Revisa la consola.');
