@@ -3177,6 +3177,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <p className="stat-box-label">Completadas</p>
                         </div>
                       </div>
+
+                      {/* Mostrar aviso si la lista es una plantilla local (no hay filas en BD) */}
+                      {checklistItems && checklistItems.length > 0 && checklistItems[0].isTemplate && (
+                        <div style={{textAlign: 'center', marginBottom: '1rem', color: '#6b7280'}}>
+                          <strong>Plantilla local</strong> — No se encontraron items en la base de datos; mostrando la plantilla por defecto.
+                        </div>
+                      )}
                       
                       <div className="progress-bar" style={{marginBottom: '2rem'}}>
                         <div className="progress-fill" style={{width: `${progress}%`}}></div>

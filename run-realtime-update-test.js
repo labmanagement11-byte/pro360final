@@ -29,14 +29,13 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
       console.log('Inserted checklist items (bigint):', insertedChecklist.map(i => i.id));
     } catch (err) {
       console.warn('Insert with bigint failed, trying fallback insertion:', err.message || err);
-      // Try inserting without bigint column, but set legacy calendar_assignment_id if exists
+      // Try inserting without bigint column and without legacy id; rely on employee+house fallback in read
       try {
-        // build fallback items removing bigint key and adding calendar_assignment_id if possible
-        const fallbackItems = checklistItems.map(({ calendar_assignment_id_bigint, ...rest }) => ({ ...rest, calendar_assignment_id: assignId }));
+        const fallbackItems = checklistItems.map(({ calendar_assignment_id_bigint, ...rest }) => ({ ...rest }));
         const res2 = await supabase.from('cleaning_checklist').insert(fallbackItems).select();
         if (res2.error) throw res2.error;
         insertedChecklist = res2.data;
-        console.log('Inserted checklist items (fallback):', insertedChecklist.map(i => i.id));
+        console.log('Inserted checklist items (fallback no ids):', insertedChecklist.map(i => i.id));
       } catch (err2) {
         console.error('Fallback insert also failed:', err2.message || err2);
         throw err2;

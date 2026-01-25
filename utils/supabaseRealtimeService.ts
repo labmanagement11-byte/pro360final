@@ -845,7 +845,9 @@ export async function getCleaningChecklistItems(assignmentId: string) {
             order_num: order++,
             calendar_assignment_id: assignmentId,
             house: assignment.house,
-            assigned_to: assignment.employee
+            assigned_to: assignment.employee,
+            // Marcar que se trata de una plantilla generada en memoria (no viene de la BD)
+            isTemplate: true
           });
         });
       });
