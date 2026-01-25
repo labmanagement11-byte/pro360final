@@ -1723,9 +1723,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             setCalendarAssignments(prev => [result, ...(prev || [])]);
 
                             // Crear los items del checklist para esta asignación
+                            let checklistItems: any[] = [];
                             try {
                               console.log('🧹 Creando items del checklist para asignación:', result.id);
-                              const checklistItems = await realtimeService.createCleaningChecklistItems(
+                              checklistItems = await realtimeService.createCleaningChecklistItems(
                                 result.id,
                                 newAssignment.employee,
                                 newAssignment.type,  // Pasar el tipo de limpieza
@@ -1742,13 +1743,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               }
                             } catch (err) {
                               console.error('❌ Error creando checklist items:', err);
-                              alert('Error creando items del checklist. Revisa la consola.');
+                              // No alert here to avoid blocking UX; continuaremos con fallback para mostrar plantilla
+                              console.warn('⚠️ Falló la creación remota; usando fallback local/legacy para visibilidad');
+                            }
+
+                            // Si no se crearon items en la BD (o la creación falló), obtener items vía getCleaningChecklistItems
+                            // que aplicará los fallbacks (calendar_assignment_id_bigint, employee+house, o plantilla en memoria)
+                            try {
+                              if (!checklistItems || checklistItems.length === 0) {
+                                const fallbackItems = await realtimeService.getCleaningChecklistItems(result.id);
+                                setSyncedChecklists(prev => new Map(prev).set(String(result.id), fallbackItems));
+                                console.log('✅ Synced checklists actualizado con fallback/template para assignment', result.id);
+                              }
+                            } catch (err) {
+                              console.error('❌ Error obteniendo fallback checklist items:', err);
                             }
 
                             // Crear inventario para la asignación (solo si no es Mantenimiento)
                             if (newAssignment.type !== 'Mantenimiento') {
+                              let inventoryItems: any[] = [];
                               try {
-                                const inventoryItems = await realtimeService.createAssignmentInventory(
+                                inventoryItems = await realtimeService.createAssignmentInventory(
                                   result.id,
                                   newAssignment.employee,
                                   selectedHouse
@@ -1764,7 +1779,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 }
                               } catch (err) {
                                 console.error('❌ Error creando inventario:', err);
-                                alert('Error creando inventario para la asignación. Revisa la consola.');
+                                console.warn('⚠️ Falló la creación remota de inventario; usando fallback de cargar inventario por asignación');
+                              }
+
+                              // Si no se crearon items de inventario en la BD (o la creación falló), intentar obtenerlos por la API (fallback) y setear estado
+                              try {
+                                if (!inventoryItems || inventoryItems.length === 0) {
+                                  const fallbackInv = await realtimeService.getAssignmentInventory(result.id);
+                                  setSyncedInventories(prev => new Map(prev).set(String(result.id), fallbackInv));
+                                  console.log('✅ Synced inventories actualizado con fallback para assignment', result.id);
+                                }
+                              } catch (err) {
+                                console.error('❌ Error obteniendo fallback inventory items:', err);
                               }
                             }
 
