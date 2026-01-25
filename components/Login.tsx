@@ -51,9 +51,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         return;
       }
 
-      // Obtener perfil desde tabla users (no profiles que está vacía)
+
+      // Obtener perfil desde tabla profiles
       const { data: userData, error: userError } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*')
         .eq('username', email.split('@')[0].toLowerCase())
         .single();
