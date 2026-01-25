@@ -655,7 +655,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     }
 
     // Mapear campos de cleaning_checklist a los campos que espera el Dashboard
-    const mappedData = (data || []).map((item: any) => ({
+    let mappedData = (data || []).map((item: any) => ({
       id: item.id,
       zone: item.zone || 'Sin zona',
       task: item.task,
@@ -668,7 +668,50 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       house: item.house,
       assigned_to: item.employee
     }));
-    
+
+    // Si no encontramos items en cleaning_checklist, caer hacia la tabla "checklist" (compatibilidad)
+    if (!mappedData || mappedData.length === 0) {
+      console.log('⚠️ [Checklist] No items in cleaning_checklist; falling back to legacy checklist table for assignment type', assignment.type);
+
+      let query = (supabase
+        .from('checklist') as any)
+        .select('*')
+        .eq('house', assignment.house);
+
+      // Filtrar por tipo de asignación
+      if (assignment.type === 'Limpieza profunda') {
+        query = query.eq('room', 'LIMPIEZA PROFUNDA');
+      } else if (assignment.type === 'Limpieza regular') {
+        query = query
+          .neq('room', 'LIMPIEZA PROFUNDA')
+          .notIn('room', ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES']);
+      } else if (assignment.type === 'Mantenimiento') {
+        query = query.in('room', ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES']);
+      }
+
+      const { data: legacyData, error: legacyError } = await query.order('room', { ascending: true });
+
+      if (legacyError) {
+        console.error('❌ [Checklist] Error fetching legacy checklist items:', legacyError);
+        return [];
+      }
+
+      mappedData = (legacyData || []).map((item: any) => ({
+        id: item.id,
+        zone: item.room || 'Sin zona',
+        task: item.item,
+        completed: item.complete || false,
+        completed_by: null,
+        completed_at: null,
+        order_num: 0,
+        calendar_assignment_id: assignmentId,
+        house: item.house,
+        assigned_to: item.assigned_to
+      }));
+
+      console.log('✅ [Checklist] Fallback items obtained from checklist table:', mappedData.length);
+    }
+
     console.log('✅ [Checklist] Items obtenidos:', mappedData.length, 'items para', assignment.type);
     return mappedData;
   } catch (error) {
