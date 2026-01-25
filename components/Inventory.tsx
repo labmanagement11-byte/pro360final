@@ -231,7 +231,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
             if (editIdx !== null) {
               // Editar item existente
               const itemToEdit = items[editIdx];
-              const { data, error } = await supabase!.from('inventory').update({ name: editForm.name, room: editForm.room, quantity: editForm.quantity }).eq('id', itemToEdit.id).select();
+              const { data, error } = await (supabase!.from('inventory') as any).update({ name: editForm.name, room: editForm.room, quantity: editForm.quantity }).eq('id', itemToEdit.id).select();
               if (!error && data && data.length > 0) {
                 setItemsState(items.map((it, idx) => idx === editIdx ? data[0] : it));
                 setEditIdx(null);
