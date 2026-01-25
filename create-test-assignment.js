@@ -29,23 +29,50 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const assignmentId = assignment[0].id;
 
-    // Crear checklist items
-    console.log('Creando checklist items para la asignación (Mantenimiento)');
-    const checklistItems = [
-      { house: 'EPIC D1', item: 'Revisar generador', room: 'SISTEMAS ELÉCTRICOS', complete: false, assigned_to: 'victor', calendar_assignment_id: assignmentId },
-      { house: 'EPIC D1', item: 'Inspeccionar piscina', room: 'PISCINA Y AGUA', complete: false, assigned_to: 'victor', calendar_assignment_id: assignmentId }
+    // Crear checklist items en la tabla moderna cleaning_checklist usando la columna bigint
+    console.log('Creando checklist items en cleaning_checklist para la asignación (Mantenimiento)');
+    const cleaningItems = [
+      { calendar_assignment_id_bigint: assignmentId, employee: 'victor', house: 'EPIC D1', zone: 'SISTEMAS ELÉCTRICOS', task: 'Revisar generador', completed: false, order_num: 1 },
+      { calendar_assignment_id_bigint: assignmentId, employee: 'victor', house: 'EPIC D1', zone: 'PISCINA Y AGUA', task: 'Inspeccionar piscina', completed: false, order_num: 2 }
     ];
-    const { error: cErr } = await supabase.from('checklist').insert(checklistItems);
-    if (cErr) console.error('Error insertando checklist items:', cErr);
-    else console.log('Checklist items insertados');
+
+    let ccData = null;
+    try {
+      const { data, error } = await supabase.from('cleaning_checklist').insert(cleaningItems).select();
+      if (error) throw error;
+      ccData = data;
+      console.log('Cleaning_checklist items insertados:', ccData.length);
+    } catch (err) {
+      console.warn('Error insertando cleaning_checklist items con bigint. Intentando fallback por employee+house:', err?.message || err);
+
+      // Fallback: insertar sin calendar_assignment_id_bigint (usar employee + house)
+      const fallbackItems = cleaningItems.map((it, i) => ({
+        calendar_assignment_id: assignmentId, // legacy column fallback (ensure assignment id present)
+        employee: it.employee,
+        house: it.house,
+        zone: it.zone,
+        task: it.task,
+        completed: it.completed,
+        order_num: it.order_num
+      }));
+
+      const { data: fbData, error: fbErr } = await supabase.from('cleaning_checklist').insert(fallbackItems).select();
+      if (fbErr) {
+        console.error('Fallback failed inserting cleaning_checklist items:', fbErr);
+      } else {
+        ccData = fbData;
+        console.log('Fallback: cleaning_checklist items insertados por employee+house:', ccData.length);
+      }
+    }
 
     // No crear inventario para mantenimiento
 
     const { data: assignments } = await supabase.from('calendar_assignments').select('*').eq('house','EPIC D1');
     console.log('Asignaciones EPIC D1 ahora:', assignments.length);
 
-    const { data: checklist } = await supabase.from('checklist').select('*').eq('calendar_assignment_id', assignmentId);
-    console.log('Checklist items for assignment:', checklist.length);
+    // Consultar cleaning_checklist por calendar_assignment_id_bigint
+    const { data: checklist } = await supabase.from('cleaning_checklist').select('*').eq('calendar_assignment_id_bigint', assignmentId).order('order_num', { ascending: true });
+    console.log('Checklist items for assignment:', (checklist || []).length);
 
   } catch (err) {
     console.error(err);
