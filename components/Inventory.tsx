@@ -44,17 +44,17 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 406', inventory: externalInventory, setInventory: setExternalInventory }) => {
-    // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
-    useEffect(() => {
-      if (houseName === 'HYNTIBA2 APTO 406') {
-        localStorage.setItem('plantilla_inventario_hyntiba2', JSON.stringify(items));
-      }
-    }, [items, houseName]);
-  // Para HYNTIBA2, no hay inventario predefinido, solo gestión manual
-    // Formulario para agregar/editar items
-    // ...existing code...
   const [items, setItemsState] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
+  useEffect(() => {
+    if (houseName === 'HYNTIBA2 APTO 406') {
+      localStorage.setItem('plantilla_inventario_hyntiba2', JSON.stringify(items));
+    }
+  }, [items, houseName]);
+  // Para HYNTIBA2, no hay inventario predefinido, solo gestión manual
+  // Formulario para agregar/editar items
+  // ...existing code...
 
   // Cargar inventario desde Supabase
   const fetchInventory = async () => {
