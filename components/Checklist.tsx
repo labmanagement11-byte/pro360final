@@ -101,22 +101,22 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
 
   // Cargar checklist desde Supabase, pero para HYNTIBA2 no hay carga automática
   const fetchChecklist = async () => {
-        // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
-        if (selectedHouse === 'HYNTIBA2 APTO 406') {
-          const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
-          if ((!error && data && data.length === 0)) {
-            const plantilla = localStorage.getItem('plantilla_checklist_hyntiba2');
-            if (plantilla) {
-              const { cleaning: plantillaCleaning, maintenance: plantillaMaintenance } = JSON.parse(plantilla);
-              setCleaning(plantillaCleaning || []);
-              setMaintenance(plantillaMaintenance || []);
-              setLoading(false);
-              return;
-            }
-          }
-        }
-    setLoading(true);
     let selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
+    // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
+    if (selectedHouse === 'HYNTIBA2 APTO 406') {
+      const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
+      if ((!error && data && data.length === 0)) {
+        const plantilla = localStorage.getItem('plantilla_checklist_hyntiba2');
+        if (plantilla) {
+          const { cleaning: plantillaCleaning, maintenance: plantillaMaintenance } = JSON.parse(plantilla);
+          setCleaning(plantillaCleaning || []);
+          setMaintenance(plantillaMaintenance || []);
+          setLoading(false);
+          return;
+        }
+      }
+    }
+    setLoading(true);
     if (selectedHouse === 'HYNTIBA2 APTO 406') {
       // Para HYNTIBA2, solo mostrar lo que esté en la base (sin predefinidos)
       const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
