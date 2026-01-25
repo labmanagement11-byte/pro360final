@@ -242,6 +242,10 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     const { data, error } = await (checklistTable() as any)
       .update({ complete: false })
       .in('id', allIds);
+    console.log({ allIds, data, error });
+    if (error) {
+      alert('Error al reiniciar checklist: ' + error.message);
+    }
     if (!error) {
       setCleaning(cleaning.map(i => ({ ...i, complete: false })));
       setMaintenance(maintenance.map(i => ({ ...i, complete: false })));
