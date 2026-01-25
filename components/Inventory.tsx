@@ -52,9 +52,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
     }, [items, houseName]);
   // Para HYNTIBA2, no hay inventario predefinido, solo gestión manual
     // Formulario para agregar/editar items
-    const [form, setForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
-    const [editIdx, setEditIdx] = useState<number | null>(null);
-    const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
+    // Eliminados duplicados, solo se definen una vez más abajo
   const [items, setItemsState] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -107,13 +105,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
 
   // Sync with external inventory if provided
   // No externalInventory ni setInventory: todo es cloud
-  const [form, setForm] = useState({
-    name: '',
-    room: ROOMS[0],
-    quantity: 1,
-  });
-  const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
+  // (Ya definidos arriba)
 
   // No localStorage: todo es cloud
 
