@@ -44,6 +44,9 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 406', inventory: externalInventory, setInventory: setExternalInventory }) => {
+    const [form, setForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
+    const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
+    const [editIdx, setEditIdx] = useState<number | null>(null);
   const [items, setItemsState] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
