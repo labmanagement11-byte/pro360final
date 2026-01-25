@@ -1864,15 +1864,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               >
                                 ✅ Ver Checklist
                               </button>
-                              <button 
-                                className="dashboard-btn success"
-                                onClick={() => {
-                                  console.log('📦 Abriendo inventario para asignación:', assignment.id);
-                                  setSelectedAssignmentForInventory(assignment.id);
-                                }}
-                              >
-                                📦 Ver Inventario
-                              </button>
+                              {assignment.type !== 'Mantenimiento' && (
+                                <button 
+                                  className="dashboard-btn success"
+                                  onClick={() => {
+                                    console.log('📦 Abriendo inventario para asignación:', assignment.id);
+                                    setSelectedAssignmentForInventory(assignment.id);
+                                  }}
+                                >
+                                  📦 Ver Inventario
+                                </button>
+                              )}
                               {(user.role === 'owner' || user.role === 'manager') && (
                                 <button 
                                   className="dashboard-btn danger"
