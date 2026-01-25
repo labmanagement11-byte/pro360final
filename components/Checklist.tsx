@@ -83,27 +83,63 @@ interface ChecklistProps {
   users?: User[];
 }
 const Checklist = ({ user, users = [] }: ChecklistProps) => {
+      // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
+      useEffect(() => {
+        if (user.house === 'HYNTIBA2 APTO 406') {
+          const plantilla = { cleaning, maintenance };
+          localStorage.setItem('plantilla_checklist_hyntiba2', JSON.stringify(plantilla));
+        }
+      }, [cleaning, maintenance, user.house]);
+    // Estado para formulario de tarea manual
+    const [taskForm, setTaskForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
+    const [editIdx, setEditIdx] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
   const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
   const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Cargar checklist desde Supabase
+  // Cargar checklist desde Supabase, pero para HYNTIBA2 no hay carga automática
   const fetchChecklist = async () => {
+        // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
+        if (selectedHouse === 'HYNTIBA2 APTO 406') {
+          const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
+          if ((!error && data && data.length === 0)) {
+            const plantilla = localStorage.getItem('plantilla_checklist_hyntiba2');
+            if (plantilla) {
+              const { cleaning: plantillaCleaning, maintenance: plantillaMaintenance } = JSON.parse(plantilla);
+              setCleaning(plantillaCleaning || []);
+              setMaintenance(plantillaMaintenance || []);
+              setLoading(false);
+              return;
+            }
+          }
+        }
     setLoading(true);
-    const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
+    let selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
+    if (selectedHouse === 'HYNTIBA2 APTO 406') {
+      // Para HYNTIBA2, solo mostrar lo que esté en la base (sin predefinidos)
+      const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
+      if (!error && data) {
+        setCleaning(data.filter(i => !i.room || i.room === '' || i.room === 'LIMPIEZA'));
+        setMaintenance(data.filter(i => i.room && i.room !== '' && i.room !== 'LIMPIEZA'));
+      } else {
+        setCleaning([]);
+        setMaintenance([]);
+      }
+      setLoading(false);
+      return;
+    }
+    // Para otras casas, mantener lógica anterior
     console.log('📋 [Checklist] Cargando checklist para casa:', selectedHouse, 'usuario:', user.username);
     let query = checklistTable().select('*').eq('house', selectedHouse);
-    // Si es empleado, solo ve tareas asignadas a él o no asignadas
     if (user.role === 'empleado') {
       query = query.in('assigned_to', [user.username, null]);
     }
     const { data, error } = await query;
     if (!error && data) {
       const items = data as ChecklistItem[];
-      // Separar tareas de limpieza (todas las zonas) vs mantenimiento
       const maintenanceRooms = ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES'];
       const deepCleaningRooms = ['LIMPIEZA PROFUNDA'];
-      
       setCleaning(items.filter(i => 
         !maintenanceRooms.includes(i.room || '') && !deepCleaningRooms.includes(i.room || '')
       ));
@@ -250,65 +286,120 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
 
   return (
     <div className="checklist-list ultra-checklist">
-      <h2 className="ultra-checklist-title">Checklist EPIC D1</h2>
+      <h2 className="ultra-checklist-title">Checklist {user.house}</h2>
       {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
+      {/* Formulario para agregar/editar tareas solo para managers de HYNTIBA2 */}
+      {!loading && user.house === 'HYNTIBA2 APTO 406' && (user.role === 'manager' || user.role === 'owner') && (
+        <form
+          onSubmit={async e => {
+            e.preventDefault();
+            if (editIdx !== null) {
+              // Editar tarea existente
+              const list = [...cleaning, ...maintenance];
+              const tarea = list[editIdx];
+              const { data, error } = await checklistTable().update({ item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to }).eq('id', tarea.id).select();
+              if (!error && data && data.length > 0) {
+                if (!editForm.room || editForm.room === '' || editForm.room === 'LIMPIEZA') {
+                  setCleaning(cleaning.map((i, idx) => idx === editIdx ? data[0] : i));
+                } else {
+                  setMaintenance(maintenance.map((i, idx) => idx === (editIdx - cleaning.length) ? data[0] : i));
+                }
+                setEditIdx(null);
+                setEditForm({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
+              }
+            } else {
+              // Agregar nueva tarea
+              const { data, error } = await checklistTable().insert([{ item: taskForm.item, room: taskForm.room, assigned_to: taskForm.assigned_to, house: user.house, complete: false }]).select();
+              if (!error && data && data.length > 0) {
+                if (!taskForm.room || taskForm.room === '' || taskForm.room === 'LIMPIEZA') {
+                  setCleaning([...cleaning, data[0]]);
+                } else {
+                  setMaintenance([...maintenance, data[0]]);
+                }
+                setTaskForm({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
+              }
+            }
+          }}
+          style={{display:'flex',gap:'0.7rem',marginBottom:'1.2rem',flexWrap:'wrap',alignItems:'center'}}
+        >
+          <input type="text" placeholder="Tarea" value={editIdx !== null ? editForm.item : taskForm.item} onChange={e => editIdx !== null ? setEditForm(f => ({ ...f, item: e.target.value })) : setTaskForm(f => ({ ...f, item: e.target.value }))} required className="ultra-task-text" style={{minWidth:'120px'}} />
+          <input type="text" placeholder="Zona/Room" value={editIdx !== null ? editForm.room : taskForm.room} onChange={e => editIdx !== null ? setEditForm(f => ({ ...f, room: e.target.value })) : setTaskForm(f => ({ ...f, room: e.target.value }))} className="ultra-task-text" style={{minWidth:'100px'}} />
+          <select value={editIdx !== null ? editForm.assigned_to : taskForm.assigned_to} onChange={e => editIdx !== null ? setEditForm(f => ({ ...f, assigned_to: e.target.value })) : setTaskForm(f => ({ ...f, assigned_to: e.target.value }))} className="ultra-task-text" style={{minWidth:'100px'}}>
+            <option value="">Sin asignar</option>
+            {users.filter(u => u.role === 'empleado').map(u => (
+              <option key={u.username} value={u.username}>{u.username}</option>
+            ))}
+          </select>
+          <button type="submit" className="ultra-reset-btn">{editIdx !== null ? 'Guardar' : 'Agregar'}</button>
+          {editIdx !== null && <button type="button" className="ultra-reset-btn" style={{background:'#aaa',color:'#fff'}} onClick={() => { setEditIdx(null); setEditForm({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' }); }}>Cancelar</button>}
+        </form>
+      )}
+      {/* Lista de tareas */}
       {!loading && <>
-      {cleaningZones.map(zone => (
-        cleaningByZone[zone.key].length > 0 && (
-          <div className="ultra-checklist-section" key={zone.key}>
-            <h3 className="ultra-section-title">{zone.label}</h3>
-            <div className="ultra-tasks-grid">
-              {cleaningByZone[zone.key].map((i, idx) => (
-                <div key={i.id || idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
-                  <label className="ultra-checkbox">
-                    <input type="checkbox" checked={!!i.complete} onChange={() => toggleCleaning(cleaning.findIndex(c => c.id === i.id))} disabled={user.role !== 'empleado'} title={i.item} />
-                    <span className="ultra-task-icon">{i.complete ? '✔️' : '🧹'}</span>
-                    <span className="ultra-task-text">{i.item}</span>
-                  </label>
-                  {(user.role === 'manager' || user.role === 'owner') && users.length > 0 && (
-                    <select
-                      value={i.assigned_to || ''}
-                      onChange={e => handleAssign(i.id, e.target.value)}
-                      className="ultra-assign-dropdown"
-                    >
-                      <option value="">Sin asignar</option>
-                      {users.filter(u => u.role === 'empleado').map(u => (
-                        <option key={u.username} value={u.username}>{u.username}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              ))}
-            </div>
+        <div className="ultra-checklist-section">
+          <h3 className="ultra-section-title">Limpieza</h3>
+          <div className="ultra-tasks-grid">
+            {cleaning.map((i, idx) => (
+              <div key={i.id || idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
+                <label className="ultra-checkbox">
+                  <input type="checkbox" checked={!!i.complete} onChange={() => toggleCleaning(cleaning.findIndex(c => c.id === i.id))} disabled={user.role !== 'empleado'} title={i.item} />
+                  <span className="ultra-task-icon">{i.complete ? '✔️' : '🧹'}</span>
+                  <span className="ultra-task-text">{i.item}</span>
+                </label>
+                {(user.role === 'manager' || user.role === 'owner') && user.house === 'HYNTIBA2 APTO 406' && (
+                  <>
+                    <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(idx); setEditForm({ item: i.item, room: i.room || '', assigned_to: i.assigned_to || '', tipo: 'LIMPIEZA' }); }}>Editar</button>
+                    <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={async () => { await checklistTable().delete().eq('id', i.id); setCleaning(cleaning.filter((_, j) => j !== idx)); }}>Eliminar</button>
+                  </>
+                )}
+                {(user.role === 'manager' || user.role === 'owner') && users.length > 0 && user.house !== 'HYNTIBA2 APTO 406' && (
+                  <select
+                    value={i.assigned_to || ''}
+                    onChange={e => handleAssign(i.id, e.target.value)}
+                    className="ultra-assign-dropdown"
+                  >
+                    <option value="">Sin asignar</option>
+                    {users.filter(u => u.role === 'empleado').map(u => (
+                      <option key={u.username} value={u.username}>{u.username}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
           </div>
-        )
-      ))}
-      <div className="ultra-checklist-section">
-        <h3 className="ultra-section-title">Mantenimiento</h3>
-        <div className="ultra-tasks-grid">
-          {maintenance.map((i, idx) => (
-            <div key={idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
-              <label className="ultra-checkbox">
-                <input type="checkbox" checked={!!i.complete} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.item} />
-                <span className="ultra-task-icon">{i.complete ? '🔧' : '🛠️'}</span>
-                <span className="ultra-task-text">{i.item}</span>
-              </label>
-              {(user.role === 'manager' || user.role === 'dueno') && users.length > 0 && (
-                <select
-                  value={i.assigned_to || ''}
-                  onChange={e => handleAssign(i.id, e.target.value)}
-                  className="ultra-assign-dropdown"
-                >
-                  <option value="">Sin asignar</option>
-                  {users.filter(u => u.role === 'empleado').map(u => (
-                    <option key={u.username} value={u.username}>{u.username}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          ))}
         </div>
-      </div>
+        <div className="ultra-checklist-section">
+          <h3 className="ultra-section-title">Mantenimiento</h3>
+          <div className="ultra-tasks-grid">
+            {maintenance.map((i, idx) => (
+              <div key={i.id || idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
+                <label className="ultra-checkbox">
+                  <input type="checkbox" checked={!!i.complete} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.item} />
+                  <span className="ultra-task-icon">{i.complete ? '🔧' : '🛠️'}</span>
+                  <span className="ultra-task-text">{i.item}</span>
+                </label>
+                {(user.role === 'manager' || user.role === 'owner') && user.house === 'HYNTIBA2 APTO 406' && (
+                  <>
+                    <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(idx + cleaning.length); setEditForm({ item: i.item, room: i.room || '', assigned_to: i.assigned_to || '', tipo: 'MANTENIMIENTO' }); }}>Editar</button>
+                    <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={async () => { await checklistTable().delete().eq('id', i.id); setMaintenance(maintenance.filter((_, j) => j !== idx)); }}>Eliminar</button>
+                  </>
+                )}
+                {(user.role === 'manager' || user.role === 'dueno') && users.length > 0 && user.house !== 'HYNTIBA2 APTO 406' && (
+                  <select
+                    value={i.assigned_to || ''}
+                    onChange={e => handleAssign(i.id, e.target.value)}
+                    className="ultra-assign-dropdown"
+                  >
+                    <option value="">Sin asignar</option>
+                    {users.filter(u => u.role === 'empleado').map(u => (
+                      <option key={u.username} value={u.username}>{u.username}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </>}
       {!loading && (user.role === 'owner' || user.role === 'manager') && (
         <button onClick={resetChecklist} className="ultra-reset-btn">Reiniciar Checklist</button>
