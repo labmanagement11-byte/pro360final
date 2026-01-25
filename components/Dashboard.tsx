@@ -1277,6 +1277,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [user.role, user.username, houses, selectedHouseIdx]);
 
+  // Solución robusta: solo renderizar dashboard en cliente, nunca en SSR
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => { setIsClient(true); }, []);
+  if (!isClient) {
+    // SSR y primer render del cliente muestran exactamente lo mismo
+    return <div style={{padding: 40, textAlign: 'center'}}>Cargando...</div>;
+  }
+  // Ya en cliente, renderizar dashboard normalmente
+  if (!user || !user.username) {
+    return <div style={{padding: 40, textAlign: 'center'}}>Cargando usuario...</div>;
+  }
   return (
     <div className="dashboard-container">
       {/* Logo y Header */}

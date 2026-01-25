@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaCalendarAlt, FaUser, FaTasks, FaClock, FaBoxOpen, FaTrash } from 'react-icons/fa';
 import { supabase } from '../utils/supabaseClient';
+import * as realtimeService from '../utils/supabaseRealtimeService';
 
 const CALENDAR_KEY = 'dashboard_calendar'; // legacy, no longer used
 
@@ -86,8 +87,36 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
     e.preventDefault();
     if (!supabase) return;
     const house = selectedHouse || 'EPIC D1';
-    const newEvent = { ...form, house };
-    await (supabase as any).from('calendar').insert(newEvent);
+    const newAssignment = {
+      house,
+      date: form.date,
+      type: form.type,
+      employee: form.employee,
+      time: form.time,
+      tasks: form.tasks,
+      inventory: form.inventory,
+      created_at: new Date().toISOString(),
+    };
+    // Insertar el evento en la tabla calendar_assignments y obtener el id
+    const { data: inserted, error } = await (supabase as any).from('calendar_assignments').insert(newAssignment).select();
+    let assignmentId = null;
+    if (!error && inserted && inserted.length > 0) {
+      assignmentId = inserted[0].id;
+    }
+
+    // Si hay tareas y empleado, crear/actualizar en cleaning_checklist usando la función moderna
+    if (assignmentId && form.tasks && form.employee) {
+      try {
+        await realtimeService.createCleaningChecklistItems(
+          assignmentId,
+          form.employee,
+          form.type, // tipo de limpieza/mantenimiento
+          house
+        );
+      } catch (err) {
+        console.error('❌ Error creando checklist items modernos:', err);
+      }
+    }
     setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
     // Realtime actualizará automáticamente
   };
