@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getSupabaseClient, checklistTable } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
+import type { Database } from '../utils/supabaseClient';
 
 const cleaningTasks = [
   'Barrer y trapear toda la casa.',
@@ -299,7 +300,8 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
               // Editar tarea existente
               const list = [...cleaning, ...maintenance];
               const tarea = list[editIdx];
-              const { data, error } = await checklistTable().update({ item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to } as import("../utils/supabaseClient").Database["public"]["Tables"]["checklist"]["Update"]).eq('id', tarea.id).select();
+              const updateObj: Database["public"]["Tables"]["checklist"]["Update"] = { item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to };
+              const { data, error } = await checklistTable().update(updateObj).eq('id', tarea.id).select();
               const updated = data as ChecklistItem[];
               if (!error && updated && updated.length > 0) {
                 if (!editForm.room || editForm.room === '' || editForm.room === 'LIMPIEZA') {
