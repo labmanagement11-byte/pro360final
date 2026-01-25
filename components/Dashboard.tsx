@@ -1277,6 +1277,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [user.role, user.username, houses, selectedHouseIdx]);
 
+  // Solución robusta: solo renderizar dashboard en cliente, nunca en SSR
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => { setIsClient(true); }, []);
+  if (!isClient) {
+    // SSR y primer render del cliente muestran exactamente lo mismo
+    return <div style={{padding: 40, textAlign: 'center'}}>Cargando...</div>;
+  }
+  // Ya en cliente, renderizar dashboard normalmente
+  if (!user || !user.username) {
+    return <div style={{padding: 40, textAlign: 'center'}}>Cargando usuario...</div>;
+  }
   return (
     <div className="dashboard-container">
       {/* Logo y Header */}
@@ -1718,24 +1729,88 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           
                           if (result && result.id) {
                             console.log('✅ Asignación creada:', result);
-                            
-                            // Crear los items del checklist para esta asignación
-                            console.log('🧹 Creando items del checklist para asignación:', result.id);
-                            const checklistItems = await realtimeService.createCleaningChecklistItems(
-                              result.id,
-                              newAssignment.employee,
-                              newAssignment.type,  // Pasar el tipo de limpieza
-                              selectedHouse
-                            );
-                            console.log('✅ Checklist creado con', checklistItems.length, 'items');
 
-                            // Crear inventario para la asignación
-                            const inventoryItems = await realtimeService.createAssignmentInventory(
-                              result.id,
-                              newAssignment.employee,
-                              selectedHouse
-                            );
-                            console.log('✅ Inventario creado con', inventoryItems.length, 'items');
+                            // Añadir la asignación al estado local inmediatamente para visibilidad instantánea
+                            setCalendarAssignments(prev => [result, ...(prev || [])]);
+
+                            // Crear los items del checklist para esta asignación
+                            let checklistItems: any[] = [];
+                            try {
+                              console.log('🧹 Creando items del checklist para asignación:', result.id);
+                              checklistItems = await realtimeService.createCleaningChecklistItems(
+                                result.id,
+                                newAssignment.employee,
+                                newAssignment.type,  // Pasar el tipo de limpieza
+                                selectedHouse
+                              );
+                              console.log('✅ Checklist creado con', checklistItems.length, 'items');
+
+                              // Guardar inmediatamente en el estado sincronizado para visibilidad instantánea
+                              try {
+                                setSyncedChecklists(prev => new Map(prev).set(String(result.id), checklistItems));
+                                console.log('✅ Synced checklists actualizado en estado local para assignment', result.id);
+                              } catch (err) {
+                                console.warn('⚠️ No se pudo actualizar synced checklists localmente:', err);
+                              }
+                            } catch (err) {
+                              console.error('❌ Error creando checklist items:', err);
+                              // No alert here to avoid blocking UX; continuaremos con fallback para mostrar plantilla
+                              console.warn('⚠️ Falló la creación remota; usando fallback local/legacy para visibilidad');
+                            }
+
+                            // Si no se crearon items en la BD (o la creación falló), obtener items vía getCleaningChecklistItems
+                            // que aplicará los fallbacks (calendar_assignment_id_bigint, employee+house, o plantilla en memoria)
+                            try {
+                              if (!checklistItems || checklistItems.length === 0) {
+                                const fallbackItems = await realtimeService.getCleaningChecklistItems(result.id);
+                                setSyncedChecklists(prev => new Map(prev).set(String(result.id), fallbackItems));
+                                console.log('✅ Synced checklists actualizado con fallback/template para assignment', result.id);
+                              }
+                            } catch (err) {
+                              console.error('❌ Error obteniendo fallback checklist items:', err);
+                            }
+
+                            // Crear inventario para la asignación (solo si no es Mantenimiento)
+                            if (newAssignment.type !== 'Mantenimiento') {
+                              let inventoryItems: any[] = [];
+                              try {
+                                inventoryItems = await realtimeService.createAssignmentInventory(
+                                  result.id,
+                                  newAssignment.employee,
+                                  selectedHouse
+                                );
+                                console.log('✅ Inventario creado con', inventoryItems.length, 'items');
+
+                                // Guardar inventario en estado sincronizado para visibilidad instantánea
+                                try {
+                                  setSyncedInventories(prev => new Map(prev).set(String(result.id), inventoryItems));
+                                  console.log('✅ Synced inventories actualizado en estado local para assignment', result.id);
+                                } catch (err) {
+                                  console.warn('⚠️ No se pudo actualizar synced inventories localmente:', err);
+                                }
+                              } catch (err) {
+                                console.error('❌ Error creando inventario:', err);
+                                console.warn('⚠️ Falló la creación remota de inventario; usando fallback de cargar inventario por asignación');
+                              }
+
+                              // Si no se crearon items de inventario en la BD (o la creación falló), intentar obtenerlos por la API (fallback) y setear estado
+                              try {
+                                if (!inventoryItems || inventoryItems.length === 0) {
+                                  const fallbackInv = await realtimeService.getAssignmentInventory(result.id);
+                                  setSyncedInventories(prev => new Map(prev).set(String(result.id), fallbackInv));
+                                  console.log('✅ Synced inventories actualizado con fallback para assignment', result.id);
+                                }
+                              } catch (err) {
+                                console.error('❌ Error obteniendo fallback inventory items:', err);
+                              }
+                            }
+
+                            // Limpiar formulario
+                            setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
+
+                          } else {
+                            console.error('❌ No se pudo crear la asignación:', result);
+                            alert('No se pudo crear la asignación. Revisa la consola para más detalles.');
                           }
                           
                           setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
@@ -1864,15 +1939,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               >
                                 ✅ Ver Checklist
                               </button>
-                              <button 
-                                className="dashboard-btn success"
-                                onClick={() => {
-                                  console.log('📦 Abriendo inventario para asignación:', assignment.id);
-                                  setSelectedAssignmentForInventory(assignment.id);
-                                }}
-                              >
-                                📦 Ver Inventario
-                              </button>
+                              {assignment.type !== 'Mantenimiento' && (
+                                <button 
+                                  className="dashboard-btn success"
+                                  onClick={() => {
+                                    console.log('📦 Abriendo inventario para asignación:', assignment.id);
+                                    setSelectedAssignmentForInventory(assignment.id);
+                                  }}
+                                >
+                                  📦 Ver Inventario
+                                </button>
+                              )}
                               {(user.role === 'owner' || user.role === 'manager') && (
                                 <button 
                                   className="dashboard-btn danger"
@@ -3153,6 +3230,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <p className="stat-box-label">Completadas</p>
                         </div>
                       </div>
+
+                      {/* Mostrar aviso si la lista es una plantilla local (no hay filas en BD) */}
+                      {checklistItems && checklistItems.length > 0 && checklistItems[0].isTemplate && (
+                        <div style={{textAlign: 'center', marginBottom: '1rem', color: '#6b7280'}}>
+                          <strong>Plantilla local</strong> — No se encontraron items en la base de datos; mostrando la plantilla por defecto.
+                        </div>
+                      )}
                       
                       <div className="progress-bar" style={{marginBottom: '2rem'}}>
                         <div className="progress-fill" style={{width: `${progress}%`}}></div>

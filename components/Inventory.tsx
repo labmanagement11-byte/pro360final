@@ -44,100 +44,35 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 406', inventory: externalInventory, setInventory: setExternalInventory }) => {
-  const airbnbExample: InventoryItem[] = [
-    // Cocina
-    { name: 'Cucharas', room: 'Cocina', quantity: 8 },
-    { name: 'Tenedores', room: 'Cocina', quantity: 8 },
-    { name: 'Cuchillos', room: 'Cocina', quantity: 8 },
-    { name: 'Platos llanos', room: 'Cocina', quantity: 8 },
-    { name: 'Platos hondos', room: 'Cocina', quantity: 8 },
-    { name: 'Platos de postre', room: 'Cocina', quantity: 8 },
-    { name: 'Vasos', room: 'Cocina', quantity: 8 },
-    { name: 'Copas de vino', room: 'Cocina', quantity: 6 },
-    { name: 'Copas de agua', room: 'Cocina', quantity: 6 },
-    { name: 'Tazas', room: 'Cocina', quantity: 8 },
-    { name: 'Sartenes', room: 'Cocina', quantity: 3 },
-    { name: 'Ollas', room: 'Cocina', quantity: 3 },
-    { name: 'Cafetera', room: 'Cocina', quantity: 1 },
-    { name: 'Microondas', room: 'Cocina', quantity: 1 },
-    { name: 'Licuadora', room: 'Cocina', quantity: 1 },
-    { name: 'Tostadora', room: 'Cocina', quantity: 1 },
-    { name: 'Refrigerador', room: 'Cocina', quantity: 1 },
-    { name: 'Dispensador de agua', room: 'Cocina', quantity: 1 },
-    { name: 'Cuchillos grandes', room: 'Cocina', quantity: 2 },
-    { name: 'Tabla de picar', room: 'Cocina', quantity: 2 },
-    { name: 'Abrelatas', room: 'Cocina', quantity: 1 },
-    { name: 'Sacacorchos', room: 'Cocina', quantity: 1 },
-    { name: 'Colador', room: 'Cocina', quantity: 1 },
-    { name: 'Bandejas', room: 'Cocina', quantity: 2 },
-    { name: 'Recipientes plásticos', room: 'Cocina', quantity: 6 },
-    { name: 'Papel aluminio', room: 'Cocina', quantity: 1 },
-    { name: 'Film plástico', room: 'Cocina', quantity: 1 },
-    { name: 'Servilletas', room: 'Cocina', quantity: 1 },
-    { name: 'Jarra de agua', room: 'Cocina', quantity: 1 },
-    { name: 'Cestos de basura', room: 'Cocina', quantity: 1 },
-    // Habitaciones
-    { name: 'Almohadas', room: 'Habitación 1', quantity: 2 },
-    { name: 'Almohadas', room: 'Habitación 2', quantity: 2 },
-    { name: 'Almohadas', room: 'Habitación 3', quantity: 2 },
-    { name: 'Sábanas', room: 'Habitación 1', quantity: 2 },
-    { name: 'Sábanas', room: 'Habitación 2', quantity: 2 },
-    { name: 'Sábanas', room: 'Habitación 3', quantity: 2 },
-    { name: 'Cobijas', room: 'Habitación 1', quantity: 2 },
-    { name: 'Cobijas', room: 'Habitación 2', quantity: 2 },
-    { name: 'Cobijas', room: 'Habitación 3', quantity: 2 },
-    { name: 'Perchas', room: 'Habitación 1', quantity: 6 },
-    { name: 'Perchas', room: 'Habitación 2', quantity: 6 },
-    { name: 'Perchas', room: 'Habitación 3', quantity: 6 },
-    { name: 'Cortinas', room: 'Habitación 1', quantity: 1 },
-    { name: 'Cortinas', room: 'Habitación 2', quantity: 1 },
-    { name: 'Cortinas', room: 'Habitación 3', quantity: 1 },
-    // Baños
-    { name: 'Toallas de baño', room: 'Baños', quantity: 6 },
-    { name: 'Toallas de mano', room: 'Baños', quantity: 3 },
-    { name: 'Tapetes de baño', room: 'Baños', quantity: 3 },
-    { name: 'Cestos de basura', room: 'Baños', quantity: 2 },
-    { name: 'Papel higiénico', room: 'Baños', quantity: 6 },
-    { name: 'Jabón de manos', room: 'Baños', quantity: 3 },
-    { name: 'Shampoo', room: 'Baños', quantity: 3 },
-    { name: 'Acondicionador', room: 'Baños', quantity: 3 },
-    { name: 'Secador de pelo', room: 'Baños', quantity: 1 },
-    // Terraza
-    { name: 'Sillas', room: 'Terraza', quantity: 4 },
-    { name: 'Mesa', room: 'Terraza', quantity: 1 },
-    { name: 'Cojines', room: 'Terraza', quantity: 4 },
-    { name: 'Cestos de basura', room: 'Terraza', quantity: 1 },
-    // Piscina
-    { name: 'Toallas de piscina', room: 'Piscina', quantity: 4 },
-    { name: 'Flotadores', room: 'Piscina', quantity: 2 },
-    { name: 'Sillas de piscina', room: 'Piscina', quantity: 2 },
-    // BBQ
-    { name: 'Parrilla', room: 'BBQ', quantity: 1 },
-    { name: 'Cenicero', room: 'BBQ', quantity: 1 },
-    { name: 'Utensilios BBQ', room: 'BBQ', quantity: 3 },
-    // Lavandería
-    { name: 'Lavadora', room: 'Lavandería', quantity: 1 },
-    { name: 'Secadora', room: 'Lavandería', quantity: 1 },
-    { name: 'Jabón de ropa', room: 'Lavandería', quantity: 1 },
-    { name: 'Canasta de ropa', room: 'Lavandería', quantity: 1 },
-    // Limpieza
-    { name: 'Escoba', room: 'Pasillo', quantity: 1 },
-    { name: 'Trapeador', room: 'Pasillo', quantity: 1 },
-    { name: 'Recogedor', room: 'Pasillo', quantity: 1 },
-    { name: 'Balde', room: 'Pasillo', quantity: 1 },
-    { name: 'Cloro', room: 'Pasillo', quantity: 1 },
-    { name: 'Desinfectante', room: 'Pasillo', quantity: 1 },
-    // Extras
-    { name: 'Botiquín de primeros auxilios', room: 'Pasillo', quantity: 1 },
-    { name: 'Extintor', room: 'Pasillo', quantity: 1 },
-    { name: 'Linterna', room: 'Pasillo', quantity: 1 },
-    { name: 'Manual de la casa', room: 'Pasillo', quantity: 1 },
-  ];
+    const [form, setForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
+    const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
+    const [editIdx, setEditIdx] = useState<number | null>(null);
   const [items, setItemsState] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
+  useEffect(() => {
+    if (houseName === 'HYNTIBA2 APTO 406') {
+      localStorage.setItem('plantilla_inventario_hyntiba2', JSON.stringify(items));
+    }
+  }, [items, houseName]);
+  // Para HYNTIBA2, no hay inventario predefinido, solo gestión manual
+  // Formulario para agregar/editar items
+  // ...existing code...
 
   // Cargar inventario desde Supabase
   const fetchInventory = async () => {
+        // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
+        if (houseName === 'HYNTIBA2 APTO 406') {
+          const { data, error } = await supabase!.from('inventory').select('*').eq('house', houseName);
+          if ((!error && data && data.length === 0)) {
+            const plantilla = localStorage.getItem('plantilla_inventario_hyntiba2');
+            if (plantilla) {
+              setItemsState(JSON.parse(plantilla));
+              setLoading(false);
+              return;
+            }
+          }
+        }
     setLoading(true);
     const { data, error } = await supabase!
       .from('inventory')
@@ -173,13 +108,6 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
 
   // Sync with external inventory if provided
   // No externalInventory ni setInventory: todo es cloud
-  const [form, setForm] = useState({
-    name: '',
-    room: ROOMS[0],
-    quantity: 1,
-  });
-  const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
 
   // No localStorage: todo es cloud
 
@@ -295,15 +223,38 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
     <div className="inventory-list ultra-checklist">
       <h2 className="ultra-checklist-title">Inventario {houseName}</h2>
       {loading && <p className="ultra-task-text" style={{textAlign:'center'}}>Cargando inventario...</p>}
-      {!loading && (user.role === 'owner' || user.role === 'manager') && (
-        <form onSubmit={editIdx !== null ? saveEdit : addItem} className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}>
+      {/* Formulario para agregar/editar items solo para managers de HYNTIBA2 */}
+      {!loading && houseName === 'HYNTIBA2 APTO 406' && (user.role === 'owner' || user.role === 'manager') && (
+        <form
+          onSubmit={async e => {
+            e.preventDefault();
+            if (editIdx !== null) {
+              // Editar item existente
+              const itemToEdit = items[editIdx];
+              const { data, error } = await (supabase!.from('inventory') as any).update({ name: editForm.name, room: editForm.room, quantity: editForm.quantity }).eq('id', itemToEdit.id).select();
+              if (!error && data && data.length > 0) {
+                setItemsState(items.map((it, idx) => idx === editIdx ? data[0] : it));
+                setEditIdx(null);
+                setEditForm({ name: '', room: ROOMS[0], quantity: 1 });
+              }
+            } else {
+              // Agregar nuevo item
+              const { data, error } = await (supabase!.from('inventory') as any).insert([{ name: form.name, room: form.room, quantity: form.quantity, house: houseName, complete: false, missing: 0 }]).select();
+              if (!error && data && data.length > 0) {
+                setItemsState([...items, data[0]]);
+                setForm({ name: '', room: ROOMS[0], quantity: 1 });
+              }
+            }
+          }}
+          className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}
+        >
           <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text" style={{minWidth:'120px'}} />
           <select id="inv-room-select" value={editIdx !== null ? editForm.room : form.room} onChange={e => editIdx !== null ? setEditForm({ ...editForm, room: e.target.value }) : setForm({ ...form, room: e.target.value })} title="Selecciona la habitación" className="ultra-task-text">
             {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
           <input id="inv-qty" type="number" min={1} value={editIdx !== null ? editForm.quantity : form.quantity} onChange={e => editIdx !== null ? setEditForm({ ...editForm, quantity: Number(e.target.value) }) : setForm({ ...form, quantity: Number(e.target.value) })} required title="Cantidad del artículo" className="ultra-task-text" style={{width:'70px'}} />
           <button type="submit" className="ultra-reset-btn" style={{padding:'0.5rem 1.2rem', fontSize:'1rem'}}>{editIdx !== null ? 'Guardar' : 'Agregar'}</button>
-          {editIdx !== null && <button type="button" className="ultra-reset-btn" style={{background:'#aaa',color:'#fff',padding:'0.5rem 1.2rem', fontSize:'1rem'}} onClick={() => setEditIdx(null)}>Cancelar</button>}
+          {editIdx !== null && <button type="button" className="ultra-reset-btn" style={{background:'#aaa',color:'#fff',padding:'0.5rem 1.2rem', fontSize:'1rem'}} onClick={() => { setEditIdx(null); setEditForm({ name: '', room: ROOMS[0], quantity: 1 }); }}>Cancelar</button>}
         </form>
       )}
       {!loading && grouped.length === 0 && <p className="ultra-task-text" style={{textAlign:'center'}}>No hay artículos en el inventario.</p>}
@@ -319,7 +270,13 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
                 <div key={idx} className={`ultra-task-card${it.complete ? ' done' : ''}`} style={{marginBottom:'0.5rem',background:'#fff',color:'#23272f',padding:'0.7rem 1rem',boxShadow:'0 1px 6px #0001',display:'flex',alignItems:'center',gap:'0.7rem'}}>
                   <span className="ultra-task-icon">📦</span>
                   <span className="ultra-task-text" style={{flex:1}}>{it.name} <span style={{opacity:0.7}}>({it.quantity})</span></span>
-                  {(user.role === 'owner' || user.role === 'manager') && (
+                  {(user.role === 'owner' || user.role === 'manager') && houseName === 'HYNTIBA2 APTO 406' && (
+                    <>
+                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
+                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>
+                    </>
+                  )}
+                  {(user.role === 'owner' || user.role === 'manager') && houseName !== 'HYNTIBA2 APTO 406' && (
                     <>
                       <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
                       <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>

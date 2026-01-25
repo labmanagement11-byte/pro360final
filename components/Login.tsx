@@ -39,6 +39,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
 
     try {
+
       // Login con Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -51,25 +52,59 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         return;
       }
 
+      // Buscar perfil robustamente en varias fuentes (users, profiles)
+      const localPart = email.split('@')[0].toLowerCase();
+      let record: any = null;
 
-      // Obtener perfil desde tabla profiles
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('full_name', email.split('@')[0].toLowerCase())
-        .single();
+      // 1) Buscar en tabla users por username
+      try {
+        const { data: u } = await supabase.from('users').select('*').ilike('username', localPart).single();
+        if (u) record = u;
+      } catch (e) { /* ignored */ }
 
-      if (userError || !userData) {
+      // 2) Si no existe, buscar en profiles por username
+      if (!record) {
+        try {
+          const { data: p } = await supabase.from('profiles').select('*').ilike('username', localPart).single();
+          if (p) record = p;
+        } catch (e) { /* ignored */ }
+      }
+
+      // 3) Si no existe, buscar en profiles por full_name
+      if (!record) {
+        try {
+          const { data: p2 } = await supabase.from('profiles').select('*').ilike('full_name', localPart).single();
+          if (p2) record = p2;
+        } catch (e) { /* ignored */ }
+      }
+
+      // 4) Si sigue sin existir, buscar por email en users o profiles (si tenemos email)
+      const userEmail = authData?.user?.email;
+      if (!record && userEmail) {
+        try {
+          const { data: u2 } = await supabase.from('users').select('*').eq('email', userEmail).single();
+          if (u2) record = u2;
+        } catch (e) { /* ignored */ }
+      }
+
+      if (!record && userEmail) {
+        try {
+          const { data: p3 } = await supabase.from('profiles').select('*').eq('email', userEmail).single();
+          if (p3) record = p3;
+        } catch (e) { /* ignored */ }
+      }
+
+      if (!record) {
         setError('Usuario no encontrado en base de datos');
         setLoading(false);
         return;
       }
 
       const user: User = {
-        username: (userData as any).username,
+        username: record.username || record.full_name || localPart,
         password: '',
-        role: (userData as any).role,
-        house: (userData as any).house || 'EPIC D1',
+        role: record.role || (record.user_metadata && record.user_metadata.role) || 'empleado',
+        house: record.house || 'EPIC D1',
       };
 
       console.log('✅ [Login] Usuario cargado desde tabla users:', user);
