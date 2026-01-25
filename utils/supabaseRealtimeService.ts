@@ -621,45 +621,30 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
-    // Obtener tareas de la tabla checklist filtradas por casa
-    let query = (supabase
-      .from('checklist') as any)
+    // Obtener tareas desde la tabla cleaning_checklist vinculadas a la asignación
+    const { data, error } = await (supabase
+      .from('cleaning_checklist') as any)
       .select('*')
-      .eq('house', assignment.house);
-    
-    // Filtrar por tipo de asignación
-    if (assignment.type === 'Limpieza profunda') {
-      // Solo tareas de limpieza profunda
-      query = query.eq('room', 'LIMPIEZA PROFUNDA');
-    } else if (assignment.type === 'Limpieza regular') {
-      // Tareas regulares (excluir profunda y mantenimiento)
-      query = query
-        .neq('room', 'LIMPIEZA PROFUNDA')
-        .notIn('room', ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES']);
-    } else if (assignment.type === 'Mantenimiento') {
-      // Solo tareas de mantenimiento
-      query = query.in('room', ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES']);
-    }
-    
-    const { data, error } = await query.order('room', { ascending: true });
+      .eq('calendar_assignment_id', assignmentId)
+      .order('order_num', { ascending: true });
 
     if (error) {
-      console.error('❌ [Checklist] Error fetching checklist items:', error);
+      console.error('❌ [Checklist] Error fetching cleaning_checklist items:', error);
       return [];
     }
-    
-    // Mapear campos de checklist a los campos que espera el Dashboard
+
+    // Mapear campos de cleaning_checklist a los campos que espera el Dashboard
     const mappedData = (data || []).map((item: any) => ({
       id: item.id,
-      zone: item.room || 'Sin zona',
-      task: item.item,
-      completed: item.complete || false,
-      completed_by: null, // checklist no tiene este campo
-      completed_at: null,
-      order_num: 0,
-      calendar_assignment_id: assignmentId,
+      zone: item.zone || 'Sin zona',
+      task: item.task,
+      completed: item.completed || false,
+      completed_by: item.completed_by || null,
+      completed_at: item.completed_at || null,
+      order_num: item.order_num || 0,
+      calendar_assignment_id: item.calendar_assignment_id,
       house: item.house,
-      assigned_to: item.assigned_to
+      assigned_to: item.employee
     }));
     
     console.log('✅ [Checklist] Items obtenidos:', mappedData.length, 'items para', assignment.type);
