@@ -83,20 +83,21 @@ interface ChecklistProps {
   users?: User[];
 }
 const Checklist = ({ user, users = [] }: ChecklistProps) => {
-      // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
-      useEffect(() => {
-        if (user.house === 'HYNTIBA2 APTO 406') {
-          const plantilla = { cleaning, maintenance };
-          localStorage.setItem('plantilla_checklist_hyntiba2', JSON.stringify(plantilla));
-        }
-      }, [cleaning, maintenance, user.house]);
     // Estado para formulario de tarea manual
     const [taskForm, setTaskForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
     const [editIdx, setEditIdx] = useState<number | null>(null);
     const [editForm, setEditForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
-  const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
-  const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+    const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
+    const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
+    useEffect(() => {
+      if (user.house === 'HYNTIBA2 APTO 406') {
+        const plantilla = { cleaning, maintenance };
+        localStorage.setItem('plantilla_checklist_hyntiba2', JSON.stringify(plantilla));
+      }
+    }, [cleaning, maintenance, user.house]);
 
   // Cargar checklist desde Supabase, pero para HYNTIBA2 no hay carga automática
   const fetchChecklist = async () => {
