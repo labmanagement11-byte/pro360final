@@ -314,7 +314,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
               }
             } else {
               // Agregar nueva tarea
-              const { data, error } = await checklistTable().insert([{ item: taskForm.item, room: taskForm.room, assigned_to: taskForm.assigned_to, house: user.house, complete: false }]).select();
+              const { data, error } = await (checklistTable() as any).insert([{ item: taskForm.item, room: taskForm.room, assigned_to: taskForm.assigned_to, house: user.house, complete: false }]).select();
               if (!error && data && data.length > 0) {
                 if (!taskForm.room || taskForm.room === '' || taskForm.room === 'LIMPIEZA') {
                   setCleaning([...cleaning, data[0]]);
