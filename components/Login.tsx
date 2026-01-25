@@ -77,17 +77,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         } catch (e) { /* ignored */ }
       }
 
-      // 4) Si sigue sin existir, buscar por email en users o profiles
-      if (!record) {
+      // 4) Si sigue sin existir, buscar por email en users o profiles (si tenemos email)
+      const userEmail = authData?.user?.email;
+      if (!record && userEmail) {
         try {
-          const { data: u2 } = await supabase.from('users').select('*').eq('email', authData.user.email).single();
+          const { data: u2 } = await supabase.from('users').select('*').eq('email', userEmail).single();
           if (u2) record = u2;
         } catch (e) { /* ignored */ }
       }
 
-      if (!record) {
+      if (!record && userEmail) {
         try {
-          const { data: p3 } = await supabase.from('profiles').select('*').eq('email', authData.user.email).single();
+          const { data: p3 } = await supabase.from('profiles').select('*').eq('email', userEmail).single();
           if (p3) record = p3;
         } catch (e) { /* ignored */ }
       }
