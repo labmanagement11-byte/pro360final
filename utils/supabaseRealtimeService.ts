@@ -723,16 +723,18 @@ export async function getCleaningChecklistItems(assignmentId: string) {
 export async function updateCleaningChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await (supabase
-    .from('checklist') as any)
+    .from('cleaning_checklist') as any)
     .update({
-      complete: completed,
+      completed: completed,
+      completed_by: completed ? completedBy || null : null,
+      completed_at: completed ? new Date().toISOString() : null,
       updated_at: new Date().toISOString()
     })
     .eq('id', itemId)
     .select();
 
   if (error) {
-    console.error('Error updating checklist item:', error);
+    console.error('❌ [Checklist] Error updating cleaning_checklist item:', error);
     return null;
   }
   return data?.[0] || null;
@@ -750,18 +752,25 @@ export function subscribeToChecklist(assignmentId: string, callback: (data: any)
         {
           event: '*',
           schema: 'public',
-          table: 'cleaning_checklist',
-          filter: `calendar_assignment_id=eq.${assignmentId}`
+          table: 'cleaning_checklist'
         },
         (payload: any) => {
           console.log('⚡ [Checklist Service] Evento recibido:', payload);
-          
+
+          // Determinar si el evento corresponde a esta asignación (soporta legacy calendar_assignment_id y calendar_assignment_id_bigint)
+          const newId = payload?.new?.calendar_assignment_id_bigint ?? payload?.new?.calendar_assignment_id;
+          const oldId = payload?.old?.calendar_assignment_id_bigint ?? payload?.old?.calendar_assignment_id;
+          if (String(newId) !== String(assignmentId) && String(oldId) !== String(assignmentId)) {
+            // No es para esta asignación
+            return;
+          }
+
           const mappedPayload = {
             eventType: payload.eventType,
             new: payload.new,
             old: payload.old
           };
-          
+
           callback(mappedPayload);
         }
       )
@@ -791,19 +800,18 @@ export function subscribeToCleaningChecklistByHouse(house: string, callback: (da
         {
           event: '*',
           schema: 'public',
-          table: 'cleaning_checklist'
+          table: 'cleaning_checklist',
+          filter: `house=eq.${house}`
         },
         (payload: any) => {
-          // Filtrar solo los eventos de esta casa
-          // Necesitamos hacer join con calendar_assignments para obtener la casa
-          console.log('⚡ [Checklist House Service] Evento potencial para:', house, payload);
-          
+          console.log('⚡ [Checklist House Service] Evento recibido para casa:', house, payload);
+
           const mappedPayload = {
             eventType: payload.eventType,
             new: payload.new,
             old: payload.old
           };
-          
+
           callback(mappedPayload);
         }
       )
