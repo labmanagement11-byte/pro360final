@@ -299,7 +299,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
               // Editar tarea existente
               const list = [...cleaning, ...maintenance];
               const tarea = list[editIdx];
-              const { data, error } = await checklistTable().update({ item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to } as Partial<ChecklistItem>).eq('id', tarea.id).select();
+              const { data, error } = await checklistTable<Partial<ChecklistItem>>().update({ item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to }).eq('id', tarea.id).select();
               const updated = data as ChecklistItem[];
               if (!error && updated && updated.length > 0) {
                 if (!editForm.room || editForm.room === '' || editForm.room === 'LIMPIEZA') {
