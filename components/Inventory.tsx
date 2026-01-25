@@ -239,7 +239,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
               }
             } else {
               // Agregar nuevo item
-              const { data, error } = await supabase!.from('inventory').insert([{ name: form.name, room: form.room, quantity: form.quantity, house: houseName, complete: false, missing: 0 }]).select();
+              const { data, error } = await (supabase!.from('inventory') as any).insert([{ name: form.name, room: form.room, quantity: form.quantity, house: houseName, complete: false, missing: 0 }]).select();
               if (!error && data && data.length > 0) {
                 setItemsState([...items, data[0]]);
                 setForm({ name: '', room: ROOMS[0], quantity: 1 });
