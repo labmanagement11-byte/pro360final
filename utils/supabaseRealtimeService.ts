@@ -577,7 +577,7 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
   console.log('📋 [Checklist] Items a insertar:', checklistItems.length);
 
   const itemsToInsert = checklistItems.map(item => ({
-    calendar_assignment_id: assignmentId,
+    calendar_assignment_id_bigint: assignmentId, // non-destructive: write to new bigint FK column
     employee: employee,
     house: house,
     zone: item.zone,
@@ -622,15 +622,36 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
     // Obtener tareas desde la tabla cleaning_checklist vinculadas a la asignación
-    const { data, error } = await (supabase
+    // Primero buscar por calendar_assignment_id_bigint (nueva columna no destructiva)
+    let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignmentId)
+      .eq('calendar_assignment_id_bigint', assignmentId)
       .order('order_num', { ascending: true });
 
     if (error) {
-      console.error('❌ [Checklist] Error fetching cleaning_checklist items:', error);
+      console.error('❌ [Checklist] Error fetching cleaning_checklist items by bigint id:', error);
       return [];
+    }
+
+    // Si no hay resultados con la columna bigint, intentar fallback por employee + house
+    if (!data || data.length === 0) {
+      console.log('⚠️ [Checklist] No items found by bigint id, falling back to employee+house search');
+      const assignmentEmployee = assignment.employee;
+      const assignmentHouse = assignment.house;
+      const fallbackQuery = (supabase
+        .from('cleaning_checklist') as any)
+        .select('*')
+        .eq('employee', assignmentEmployee)
+        .eq('house', assignmentHouse)
+        .order('order_num', { ascending: true });
+
+      const fallbackRes = await fallbackQuery;
+      data = fallbackRes.data || [];
+      if (fallbackRes.error) {
+        console.error('❌ [Checklist] Error fetching fallback cleaning_checklist items:', fallbackRes.error);
+        return [];
+      }
     }
 
     // Mapear campos de cleaning_checklist a los campos que espera el Dashboard
@@ -642,7 +663,8 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       completed_by: item.completed_by || null,
       completed_at: item.completed_at || null,
       order_num: item.order_num || 0,
-      calendar_assignment_id: item.calendar_assignment_id,
+      // preferir calendar_assignment_id_bigint si existe
+      calendar_assignment_id: item.calendar_assignment_id_bigint || item.calendar_assignment_id,
       house: item.house,
       assigned_to: item.employee
     }));
