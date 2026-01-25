@@ -104,7 +104,7 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
       assignmentId = inserted[0].id;
     }
 
-    // Si hay tareas y empleado, crear/actualizar en cleaning_checklist usando la función moderna
+    // Si hay tareas y empleado, crear checklist e inventario automáticamente
     if (assignmentId && form.tasks && form.employee) {
       try {
         await realtimeService.createCleaningChecklistItems(
@@ -115,6 +115,15 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
         );
       } catch (err) {
         console.error('❌ Error creando checklist items modernos:', err);
+      }
+      try {
+        await realtimeService.createAssignmentInventory(
+          assignmentId,
+          form.employee,
+          house
+        );
+      } catch (err) {
+        console.error('❌ Error creando inventario para asignación:', err);
       }
     }
     setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
