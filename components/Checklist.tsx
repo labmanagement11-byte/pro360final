@@ -300,11 +300,12 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
               const list = [...cleaning, ...maintenance];
               const tarea = list[editIdx];
               const { data, error } = await checklistTable().update({ item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to }).eq('id', tarea.id).select();
-              if (!error && data && data.length > 0) {
+              const updated = data as ChecklistItem[];
+              if (!error && updated && updated.length > 0) {
                 if (!editForm.room || editForm.room === '' || editForm.room === 'LIMPIEZA') {
-                  setCleaning(cleaning.map((i, idx) => idx === editIdx ? data[0] : i));
+                  setCleaning(cleaning.map((i, idx) => idx === editIdx ? updated[0] : i));
                 } else {
-                  setMaintenance(maintenance.map((i, idx) => idx === (editIdx - cleaning.length) ? data[0] : i));
+                  setMaintenance(maintenance.map((i, idx) => idx === (editIdx - cleaning.length) ? updated[0] : i));
                 }
                 setEditIdx(null);
                 setEditForm({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
