@@ -56,7 +56,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('username', email.split('@')[0].toLowerCase())
+        .eq('full_name', email.split('@')[0].toLowerCase())
         .single();
 
       if (userError || !userData) {
