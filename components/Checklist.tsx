@@ -120,9 +120,10 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     if (selectedHouse === 'HYNTIBA2 APTO 406') {
       // Para HYNTIBA2, solo mostrar lo que esté en la base (sin predefinidos)
       const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
-      if (!error && data) {
-        setCleaning(data.filter(i => !i.room || i.room === '' || i.room === 'LIMPIEZA'));
-        setMaintenance(data.filter(i => i.room && i.room !== '' && i.room !== 'LIMPIEZA'));
+      const items = data as ChecklistItem[];
+      if (!error && items) {
+        setCleaning(items.filter(i => !i.room || i.room === '' || i.room === 'LIMPIEZA'));
+        setMaintenance(items.filter(i => i.room && i.room !== '' && i.room !== 'LIMPIEZA'));
       } else {
         setCleaning([]);
         setMaintenance([]);
