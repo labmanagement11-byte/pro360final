@@ -1718,24 +1718,46 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           
                           if (result && result.id) {
                             console.log('✅ Asignación creada:', result);
-                            
-                            // Crear los items del checklist para esta asignación
-                            console.log('🧹 Creando items del checklist para asignación:', result.id);
-                            const checklistItems = await realtimeService.createCleaningChecklistItems(
-                              result.id,
-                              newAssignment.employee,
-                              newAssignment.type,  // Pasar el tipo de limpieza
-                              selectedHouse
-                            );
-                            console.log('✅ Checklist creado con', checklistItems.length, 'items');
 
-                            // Crear inventario para la asignación
-                            const inventoryItems = await realtimeService.createAssignmentInventory(
-                              result.id,
-                              newAssignment.employee,
-                              selectedHouse
-                            );
-                            console.log('✅ Inventario creado con', inventoryItems.length, 'items');
+                            // Añadir la asignación al estado local inmediatamente para visibilidad instantánea
+                            setCalendarAssignments(prev => [result, ...(prev || [])]);
+
+                            // Crear los items del checklist para esta asignación
+                            try {
+                              console.log('🧹 Creando items del checklist para asignación:', result.id);
+                              const checklistItems = await realtimeService.createCleaningChecklistItems(
+                                result.id,
+                                newAssignment.employee,
+                                newAssignment.type,  // Pasar el tipo de limpieza
+                                selectedHouse
+                              );
+                              console.log('✅ Checklist creado con', checklistItems.length, 'items');
+                            } catch (err) {
+                              console.error('❌ Error creando checklist items:', err);
+                              alert('Error creando items del checklist. Revisa la consola.');
+                            }
+
+                            // Crear inventario para la asignación (solo si no es Mantenimiento)
+                            if (newAssignment.type !== 'Mantenimiento') {
+                              try {
+                                const inventoryItems = await realtimeService.createAssignmentInventory(
+                                  result.id,
+                                  newAssignment.employee,
+                                  selectedHouse
+                                );
+                                console.log('✅ Inventario creado con', inventoryItems.length, 'items');
+                              } catch (err) {
+                                console.error('❌ Error creando inventario:', err);
+                                alert('Error creando inventario para la asignación. Revisa la consola.');
+                              }
+                            }
+
+                            // Limpiar formulario
+                            setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
+
+                          } else {
+                            console.error('❌ No se pudo crear la asignación:', result);
+                            alert('No se pudo crear la asignación. Revisa la consola para más detalles.');
                           }
                           
                           setNewAssignment({ employee: '', date: '', time: '', type: 'Limpieza regular' });
