@@ -301,7 +301,8 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
               const list = [...cleaning, ...maintenance];
               const tarea = list[editIdx];
               const updateObj: Database["public"]["Tables"]["checklist"]["Update"] = { item: editForm.item, room: editForm.room, assigned_to: editForm.assigned_to };
-              const { data, error } = await checklistTable().update(updateObj).eq('id', tarea.id).select();
+              const table = checklistTable() as ReturnType<typeof checklistTable>;
+              const { data, error } = await table.update(updateObj).eq('id', tarea.id).select();
               const updated = data as ChecklistItem[];
               if (!error && updated && updated.length > 0) {
                 if (!editForm.room || editForm.room === '' || editForm.room === 'LIMPIEZA') {
