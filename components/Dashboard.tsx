@@ -22,19 +22,19 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       const { data } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
-        .eq('employee', user.username)
+        .or(`employee.eq.${user.username},employee_id.eq.${user.id}`)
         .in('type', ['Limpieza', 'Mantenimiento']);
       if (isMounted) setAssignedTasks(data || []);
       setLoading(false);
     };
-    if (user && user.username) {
+    if (user && (user.username || user.id)) {
       fetchAssignedTasks();
       // Suscribirse a cambios en calendar_assignments
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
       }
-      subscriptionRef.current = realtimeService.subscribeToCalendarAssignments(user.username, (payload: any) => {
-        // Refrescar tareas al recibir evento
+      // Suscribirse por ambos campos
+      subscriptionRef.current = realtimeService.subscribeToCalendarAssignments(user.username || String(user.id), (payload: any) => {
         fetchAssignedTasks();
       });
     }
