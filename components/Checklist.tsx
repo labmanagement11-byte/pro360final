@@ -372,8 +372,8 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       .eq('calendar_assignment_id_bigint', assignmentId);
 
     // 3. Reiniciar inventario de la asignación
-    await supabase
-      .from('assignment_inventory')
+    await (supabase
+      .from('assignment_inventory') as any)
       .update({ is_complete: false, checked_by: null, checked_at: null })
       .eq('calendar_assignment_id', assignmentId);
 
