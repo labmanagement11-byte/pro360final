@@ -265,12 +265,12 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, deleteUser, setUser, onLogout }) => {
   // Debug global: mostrar datos principales en la pantalla
-  useEffect(() => {
-    console.log('[Dashboard] Usuario:', user);
-    console.log('[Dashboard] CalendarAssignments:', calendarAssignments);
-    console.log('[Dashboard] TasksList:', tasksList);
-  }, [user, calendarAssignments, tasksList]);
-
+    useEffect(() => {
+      console.log('[Dashboard] Usuario:', user);
+      console.log('[Dashboard] CalendarAssignments:', calendarAssignments);
+      console.log('[Dashboard] TasksList:', tasksList);
+    }, [user, calendarAssignments, tasksList]);
+    
     // Estado para edición de recordatorio
     const [editIdx, setEditIdx] = useState(-1);
   const [view, setView] = useState('home');
