@@ -47,6 +47,11 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       const subUser = realtimeService.subscribeToCalendarAssignments(user.id, (payload: any) => {
         fetchAssignedTasks();
       });
+      // Suscribirse también por username para máxima compatibilidad
+      const subUsername = realtimeService.subscribeToCalendarAssignments(user.username, (payload: any) => {
+        fetchAssignedTasks();
+      });
+      subscriptionRef.current = [subHouse, subUser, subUsername].filter(Boolean);
       subscriptionRef.current = [subHouse, subUser].filter(Boolean);
     }
     return () => {
