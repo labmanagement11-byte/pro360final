@@ -4,17 +4,17 @@ export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (
     console.log('🔔 [Realtime Service] Iniciando suscripción a calendar_assignments para casa:', house);
     const supabase = getSupabaseClient();
     const channel = supabase
-      .channel(`calendar-assignments-changes-house-${house}`)
+      .channel(`calendar-assignments-changes-houseid-${house}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'calendar_assignments',
-          filter: `house=eq.${house}`
+          filter: `house_id=eq.${house}`
         },
         (payload: any) => {
-          console.log('⚡ [Realtime Service] Evento recibido (por casa):', payload);
+          console.log('⚡ [Realtime Service] Evento recibido (por house_id):', payload);
           const mappedPayload = {
             eventType: payload.eventType,
             new: payload.new,
@@ -24,9 +24,9 @@ export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (
         }
       )
       .subscribe((status: any) => {
-        console.log('📡 [Realtime Service] Estado de suscripción (por casa):', status);
+        console.log('📡 [Realtime Service] Estado de suscripción (por house_id):', status);
       });
-    console.log('✅ [Realtime Service] Canal creado (por casa):', channel);
+    console.log('✅ [Realtime Service] Canal creado (por house_id):', channel);
     return channel;
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse (por casa):', error);
