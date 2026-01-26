@@ -334,6 +334,15 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
 
   // Reiniciar checklist (manager/owner)
   const resetChecklist = async () => {
+    // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist si hay assignmentId
+    if (assignmentId) {
+      const supabase = getSupabaseClient();
+      await supabase
+        .from('cleaning_checklist')
+        .update({ completed: false, completed_by: null, completed_at: null })
+        .eq('calendar_assignment_id_bigint', assignmentId);
+    }
+    // Además, reiniciar los ítems legacy si existen
     const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
     const { data, error } = await (checklistTable() as any)
       .update({ complete: false })
