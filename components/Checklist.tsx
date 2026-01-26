@@ -135,7 +135,12 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       setLoading(true);
       // Usar servicio realtime para obtener checklist específico
       const { getCleaningChecklistItems } = await import('../utils/supabaseRealtimeService');
-      const items = await getCleaningChecklistItems(String(assignmentId));
+      let items = await getCleaningChecklistItems(String(assignmentId));
+      // Normalizar: asegurar que todos los items tengan 'complete' (legacy: 'complete', moderno: 'completed')
+      items = items.map((i: any) => ({
+        ...i,
+        complete: typeof i.complete === 'boolean' ? i.complete : (typeof i.completed === 'boolean' ? i.completed : false)
+      }));
       // Separar limpieza y mantenimiento por tipo/zona
       setCleaning(items.filter((i: any) => i.task && (!i.zone || !i.zone.toLowerCase().includes('mantenimiento'))));
       setMaintenance(items.filter((i: any) => i.task && i.zone && i.zone.toLowerCase().includes('mantenimiento')));

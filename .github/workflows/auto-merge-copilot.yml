@@ -1,0 +1,24 @@
+name: Auto Merge Copilot Branch
+
+on:
+  push:
+    branches:
+      - copilot/mushy-dinosaur
+
+jobs:
+  merge-to-main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Git user
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      - name: Merge copilot/mushy-dinosaur into main
+        run: |
+          git checkout main
+          git merge --no-ff copilot/mushy-dinosaur
+          git push origin main
