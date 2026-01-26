@@ -11,10 +11,10 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-      console.log('[AssignedTasksCard] Usuario:', user);
-      console.log('[AssignedTasksCard] Tareas asignadas recibidas:', assignedTasks);
-    }, [assignedTasks, user]);
+  useEffect(() => {
+    console.log('[AssignedTasksCard] Usuario:', user);
+    console.log('[AssignedTasksCard] Tareas asignadas recibidas:', assignedTasks);
+  }, [assignedTasks, user]);
 
   // Mantener referencia a las suscripciones para limpiar (pueden ser varias)
   const subscriptionRef = useRef<any[]>([]);
@@ -28,7 +28,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         .from('calendar_assignments')
         .select('*')
         .eq('house', user.house)
-        .or(`employee.eq.${user.username},employee_id.eq.${user.id}`)
+        .eq('employee', user.username)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
       if (isMounted) setAssignedTasks(data || []);
       setLoading(false);
