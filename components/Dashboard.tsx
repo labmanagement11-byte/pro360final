@@ -72,16 +72,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       'Limpiar las paredes y los guardaescobas de toda la casa.'
     ]
   };
-  const MANTENIMIENTO = {
-    'PISCINA Y AGUA': [
-      'Mantener la piscina limpia y en funcionamiento.',
-      'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.'
-    ],
-    'SISTEMAS ELÉCTRICOS': [
-      'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
-      'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.'
-    ]
-  };
+  // La definición completa de MANTENIMIENTO está más abajo, se usará esa para todas las subtareas.
 
   // Función para obtener subtareas según tipo
   // Estado para progreso de subtareas por tarea
