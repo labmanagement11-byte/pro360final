@@ -90,7 +90,15 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   function getSubtasks(type: string) {
     if (type.toLowerCase().includes('profunda')) return LIMPIEZA_PROFUNDA;
     if (type.toLowerCase().includes('regular')) return LIMPIEZA_REGULAR;
-    if (type.toLowerCase().includes('mantenimiento')) return MANTENIMIENTO;
+    if (type.toLowerCase().includes('mantenimiento')) {
+      // Unir todas las secciones de MANTENIMIENTO en un solo objeto plano (sin duplicados)
+      const allSections = Object.keys(MANTENIMIENTO).filter(z => z !== 'RUTINA DE MANTENIMIENTO');
+      const result: { [zona: string]: string[] } = {};
+      allSections.forEach(zona => {
+        result[zona] = MANTENIMIENTO[zona];
+      });
+      return result;
+    }
     return null;
   }
 
