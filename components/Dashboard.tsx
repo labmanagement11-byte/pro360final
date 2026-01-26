@@ -355,16 +355,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
     // Iniciar con las dos casas correctas (para evitar Hydration errors)
     // Estos valores serán reemplazados por getHouses() tan pronto cargue desde Supabase
-    return (
-      <div className="dashboard-root">
-        {/* Bloque de debug global */}
-        <div style={{margin:'2rem 0', color:'#ccc'}}>
-          <strong>Debug global: Datos principales</strong>
-          <pre style={{fontSize:'0.9rem', background:'#222', padding:'1rem', borderRadius:'8px', maxHeight:'300px', overflow:'auto'}}>
-  {JSON.stringify({user, calendarAssignments, tasksList}, null, 2)}
-          </pre>
-        </div>
-        {/* ...existing code... */}
+    return [
+      { name: 'EPIC D1', tasks: [], inventory: [], users: [] },
+      { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] }
     ];
   });
   // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
