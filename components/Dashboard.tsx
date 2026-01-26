@@ -15,7 +15,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     const fetchAssignedTasks = async () => {
       setLoading(true);
       // Buscar tareas asignadas al usuario logueado (limpieza/mantenimiento)
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
         .eq('employee_id', user.id)
