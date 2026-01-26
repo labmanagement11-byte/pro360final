@@ -62,16 +62,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   };
 
   // Mapas de subtareas por tipo
-  const LIMPIEZA_REGULAR = {
-    'LIMPIEZA GENERAL': [
-      'Barrer y trapear toda la casa.',
-      'Quitar el polvo de todas las superficies y decoración usando un trapo húmedo.',
-      'Limpiar los televisores cuidadosamente sin dejar marcas en la pantalla.',
-      'Revisar zócalos y esquinas para asegurarse de que estén limpios.',
-      'Limpiar telaraña'
-    ],
-    // ... puedes agregar más zonas si lo deseas ...
-  };
+  // La definición completa de LIMPIEZA_REGULAR está más abajo, se usará esa para todas las subtareas.
   const LIMPIEZA_PROFUNDA = {
     'LIMPIEZA PROFUNDA': [
       'Lavar los forros de los muebles (sofás, sillas y cojines).',
