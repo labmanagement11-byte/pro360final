@@ -1305,32 +1305,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
       }
       
-      subscription = realtimeService.subscribeToCalendarAssignments(
-        houseName,
-        (payload: any) => {
-          console.log('⚡ Evento de calendario recibido:', payload);
-          
-          if (payload?.eventType === 'INSERT') {
-            console.log('➕ Nueva asignación insertada:', payload.new);
-            // Si es empleado, solo agregar si es su asignación
-            if (user.role === 'empleado' && payload.new?.employee !== user.username) {
-              console.log('⏭️ Asignación no es para este empleado, ignorando');
-              return;
+      if (user.role === 'empleado') {
+        subscription = realtimeService.subscribeToCalendarAssignments(
+          user.id,
+          (payload: any) => {
+            console.log('⚡ Evento de calendario recibido:', payload);
+            if (payload?.eventType === 'INSERT') {
+              setCalendarAssignments(prev => [...prev, payload.new]);
+            } else if (payload?.eventType === 'UPDATE') {
+              setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+            } else if (payload?.eventType === 'DELETE') {
+              setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
             }
-            setCalendarAssignments(prev => {
-              console.log('📝 Agregando asignación al estado');
-              return [...prev, payload.new];
-            });
-          } else if (payload?.eventType === 'UPDATE') {
-            console.log('✏️ Asignación actualizada:', payload.new);
-            setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
-          } else if (payload?.eventType === 'DELETE') {
-            console.log('🗑️ Asignación eliminada:', payload.old);
-            setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
           }
-        },
-        user.role === 'empleado' ? user.username : undefined
-      );
+        );
+      } else {
+        // Si es manager/owner, puedes suscribirte a todos o implementar lógica similar si lo deseas
+      }
       
       console.log('✅ Suscripción de calendario activa:', subscription);
     } catch (error) {
