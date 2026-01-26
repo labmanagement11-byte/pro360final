@@ -560,11 +560,8 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
       });
     });
   });
-  if (!data || data.length === 0) {
-    console.warn('⚠️ [Checklist] No se insertaron items en cleaning_checklist. assignmentId:', assignmentId, 'itemsToInsert:', itemsToInsert);
-  }
-  console.log('✅ [Checklist] Items creados exitosamente:', data?.length, 'items para assignmentId:', assignmentId);
-  return data || [];
+  // Aquí no se debe usar 'data', solo retornar checklistItems
+  return checklistItems;
 }
 
 export async function getCleaningChecklistItems(assignmentId: string) {
