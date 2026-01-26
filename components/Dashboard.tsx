@@ -40,11 +40,14 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
         subscriptionRef.current = [];
       }
-      // Suscribirse por casa
-      const sub = realtimeService.subscribeToCalendarAssignmentsByHouse(user.house, (payload: any) => {
+      // Suscribirse por casa y por usuario (employee_id) para sincronización en vivo
+      const subHouse = realtimeService.subscribeToCalendarAssignmentsByHouse(user.house_id || user.house, (payload: any) => {
         fetchAssignedTasks();
       });
-      subscriptionRef.current = sub ? [sub] : [];
+      const subUser = realtimeService.subscribeToCalendarAssignments(user.id, (payload: any) => {
+        fetchAssignedTasks();
+      });
+      subscriptionRef.current = [subHouse, subUser].filter(Boolean);
     }
     return () => {
       isMounted = false;
