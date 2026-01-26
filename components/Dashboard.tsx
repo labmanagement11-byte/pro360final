@@ -137,19 +137,20 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     const current = subtaskProgress[taskId] ? [...subtaskProgress[taskId]] : [];
     current[idx] = checked;
     // Buscar si ya existe registro
-    const { data: existing, error } = await supabase
+    if (!supabase) return;
+    const { data: existing, error } = await (supabase as any)
       .from('subtask_progress')
       .select('id')
       .eq('assignment_id', taskId)
       .eq('user_id', user.id)
       .maybeSingle();
     if (existing && existing.id) {
-      await supabase
+      await (supabase as any)
         .from('subtask_progress')
         .update({ subtasks_progress: current, updated_at: new Date().toISOString() })
         .eq('id', existing.id);
     } else {
-      await supabase
+      await (supabase as any)
         .from('subtask_progress')
         .insert({
           assignment_id: taskId,
