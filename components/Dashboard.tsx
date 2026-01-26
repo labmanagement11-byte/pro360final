@@ -5,6 +5,57 @@ import './Dashboard.css';
 import * as realtimeService from '../utils/supabaseRealtimeService';
 
 import Tasks from './Tasks';
+
+// Tarjeta personalizada para tareas asignadas
+const AssignedTasksCard = ({ user }: { user: any }) => {
+  const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAssignedTasks = async () => {
+      setLoading(true);
+      // Buscar tareas asignadas al usuario logueado (limpieza/mantenimiento)
+      const { data, error } = await supabase
+        .from('calendar_assignments')
+        .select('*')
+        .eq('employee_id', user.id)
+        .in('type', ['Limpieza', 'Mantenimiento']);
+      setAssignedTasks(data || []);
+      setLoading(false);
+    };
+    if (user && user.id) fetchAssignedTasks();
+  }, [user]);
+
+  const markTaskComplete = async (assignmentId: string) => {
+    // @ts-ignore
+    await supabase.from('calendar_assignments').update({ completed: true }).eq('id', assignmentId);
+    setAssignedTasks(tasks => tasks.map(t => t.id === assignmentId ? { ...t, completed: true } : t));
+  };
+
+  return (
+    <div className="dashboard-assigned-tasks-modal">
+      <h2>Tareas Asignadas</h2>
+      {loading ? (
+        <p>Cargando tareas...</p>
+      ) : assignedTasks.length === 0 ? (
+        <p>No tienes tareas asignadas.</p>
+      ) : (
+        <ul className="dashboard-assigned-tasks-list">
+          {assignedTasks.map(task => (
+            <li key={task.id} className={task.completed ? 'completed' : ''}>
+              <span>{task.type}: {task.title || task.description || task.date}</span>
+              {task.completed ? (
+                <span className="dashboard-task-completed">✅ Completada</span>
+              ) : (
+                <button className="dashboard-btn" onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 import Inventory from './Inventory';
 import Checklist from './Checklist';
 import Users from './Users';
@@ -1327,16 +1378,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {view === 'home' && (
         <>
           <div className="dashboard-cards">
+            {/* Tarjeta personalizada para tareas asignadas (solo empleados) */}
+            {user.role === 'empleado' && (
+              <button
+                className="dashboard-card"
+                onClick={() => setSelectedModalCard('assignedTasks')}
+                aria-label="Tareas Asignadas"
+              >
+                <span className="dashboard-card-title">Tareas Asignadas</span>
+                <span className="dashboard-card-desc">Tareas de limpieza o mantenimiento asignadas por el manager</span>
+              </button>
+            )}
             {cards.filter(card => card.show).map(card => (
               <button
                 key={card.key}
                 className="dashboard-card"
                 onClick={() => {
-                  // Para calendar, shopping, reminders: mostrar modal
                   if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks', 'extraTasks'].includes(card.key)) {
                     setSelectedModalCard(card.key);
                   } else {
-                    // Para los demás: cambiar vista
                     setView(card.key);
                   }
                 }}
@@ -1978,6 +2038,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 </>
               )}
               
+              {selectedModalCard === 'assignedTasks' && (
+                <AssignedTasksCard user={user} />
+              )}
               {selectedModalCard === 'shopping' && (
                 <>
                   {/* Formulario para agregar productos */}
