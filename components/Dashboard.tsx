@@ -76,21 +76,31 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   // Función para obtener subtareas según tipo
   // Estado para progreso de subtareas por tarea
-  const [subtaskProgress, setSubtaskProgress] = useState<{ [taskId: string]: boolean[] }>({});
+  // Para managers: progreso por tarea y usuario (assignment_id + user_id)
+  const [subtaskProgress, setSubtaskProgress] = useState<{ [key: string]: boolean[] }>({});
 
   // Cargar progreso de subtareas desde Supabase al iniciar
   useEffect(() => {
-    if (!user || !user.id) return;
+    if (!user || !user.id || !user.house) return;
+    const isManager = user.role && user.role.toLowerCase().includes('manager');
     const fetchProgress = async () => {
       if (!supabase) return;
-      const { data, error } = await (supabase as any)
+      let query = (supabase as any)
         .from('subtask_progress')
-        .select('assignment_id, subtasks_progress')
-        .eq('user_id', user.id);
+        .select('assignment_id, user_id, subtasks_progress');
+      if (isManager) {
+        // Para managers: traer todos los progresos de la casa
+        query = query.eq('house_id', user.house_id || user.house);
+      } else {
+        // Para empleados: solo su propio progreso
+        query = query.eq('user_id', user.id);
+      }
+      const { data, error } = await query;
       if (!error && data) {
-        const progressMap: { [taskId: string]: boolean[] } = {};
+        const progressMap: { [key: string]: boolean[] } = {};
         data.forEach((row: any) => {
-          progressMap[row.assignment_id] = row.subtasks_progress;
+          const key = isManager ? `${row.assignment_id}_${row.user_id}` : row.assignment_id;
+          progressMap[key] = row.subtasks_progress;
         });
         setSubtaskProgress(progressMap);
       }
@@ -101,8 +111,15 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     if (!supabase) return;
     const channel = (supabase as any).channel('subtask_progress_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subtask_progress' }, (payload: any) => {
-        if (payload.new && payload.new.user_id === user.id) {
-          setSubtaskProgress(prev => ({ ...prev, [payload.new.assignment_id]: payload.new.subtasks_progress }));
+        if (!payload.new) return;
+        if (isManager) {
+          if (payload.new.house_id === (user.house_id || user.house)) {
+            setSubtaskProgress(prev => ({ ...prev, [`${payload.new.assignment_id}_${payload.new.user_id}`]: payload.new.subtasks_progress }));
+          }
+        } else {
+          if (payload.new.user_id === user.id) {
+            setSubtaskProgress(prev => ({ ...prev, [payload.new.assignment_id]: payload.new.subtasks_progress }));
+          }
         }
       })
       .subscribe();
@@ -193,7 +210,9 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
               {tasks.map((task: any) => {
                 const subtasksMap = getSubtasks(task.type || '');
                 const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
-                const progressArr = subtaskProgress[task.id] || Array(allSubtasks.length).fill(false);
+                // Para managers: clave es assignment_id + user_id
+                const progressKey = isManager ? `${task.id}_${task.user_id || task.employee_id || task.employee}` : task.id;
+                const progressArr = subtaskProgress[progressKey] || Array(allSubtasks.length).fill(false);
                 const completedCount = progressArr.filter(Boolean).length;
                 const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
                 const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
