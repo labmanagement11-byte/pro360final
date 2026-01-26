@@ -71,18 +71,63 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
           <p>No tienes tareas asignadas.</p>
         </div>
       ) : (
-        <ul className="dashboard-assigned-tasks-list">
+        <div className="assigned-tasks-list-modern">
           {assignedTasks.map(task => (
-            <li key={task.id} className={task.completed ? 'completed' : ''}>
-              <span>{task.type}: {task.title || task.description || task.date}</span>
-              {task.completed ? (
-                <span className="dashboard-task-completed">✅ Completada</span>
-              ) : (
-                <button className="dashboard-btn" onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
-              )}
-            </li>
+            <div key={task.id} className={`assigned-task-card ${task.completed ? 'completed' : 'incomplete'}`} style={{
+              background: task.completed ? '#e0f7e9' : '#fff8e1',
+              border: task.completed ? '2px solid #22c55e' : '2px solid #fbbf24',
+              borderRadius: '12px',
+              marginBottom: '1.2rem',
+              padding: '1.2rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1.5rem',
+              transition: 'background 0.2s, border 0.2s'
+            }}>
+              <div style={{flex: 1}}>
+                <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
+                <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
+                  {task.title || task.description || ''}
+                </div>
+                <div style={{fontSize: '0.95rem', color: '#64748b'}}>
+                  Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
+                </div>
+                <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
+                  Estado: {task.completed ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
+                </div>
+              </div>
+              <div>
+                {task.completed ? (
+                  <button style={{
+                    background: '#22c55e',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.7rem 1.2rem',
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    cursor: 'not-allowed',
+                    opacity: 0.7
+                  }} disabled>Completada</button>
+                ) : (
+                  <button style={{
+                    background: '#fbbf24',
+                    color: '#222',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.7rem 1.2rem',
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                  }} onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
+                )}
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
       {/* Bloque de debug siempre visible */}
       <div style={{marginTop:'2rem', color:'#ccc'}}>
