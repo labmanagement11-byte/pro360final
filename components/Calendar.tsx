@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaCalendarAlt, FaUser, FaTasks, FaClock, FaBoxOpen, FaTrash } from 'react-icons/fa';
 import { supabase } from '../utils/supabaseClient';
 import * as realtimeService from '../utils/supabaseRealtimeService';
+import Checklist from './Checklist';
 
 const CALENDAR_KEY = 'dashboard_calendar'; // legacy, no longer used
 
@@ -27,6 +28,7 @@ interface User {
   username: string;
   role: string;
   house?: string; // Casa asignada (opcional)
+  password?: string; // Opcional para compatibilidad con Checklist
 }
 interface CalendarProps {
   users: User[];
@@ -44,6 +46,9 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
     tasks: '',
     inventory: '',
   });
+  // Modal para mostrar checklist de asignación seleccionada
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
 
   // Cargar eventos desde Supabase
   const fetchEvents = async (house: string = 'EPIC D1') => {
@@ -104,8 +109,8 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
       assignmentId = inserted[0].id;
     }
 
-    // Si hay tareas y empleado, crear checklist e inventario automáticamente
-    if (assignmentId && form.tasks && form.employee) {
+    // Crear checklist e inventario automáticamente si hay empleado y tipo
+    if (assignmentId && form.employee && form.type) {
       try {
         await realtimeService.createCleaningChecklistItems(
           assignmentId,
@@ -190,9 +195,19 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
               <span className="calendar-event-icon"><FaBoxOpen /></span>
               <span className="calendar-event-inventory">{ev.inventory}</span>
             </div>
+            <button className="calendar-btn main" onClick={() => { setSelectedAssignmentId(ev.id!); setShowChecklistModal(true); }}>Ver Checklist</button>
             {canEdit && <button className="calendar-btn danger" onClick={() => deleteEvent(ev.id!)} title="Eliminar"><FaTrash /></button>}
           </div>
         ))}
+        {/* Modal Checklist */}
+        {showChecklistModal && selectedAssignmentId && (
+          <div className="calendar-modal-overlay" style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(0,0,0,0.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div className="calendar-modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'1rem',minWidth:'350px',maxWidth:'90vw',maxHeight:'90vh',overflowY:'auto',position:'relative'}}>
+              <button style={{position:'absolute',top:10,right:10,fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>setShowChecklistModal(false)}>✕</button>
+              <Checklist user={{...user, password: user.password ?? ''}} assignmentId={selectedAssignmentId} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

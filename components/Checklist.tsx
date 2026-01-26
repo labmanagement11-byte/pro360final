@@ -82,8 +82,9 @@ interface ChecklistItem {
 interface ChecklistProps {
   user: User;
   users?: User[];
+  assignmentId?: number | string;
 }
-const Checklist = ({ user, users = [] }: ChecklistProps) => {
+const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     // Estado para formulario de tarea manual
     const [taskForm, setTaskForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
     const [editIdx, setEditIdx] = useState<number | null>(null);
@@ -91,6 +92,7 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
     const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
     const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [assignmentType, setAssignmentType] = useState<string | null>(null);
     // Nuevo: tipo de asignación activa para el empleado
     const [activeAssignmentType, setActiveAssignmentType] = useState<string | null>(null);
 
@@ -123,8 +125,20 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
       fetchAssignmentType();
     }, [user.username, user.house, user.role]);
 
-  // Cargar checklist desde Supabase, pero para HYNTIBA2 no hay carga automática
+  // Cargar checklist por assignmentId si está presente, si no, por casa/usuario
   const fetchChecklist = async () => {
+    if (assignmentId) {
+      setLoading(true);
+      // Usar servicio realtime para obtener checklist específico
+      const { getCleaningChecklistItems } = await import('../utils/supabaseRealtimeService');
+      const items = await getCleaningChecklistItems(String(assignmentId));
+      // Separar limpieza y mantenimiento por tipo/zona
+      setCleaning(items.filter((i: any) => i.task && (!i.zone || !i.zone.toLowerCase().includes('mantenimiento'))));
+      setMaintenance(items.filter((i: any) => i.task && i.zone && i.zone.toLowerCase().includes('mantenimiento')));
+      setAssignmentType(items.length > 0 && items[0].assignment_type ? items[0].assignment_type : null);
+      setLoading(false);
+      return;
+    }
     let selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
     // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
     if (selectedHouse === 'HYNTIBA2 APTO 406') {
@@ -189,12 +203,29 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
 
     if (!supabase) return;
 
+    // Si hay assignmentId, suscribirse a cambios solo de esa asignación
+    if (assignmentId) {
+      const channel = supabase
+        .channel(`checklist-changes-assignment-${assignmentId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'cleaning_checklist',
+          filter: `calendar_assignment_id_bigint=eq.${assignmentId}`
+        }, (payload: any) => {
+          console.log('⚡ [Checklist] Cambio realtime en asignación:', assignmentId, payload);
+          fetchChecklist();
+        })
+        .subscribe((status) => {
+          console.log('📡 [Checklist] Estado de suscripción assignment:', status);
+        });
+      return () => {
+        channel.unsubscribe();
+      };
+    }
+
+    // Si no, mantener suscripción por casa (flujo anterior)
     const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
-    console.log('📋 [Checklist] Iniciando suscripción realtime para casa:', selectedHouse);
-    
-    // Suscripción realtime a cambios en checklist de esta casa
-    // El canal se filtra por casa para que todos los managers y empleados de la misma casa
-    // vean los cambios en tiempo real cuando se agrega, edita o completa una tarea
     const channel = supabase
       .channel(`checklist-changes-${selectedHouse}`)
       .on('postgres_changes', { 
@@ -209,18 +240,15 @@ const Checklist = ({ user, users = [] }: ChecklistProps) => {
           house: payload.new?.house || payload.old?.house,
           usuario: user.username
         });
-        
-        // Refrescar el checklist cuando hay cambios (INSERT, UPDATE, DELETE)
         fetchChecklist();
       })
       .subscribe((status) => {
         console.log('📡 [Checklist] Estado de suscripción:', status);
       });
-
     return () => {
       channel.unsubscribe();
     };
-  }, [user]);
+  }, [user, assignmentId]);
 
   // Asignar tarea a usuario (manager/owner)
   const handleAssign = async (taskId: number, assignedTo: string) => {

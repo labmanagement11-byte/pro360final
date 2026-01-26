@@ -440,7 +440,7 @@ export function subscribeToCalendarAssignments(house: string = 'HYNTIBA2 APTO 40
 export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
   
-  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId, 'Tipo:', assignmentType);
+  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId, 'Tipo:', assignmentType, 'Empleado:', employee, 'Casa:', house);
   
   // Listas de limpieza por tipo
   const LIMPIEZA_REGULAR: Record<string, string[]> = {
@@ -576,15 +576,26 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
 
   console.log('📋 [Checklist] Items a insertar:', checklistItems.length);
 
-  const itemsToInsert = checklistItems.map(item => ({
-    calendar_assignment_id_bigint: assignmentId, // non-destructive: write to new bigint FK column
-    employee: employee,
-    house: house,
-    zone: item.zone,
-    task: item.task,
-    completed: false,
-    order_num: item.order
-  }));
+  const now = new Date().toISOString();
+  // Nunca incluir 'id' en el insert
+  const itemsToInsert = checklistItems.map(item => {
+    const obj = {
+      calendar_assignment_id: assignmentId,
+      employee: employee,
+      house: house,
+      zone: item.zone,
+      task: item.task,
+      completed: false,
+      order_num: item.order,
+      completed_at: null,
+      completed_by: null,
+      created_at: now,
+      updated_at: now
+    };
+    // Eliminar cualquier campo id por si acaso
+    if ('id' in obj) delete obj.id;
+    return obj;
+  });
 
   console.log('📝 [Checklist] Items formateados para insertar:', itemsToInsert);
 
@@ -594,11 +605,18 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
     .select();
 
   if (error) {
-    console.error('❌ [Checklist] Error creating checklist items:', error);
+    // Log detallado del error
+    try {
+      console.error('❌ [Checklist] Error creating checklist items:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
+    } catch (e) {
+      console.error('❌ [Checklist] Error creating checklist items (raw):', error, '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
+    }
     return [];
   }
-  
-  console.log('✅ [Checklist] Items creados exitosamente:', data?.length, 'items');
+  if (!data || data.length === 0) {
+    console.warn('⚠️ [Checklist] No se insertaron items en cleaning_checklist. assignmentId:', assignmentId, 'itemsToInsert:', itemsToInsert);
+  }
+  console.log('✅ [Checklist] Items creados exitosamente:', data?.length, 'items para assignmentId:', assignmentId);
   return data || [];
 }
 
@@ -1001,7 +1019,7 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
 export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
   
-  console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId);
+  console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId, 'Empleado:', employee, 'Casa:', house);
   
   // Obtener template
   const template = await getInventoryTemplate(house);
@@ -1011,16 +1029,26 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
     return [];
   }
 
-  // Crear items basados en el template
-  const itemsToInsert = template.map((item: any) => ({
-    calendar_assignment_id: assignmentId,
-    employee: employee,
-    house: house,
-    item_name: item.item_name,
-    quantity: item.quantity,
-    category: item.category,
-    is_complete: false
-  }));
+  // Crear items basados en el template, nunca incluir 'id'
+  const now = new Date().toISOString();
+  const itemsToInsert = template.map((item: any) => {
+    const obj = {
+      calendar_assignment_id: assignmentId,
+      employee: employee,
+      house: house,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      category: item.category,
+      is_complete: false,
+      notes: null,
+      checked_by: null,
+      checked_at: null,
+      created_at: now,
+      updated_at: now
+    };
+    if ('id' in obj) delete obj.id;
+    return obj;
+  });
 
   console.log('📝 [Assignment Inventory] Insertando', itemsToInsert.length, 'items');
 
@@ -1030,11 +1058,17 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
     .select();
 
   if (error) {
-    console.error('❌ [Assignment Inventory] Error creating:', error);
+    try {
+      console.error('❌ [Assignment Inventory] Error creating:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
+    } catch (e) {
+      console.error('❌ [Assignment Inventory] Error creating (raw):', error, '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
+    }
     return [];
   }
-  
-  console.log('✅ [Assignment Inventory] Items creados:', data?.length);
+  if (!data || data.length === 0) {
+    console.warn('⚠️ [Assignment Inventory] No se insertaron items en assignment_inventory. assignmentId:', assignmentId, 'itemsToInsert:', itemsToInsert);
+  }
+  console.log('✅ [Assignment Inventory] Items creados:', data?.length, 'para assignmentId:', assignmentId);
   return data || [];
 }
 
@@ -1616,17 +1650,20 @@ export async function getUsers() {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
-      .from('app_users') as any)
-      .select('*')
-      .order('username', { ascending: true });
-    
+      .from('users') as any)
+      .select('id, correo, rol, property_id, created_at')
+      .order('correo', { ascending: true });
+
     if (error) {
       console.error('Error fetching users:', error);
       return [];
     }
     return (data || []).map((u: any) => ({
-      ...u,
-      house: u.house_name
+      id: u.id,
+      username: u.correo,
+      role: u.rol,
+      house: u.property_id,
+      created_at: u.created_at
     }));
   } catch (error) {
     console.error('Exception fetching users:', error);
