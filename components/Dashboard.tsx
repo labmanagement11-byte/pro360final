@@ -35,9 +35,10 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         subscriptionRef.current = [];
       }
       // Suscribirse por ambos campos
-      subscriptionRef.current = realtimeService.subscribeToCalendarAssignments(user.username || String(user.id), (payload: any) => {
+      const subs = realtimeService.subscribeToCalendarAssignments(user.username || String(user.id), (payload: any) => {
         fetchAssignedTasks();
       });
+      subscriptionRef.current = Array.isArray(subs) ? subs : [];
     }
     return () => {
       isMounted = false;
