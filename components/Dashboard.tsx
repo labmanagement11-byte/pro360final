@@ -1305,9 +1305,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
       }
       
-      if (user.role === 'empleado') {
+      if (user.role === 'empleado' && user.id !== undefined) {
         subscription = realtimeService.subscribeToCalendarAssignments(
-          user.id,
+          String(user.id),
           (payload: any) => {
             console.log('⚡ Evento de calendario recibido:', payload);
             if (payload?.eventType === 'INSERT') {
