@@ -350,7 +350,10 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     if (!assignmentId) return;
     const supabase = getSupabaseClient();
     await supabase
-      .from<Database['public']['Tables']['calendar_assignments']['Row']>('calendar_assignments')
+      .from<
+        Database['public']['Tables']['calendar_assignments']['Row'],
+        Database['public']['Tables']['calendar_assignments']['Insert']
+      >('calendar_assignments')
       .update({ completed: true })
       .eq('id', assignmentId);
     setShowManagerConfirmMsg(true);
