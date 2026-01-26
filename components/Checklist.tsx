@@ -95,6 +95,10 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     const [assignmentType, setAssignmentType] = useState<string | null>(null);
     // Nuevo: tipo de asignación activa para el empleado
     const [activeAssignmentType, setActiveAssignmentType] = useState<string | null>(null);
+    // Confirmación visual al completar tarea
+    const [showCompleteMsg, setShowCompleteMsg] = useState(false);
+    // Confirmación visual para manager
+    const [showManagerConfirmMsg, setShowManagerConfirmMsg] = useState(false);
 
     // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
     useEffect(() => {
@@ -303,8 +307,9 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       .eq('id', item.id)
       .select();
     if (!error && data && data.length > 0) {
-      console.log('✅ [Checklist] Item actualizado y será sincronizado a todos');
       setCleaning(cleaning.map((i, iidx) => iidx === idx ? data[0] : i));
+      setShowCompleteMsg(true);
+      setTimeout(() => setShowCompleteMsg(false), 1500);
     } else {
       console.error('❌ [Checklist] Error actualizando:', error);
     }
@@ -319,8 +324,9 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       .eq('id', item.id)
       .select();
     if (!error && data && data.length > 0) {
-      console.log('✅ [Checklist] Item de mantenimiento actualizado y será sincronizado a todos');
       setMaintenance(maintenance.map((i, iidx) => iidx === idx ? data[0] : i));
+      setShowCompleteMsg(true);
+      setTimeout(() => setShowCompleteMsg(false), 1500);
     } else {
       console.error('❌ [Checklist] Error actualizando mantenimiento:', error);
     }
@@ -338,6 +344,16 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     }
   };
 
+  // Confirmar checklist completo (manager)
+  const confirmAllCompleted = async () => {
+    // Aquí podrías actualizar el estado de la asignación en calendar_assignments (ej: completed=true)
+    if (!assignmentId) return;
+    const supabase = getSupabaseClient();
+    await supabase.from('calendar_assignments').update({ completed: true }).eq('id', assignmentId);
+    setShowManagerConfirmMsg(true);
+    setTimeout(() => setShowManagerConfirmMsg(false), 2000);
+  };
+
   return (
     <div className="checklist-list ultra-checklist">
       <h2 className="ultra-checklist-title">Checklist {user.house}</h2>
@@ -351,6 +367,9 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       {/* Mostrar solo lo que corresponde según tipo de asignación activa para empleados */}
       {!loading && user.role === 'empleado' && (
         <>
+          {showCompleteMsg && (
+            <div style={{background:'#d1fae5',color:'#065f46',padding:'8px',borderRadius:'8px',marginBottom:'10px',textAlign:'center'}}>¡Tarea marcada como completada!</div>
+          )}
           {activeAssignmentType && (activeAssignmentType.toLowerCase().includes('mantenimiento')) ? (
             // Solo mantenimiento
             <div className="ultra-checklist-section">
@@ -390,11 +409,18 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         </>
       )}
 
-      {/* Para managers/owners, mostrar ambas secciones y botón de reinicio */}
+      {/* Para managers/owners, mostrar ambas secciones y botón de reinicio y confirmación */}
       {!loading && (user.role === 'owner' || user.role === 'manager') && (
         <>
           {/* ...existing code para managers/owners... */}
           <button onClick={resetChecklist} className="ultra-reset-btn">Reiniciar Checklist</button>
+          {/* Botón para confirmar checklist completo si todas las tareas están completas */}
+          {cleaning.length > 0 && cleaning.every(i => i.complete) && maintenance.every(i => i.complete) && (
+            <button onClick={confirmAllCompleted} className="ultra-confirm-btn" style={{marginLeft:'1rem',background:'#2563eb',color:'#fff',padding:'8px 16px',borderRadius:'8px'}}>Confirmar trabajo completado</button>
+          )}
+          {showManagerConfirmMsg && (
+            <div style={{background:'#dbeafe',color:'#1e40af',padding:'8px',borderRadius:'8px',marginTop:'10px',textAlign:'center'}}>¡Checklist confirmado como completado!</div>
+          )}
         </>
       )}
     </div>
