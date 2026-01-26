@@ -98,7 +98,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     fetchProgress();
 
     // Suscripción realtime a cambios en subtask_progress
-    const channel = supabase.channel('subtask_progress_changes')
+    if (!supabase) return;
+    const channel = (supabase as any).channel('subtask_progress_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subtask_progress' }, (payload: any) => {
         if (payload.new && payload.new.user_id === user.id) {
           setSubtaskProgress(prev => ({ ...prev, [payload.new.assignment_id]: payload.new.subtasks_progress }));
@@ -106,7 +107,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       })
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) supabase.removeChannel(channel);
     };
   }, [user]);
 
