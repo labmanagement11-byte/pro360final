@@ -364,7 +364,7 @@ const LIMPIEZA_PROFUNDA = {
   ]
 };
 
-const MANTENIMIENTO = {
+const MANTENIMIENTO: { [zona: string]: string[] } = {
   'PISCINA Y AGUA': [
     'Mantener la piscina limpia y en funcionamiento.',
     'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.'
