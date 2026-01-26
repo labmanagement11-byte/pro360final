@@ -1,3 +1,36 @@
+// ==================== CALENDAR ASSIGNMENTS REALTIME ====================
+export function subscribeToCalendarAssignments(employeeId: string, callback: (data: any) => void) {
+  try {
+    console.log('🔔 [Realtime Service] Iniciando suscripción a calendar_assignments para empleado:', employeeId);
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel(`calendar-assignments-changes-${employeeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_assignments',
+          filter: `employee_id=eq.${employeeId}`
+        },
+        (payload: any) => {
+          console.log('⚡ [Realtime Service] Evento recibido:', payload);
+          callback({
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          });
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Realtime Service] Estado de suscripción:', status);
+      });
+    return channel;
+  } catch (error) {
+    console.error('❌ [Realtime Service] Error al suscribirse:', error);
+    return null;
+  }
+}
 import { getSupabaseClient } from './supabaseClient';
 
 // Helper para normalizar campos snake_case -> camelCase

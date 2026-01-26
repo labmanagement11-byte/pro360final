@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
@@ -11,19 +11,40 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Mantener referencia a la suscripción para limpiar
+  const subscriptionRef = useRef<any>(null);
+
+  // Cargar tareas y suscribirse en tiempo real
   useEffect(() => {
+    let isMounted = true;
     const fetchAssignedTasks = async () => {
       setLoading(true);
-      // Buscar tareas asignadas al usuario logueado (limpieza/mantenimiento)
-      const { data, error } = await (supabase as any)
+      const { data } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
         .eq('employee_id', user.id)
         .in('type', ['Limpieza', 'Mantenimiento']);
-      setAssignedTasks(data || []);
+      if (isMounted) setAssignedTasks(data || []);
       setLoading(false);
     };
-    if (user && user.id) fetchAssignedTasks();
+    if (user && user.id) {
+      fetchAssignedTasks();
+      // Suscribirse a cambios en calendar_assignments
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+      subscriptionRef.current = realtimeService.subscribeToCalendarAssignments(user.id, (payload: any) => {
+        // Refrescar tareas al recibir evento
+        fetchAssignedTasks();
+      });
+    }
+    return () => {
+      isMounted = false;
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+    };
   }, [user]);
 
   const markTaskComplete = async (assignmentId: string) => {
