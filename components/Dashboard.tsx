@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../utils/supabaseClient';
 import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
@@ -76,7 +77,38 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   // Función para obtener subtareas según tipo
   // Estado para progreso de subtareas por tarea
-  const [subtaskProgress, setSubtaskProgress] = useState<{ [taskId: number]: boolean[] }>({});
+  const [subtaskProgress, setSubtaskProgress] = useState<{ [taskId: string]: boolean[] }>({});
+
+  // Cargar progreso de subtareas desde Supabase al iniciar
+  useEffect(() => {
+    if (!user || !user.id) return;
+    const fetchProgress = async () => {
+      const { data, error } = await supabase
+        .from('subtask_progress')
+        .select('assignment_id, subtasks_progress')
+        .eq('user_id', user.id);
+      if (!error && data) {
+        const progressMap: { [taskId: string]: boolean[] } = {};
+        data.forEach((row: any) => {
+          progressMap[row.assignment_id] = row.subtasks_progress;
+        });
+        setSubtaskProgress(progressMap);
+      }
+    };
+    fetchProgress();
+
+    // Suscripción realtime a cambios en subtask_progress
+    const channel = supabase.channel('subtask_progress_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtask_progress' }, (payload: any) => {
+        if (payload.new && payload.new.user_id === user.id) {
+          setSubtaskProgress(prev => ({ ...prev, [payload.new.assignment_id]: payload.new.subtasks_progress }));
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   function getSubtasks(type: string) {
     if (type.toLowerCase().includes('profunda')) return LIMPIEZA_PROFUNDA;
@@ -94,13 +126,38 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   }
 
   // Guardar progreso de subtareas en Supabase (puedes mejorar esto usando una tabla aparte si lo deseas)
-  async function handleSubtaskToggle(taskId: number, idx: number, checked: boolean) {
+  async function handleSubtaskToggle(taskId: string, idx: number, checked: boolean) {
     setSubtaskProgress(prev => {
       const arr = prev[taskId] ? [...prev[taskId]] : [];
       arr[idx] = checked;
       return { ...prev, [taskId]: arr };
     });
-    // Aquí podrías guardar el progreso en Supabase si lo deseas
+    // Guardar progreso en Supabase
+    const current = subtaskProgress[taskId] ? [...subtaskProgress[taskId]] : [];
+    current[idx] = checked;
+    // Buscar si ya existe registro
+    const { data: existing, error } = await supabase
+      .from('subtask_progress')
+      .select('id')
+      .eq('assignment_id', taskId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (existing && existing.id) {
+      await supabase
+        .from('subtask_progress')
+        .update({ subtasks_progress: current, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('subtask_progress')
+        .insert({
+          assignment_id: taskId,
+          user_id: user.id,
+          house_id: user.house_id || null,
+          subtasks_progress: current,
+          updated_at: new Date().toISOString(),
+        });
+    }
   }
 
   // Si el usuario es manager, mostrar todas las tareas de todos los empleados
