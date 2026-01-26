@@ -602,7 +602,10 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
       checklistItems.push({
         zone: zone,
         task: task,
-  }
+        order: index
+      });
+    });
+  });
   if (!data || data.length === 0) {
     console.warn('⚠️ [Checklist] No se insertaron items en cleaning_checklist. assignmentId:', assignmentId, 'itemsToInsert:', itemsToInsert);
   }
