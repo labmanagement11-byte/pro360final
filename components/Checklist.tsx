@@ -349,9 +349,9 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     // Aquí podrías actualizar el estado de la asignación en calendar_assignments (ej: completed=true)
     if (!assignmentId) return;
     const supabase = getSupabaseClient();
-    // @ts-ignore
     await supabase
       .from('calendar_assignments')
+      // @ts-ignore
       .update({ completed: true })
       .eq('id', assignmentId);
     setShowManagerConfirmMsg(true);
