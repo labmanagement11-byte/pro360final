@@ -366,8 +366,8 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       .eq('id', assignmentId);
 
     // 2. Reiniciar checklist de limpieza/mantenimiento
-    await supabase
-      .from('cleaning_checklist')
+    await (supabase
+      .from('cleaning_checklist') as any)
       .update({ completed: false, completed_by: null, completed_at: null })
       .eq('calendar_assignment_id_bigint', assignmentId);
 
