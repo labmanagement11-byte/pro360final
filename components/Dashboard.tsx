@@ -113,105 +113,135 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     // Aquí podrías guardar el progreso en Supabase si lo deseas
   }
 
+  // Si el usuario es manager, mostrar todas las tareas de todos los empleados
+  const isManager = user.role && user.role.toLowerCase().includes('manager');
+  const groupedTasks = isManager
+    ? assignedTasks.reduce((acc: any, t: any) => {
+        if (!acc[t.employee]) acc[t.employee] = [];
+        acc[t.employee].push(t);
+        return acc;
+      }, {})
+    : { [user.username]: assignedTasks };
+
   return (
     <div className="dashboard-assigned-tasks-modal">
-      <h2>Tareas Asignadas</h2>
+      <h2>{isManager ? 'Progreso de Tareas de Empleados' : 'Tareas Asignadas'}</h2>
       {loading ? (
         <p>Cargando tareas...</p>
-      ) : assignedTasks.length === 0 ? (
+      ) : Object.keys(groupedTasks).length === 0 ? (
         <div>
-          <p>No tienes tareas asignadas.</p>
+          <p>No hay tareas asignadas.</p>
         </div>
       ) : (
         <div className="assigned-tasks-list-modern">
-          {assignedTasks.map(task => {
-            const subtasksMap = getSubtasks(task.type || '');
-            // Unificar todas las subtareas en un solo array para progreso
-            const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
-            const progressArr = subtaskProgress[task.id] || Array(allSubtasks.length).fill(false);
-            const completedCount = progressArr.filter(Boolean).length;
-            const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
-            return (
-              <div key={task.id} className={`assigned-task-card ${task.completed ? 'completed' : 'incomplete'}`} style={{
-                background: allComplete ? '#e0f7e9' : '#fff8e1',
-                border: allComplete ? '2px solid #22c55e' : '2px solid #fbbf24',
-                borderRadius: '12px',
-                marginBottom: '1.2rem',
-                padding: '1.2rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '1.5rem',
-                transition: 'background 0.2s, border 0.2s'
-              }}>
-                <div style={{flex: 1}}>
-                  <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
-                  <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
-                    {task.title || task.description || ''}
-                  </div>
-                  <div style={{fontSize: '0.95rem', color: '#64748b'}}>
-                    Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
-                  </div>
-                  <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
-                    Estado: {allComplete ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
-                  </div>
-                  {/* Subtareas con checkboxes */}
-                  {subtasksMap && (
-                    <div style={{marginTop: '1rem'}}>
-                      <div style={{fontWeight: 500, color: '#0284c7', marginBottom: '0.3rem'}}>Lista de subtareas:</div>
-                      {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => (
-                        <div key={zona} style={{marginBottom: '0.5rem'}}>
-                          <div style={{fontWeight: 500, color: '#374151', fontSize: '0.98rem'}}>{zona}</div>
-                          <ul style={{margin: 0, paddingLeft: '1.2rem'}}>
-                            {(subtasks as string[]).map((st, idx) => {
-                              const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
-                              return (
-                                <li key={idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                                  <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked)} />
-                                  <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      ))}
-                      <div style={{marginTop: '0.5rem', fontWeight: 500, color: allComplete ? '#22c55e' : '#64748b'}}>
-                        Progreso: {completedCount} / {allSubtasks.length} subtareas completadas
+          {Object.entries(groupedTasks).map(([employee, tasks]: any) => (
+            <div key={employee} style={{marginBottom: '2rem'}}>
+              {isManager && (
+                <div style={{fontWeight: 700, color: '#0284c7', fontSize: '1.1rem', marginBottom: '0.5rem'}}>
+                  {employee}
+                </div>
+              )}
+              {tasks.map((task: any) => {
+                const subtasksMap = getSubtasks(task.type || '');
+                const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
+                const progressArr = subtaskProgress[task.id] || Array(allSubtasks.length).fill(false);
+                const completedCount = progressArr.filter(Boolean).length;
+                const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
+                const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
+                return (
+                  <div key={task.id} className={`assigned-task-card ${allComplete ? 'completed' : 'incomplete'}`} style={{
+                    background: allComplete ? '#e0f7e9' : '#fff8e1',
+                    border: allComplete ? '2px solid #22c55e' : '2px solid #fbbf24',
+                    borderRadius: '12px',
+                    marginBottom: '1.2rem',
+                    padding: '1.2rem',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1.5rem',
+                    transition: 'background 0.2s, border 0.2s'
+                  }}>
+                    <div style={{flex: 1}}>
+                      <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
+                      <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
+                        {task.title || task.description || ''}
                       </div>
+                      <div style={{fontSize: '0.95rem', color: '#64748b'}}>
+                        Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
+                      </div>
+                      <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
+                        Estado: {allComplete ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
+                      </div>
+                      {/* Barra de progreso para manager */}
+                      {isManager && allSubtasks.length > 0 && (
+                        <div style={{margin: '0.7rem 0 0.2rem 0'}}>
+                          <div style={{height: '10px', background: '#e5e7eb', borderRadius: '6px', overflow: 'hidden', marginBottom: '0.2rem'}}>
+                            <div style={{width: `${percent}%`, height: '100%', background: allComplete ? '#22c55e' : '#fbbf24', transition: 'width 0.3s'}}></div>
+                          </div>
+                          <span style={{fontSize: '0.95rem', color: allComplete ? '#22c55e' : '#64748b', fontWeight: 500}}>
+                            {percent}% completado
+                          </span>
+                        </div>
+                      )}
+                      {/* Subtareas con checkboxes (solo para empleados) */}
+                      {!isManager && subtasksMap && (
+                        <div style={{marginTop: '1rem'}}>
+                          <div style={{fontWeight: 500, color: '#0284c7', marginBottom: '0.3rem'}}>Lista de subtareas:</div>
+                          {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => (
+                            <div key={zona} style={{marginBottom: '0.5rem'}}>
+                              <div style={{fontWeight: 500, color: '#374151', fontSize: '0.98rem'}}>{zona}</div>
+                              <ul style={{margin: 0, paddingLeft: '1.2rem'}}>
+                                {(subtasks as string[]).map((st, idx) => {
+                                  const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
+                                  return (
+                                    <li key={idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                      <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked)} />
+                                      <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          ))}
+                          <div style={{marginTop: '0.5rem', fontWeight: 500, color: allComplete ? '#22c55e' : '#64748b'}}>
+                            Progreso: {completedCount} / {allSubtasks.length} subtareas completadas
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div>
-                  {allComplete ? (
-                    <button style={{
-                      background: '#22c55e',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '0.7rem 1.2rem',
-                      fontWeight: 600,
-                      fontSize: '1rem',
-                      cursor: 'not-allowed',
-                      opacity: 0.7
-                    }} disabled>Completada</button>
-                  ) : (
-                    <button style={{
-                      background: '#fbbf24',
-                      color: '#222',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '0.7rem 1.2rem',
-                      fontWeight: 600,
-                      fontSize: '1rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
-                    }} onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                    <div>
+                      {allComplete ? (
+                        <button style={{
+                          background: '#22c55e',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '0.7rem 1.2rem',
+                          fontWeight: 600,
+                          fontSize: '1rem',
+                          cursor: 'not-allowed',
+                          opacity: 0.7
+                        }} disabled>Completada</button>
+                      ) : (!isManager && (
+                        <button style={{
+                          background: '#fbbf24',
+                          color: '#222',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '0.7rem 1.2rem',
+                          fontWeight: 600,
+                          fontSize: '1rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                        }} onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
