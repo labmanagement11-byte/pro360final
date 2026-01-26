@@ -92,6 +92,20 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
     e.preventDefault();
     if (!supabase) return;
     const house = selectedHouse || 'EPIC D1';
+
+    // Reiniciar progreso previo de subtareas para este empleado, casa y tipo/fecha
+    try {
+      await (supabase as any)
+        .from('subtask_progress')
+        .delete()
+        .eq('user_id', form.employee)
+        .eq('house_id', house)
+        .eq('assignment_type', form.type)
+        .eq('assignment_date', form.date);
+    } catch (err) {
+      console.error('❌ Error eliminando progreso previo de subtareas:', err);
+    }
+
     const newAssignment = {
       house,
       date: form.date,
