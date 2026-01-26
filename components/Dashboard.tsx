@@ -22,23 +22,24 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       const { data } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
+        .eq('house', user.house)
         .or(`employee.eq.${user.username},employee_id.eq.${user.id}`)
-        .in('type', ['Limpieza', 'Mantenimiento']);
+        .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
       if (isMounted) setAssignedTasks(data || []);
       setLoading(false);
     };
-    if (user && (user.username || user.id)) {
+    if (user && user.house) {
       fetchAssignedTasks();
       // Limpiar suscripciones previas
       if (subscriptionRef.current && subscriptionRef.current.length > 0) {
         subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
         subscriptionRef.current = [];
       }
-      // Suscribirse por ambos campos
-      const subs = realtimeService.subscribeToCalendarAssignments(user.username || String(user.id), (payload: any) => {
+      // Suscribirse por casa
+      const sub = realtimeService.subscribeToCalendarAssignmentsByHouse(user.house, (payload: any) => {
         fetchAssignedTasks();
       });
-      subscriptionRef.current = Array.isArray(subs) ? subs : [];
+      subscriptionRef.current = sub ? [sub] : [];
     }
     return () => {
       isMounted = false;
