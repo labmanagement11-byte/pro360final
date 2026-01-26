@@ -346,14 +346,28 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
 
   // Confirmar checklist completo (manager)
   const confirmAllCompleted = async () => {
-    // Aquí podrías actualizar el estado de la asignación en calendar_assignments (ej: completed=true)
+    // Marcar la asignación como completada y reiniciar checklist e inventario
     if (!assignmentId) return;
     const supabase = getSupabaseClient();
+    // 1. Marcar la asignación como completada
     await supabase
       .from('calendar_assignments')
       // @ts-ignore
       .update({ completed: true })
       .eq('id', assignmentId);
+
+    // 2. Reiniciar checklist de limpieza/mantenimiento
+    await supabase
+      .from('cleaning_checklist')
+      .update({ completed: false, completed_by: null, completed_at: null })
+      .eq('calendar_assignment_id_bigint', assignmentId);
+
+    // 3. Reiniciar inventario de la asignación
+    await supabase
+      .from('assignment_inventory')
+      .update({ is_complete: false, checked_by: null, checked_at: null })
+      .eq('calendar_assignment_id', assignmentId);
+
     setShowManagerConfirmMsg(true);
     setTimeout(() => setShowManagerConfirmMsg(false), 2000);
   };
