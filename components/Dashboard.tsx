@@ -95,7 +95,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       const allSections = Object.keys(MANTENIMIENTO).filter(z => z !== 'RUTINA DE MANTENIMIENTO');
       const result: { [zona: string]: string[] } = {};
       allSections.forEach(zona => {
-        result[zona] = MANTENIMIENTO[zona];
+        result[zona] = MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO];
       });
       return result;
     }
