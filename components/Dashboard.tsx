@@ -264,15 +264,19 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, deleteUser, setUser, onLogout }) => {
-  // Debug global: mostrar datos principales en la pantalla
-    useEffect(() => {
-      console.log('[Dashboard] Usuario:', user);
-      console.log('[Dashboard] CalendarAssignments:', calendarAssignments);
-      console.log('[Dashboard] TasksList:', tasksList);
-    }, [user, calendarAssignments, tasksList]);
-    
-    // Estado para edición de recordatorio
-    const [editIdx, setEditIdx] = useState(-1);
+      // Estado para edición de recordatorio
+      const [editIdx, setEditIdx] = useState(-1);
+
+      // Declarar calendarAssignments y tasksList justo después de la declaración del componente
+      const [calendarAssignments, setCalendarAssignments] = useState<any[]>([]);
+      const [tasksList, setTasksList] = useState<any[]>([]);
+
+      // Debug global: mostrar datos principales en la pantalla
+      useEffect(() => {
+        console.log('[Dashboard] Usuario:', user);
+        console.log('[Dashboard] CalendarAssignments:', calendarAssignments);
+        console.log('[Dashboard] TasksList:', tasksList);
+      }, [user, calendarAssignments, tasksList]);
   const [view, setView] = useState('home');
   const [selectedModalCard, setSelectedModalCard] = useState<string | null>(null);
   
@@ -282,7 +286,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Estado para asignaciones de calendario - AHORA CON SUPABASE
   const CALENDAR_KEY = 'dashboard_calendar_assignments';
-  const [calendarAssignments, setCalendarAssignments] = useState<any[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [newAssignment, setNewAssignment] = useState({
     employee: '',
@@ -292,7 +295,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
 
   // Estado para tareas en modal - AHORA CON SUPABASE
-  const [tasksList, setTasksList] = useState<any[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [newTask, setNewTask] = useState({
     title: '',
