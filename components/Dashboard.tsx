@@ -184,18 +184,19 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                           </span>
                         </div>
                       )}
-                      {/* Subtareas con checkboxes (solo para empleados) */}
+                      {/* Subtareas con checkboxes (solo para empleados, agrupadas por secciones completas) */}
                       {!isManager && subtasksMap && (
                         <div style={{marginTop: '1rem'}}>
                           <div style={{fontWeight: 500, color: '#0284c7', marginBottom: '0.3rem'}}>Lista de subtareas:</div>
                           {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => (
-                            <div key={zona} style={{marginBottom: '0.5rem'}}>
-                              <div style={{fontWeight: 500, color: '#374151', fontSize: '0.98rem'}}>{zona}</div>
+                            <div key={zona} style={{marginBottom: '0.7rem'}}>
+                              <div style={{fontWeight: 600, color: '#374151', fontSize: '1.02rem', marginBottom: '0.2rem'}}>{zona}</div>
                               <ul style={{margin: 0, paddingLeft: '1.2rem'}}>
                                 {(subtasks as string[]).map((st, idx) => {
+                                  // Calcular el índice global de la subtarea para el array de progreso
                                   const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                   return (
-                                    <li key={idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                    <li key={idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem'}}>
                                       <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked)} />
                                       <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
                                     </li>
@@ -204,7 +205,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                               </ul>
                             </div>
                           ))}
-                          <div style={{marginTop: '0.5rem', fontWeight: 500, color: allComplete ? '#22c55e' : '#64748b'}}>
+                          <div style={{marginTop: '0.7rem', fontWeight: 500, color: allComplete ? '#22c55e' : '#64748b'}}>
                             Progreso: {completedCount} / {allSubtasks.length} subtareas completadas
                           </div>
                         </div>
