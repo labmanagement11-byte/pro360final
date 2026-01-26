@@ -602,49 +602,6 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
       checklistItems.push({
         zone: zone,
         task: task,
-        order: index + 1
-      });
-    });
-  });
-
-  console.log('📋 [Checklist] Items a insertar:', checklistItems.length);
-
-  const now = new Date().toISOString();
-  // Nunca incluir 'id' en el insert
-  const itemsToInsert = checklistItems.map(item => {
-    const obj = {
-      calendar_assignment_id: assignmentId,
-      employee: employee,
-      house: house,
-      zone: item.zone,
-      task: item.task,
-      completed: false,
-      order_num: item.order,
-      completed_at: null,
-      completed_by: null,
-      created_at: now,
-      updated_at: now
-    };
-    // Eliminar cualquier campo id por si acaso
-    if ('id' in obj) delete obj.id;
-    return obj;
-  });
-
-  console.log('📝 [Checklist] Items formateados para insertar:', itemsToInsert);
-
-  const { data, error } = await (supabase
-    .from('cleaning_checklist') as any)
-    .insert(itemsToInsert)
-    .select();
-
-  if (error) {
-    // Log detallado del error
-    try {
-      console.error('❌ [Checklist] Error creating checklist items:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
-    } catch (e) {
-      console.error('❌ [Checklist] Error creating checklist items (raw):', error, '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
-    }
-    return [];
   }
   if (!data || data.length === 0) {
     console.warn('⚠️ [Checklist] No se insertaron items en cleaning_checklist. assignmentId:', assignmentId, 'itemsToInsert:', itemsToInsert);
