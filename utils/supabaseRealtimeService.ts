@@ -1024,12 +1024,22 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
 // Crear inventario para una asignación (copia del template)
 export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
-  
+
   console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId, 'Empleado:', employee, 'Casa:', house);
-  
+
+  // Eliminar inventario previo de la asignación (si existe)
+  try {
+    await (supabase
+      .from('assignment_inventory') as any)
+      .delete()
+      .eq('calendar_assignment_id', assignmentId);
+  } catch (err) {
+    console.error('❌ [Assignment Inventory] Error eliminando inventario previo:', err);
+  }
+
   // Obtener template
   const template = await getInventoryTemplate(house);
-  
+
   if (template.length === 0) {
     console.warn('⚠️ [Assignment Inventory] No hay template de inventario');
     return [];
