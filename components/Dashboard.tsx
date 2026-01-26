@@ -8,12 +8,13 @@ import Tasks from './Tasks';
 
 // Tarjeta personalizada para tareas asignadas
 const AssignedTasksCard = ({ user }: { user: any }) => {
+  const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
     useEffect(() => {
       console.log('[AssignedTasksCard] Usuario:', user);
       console.log('[AssignedTasksCard] Tareas asignadas recibidas:', assignedTasks);
     }, [assignedTasks, user]);
-  const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Mantener referencia a las suscripciones para limpiar (pueden ser varias)
   const subscriptionRef = useRef<any[]>([]);
