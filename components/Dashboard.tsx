@@ -11,8 +11,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Mantener referencia a la suscripción para limpiar
-  const subscriptionRef = useRef<any>(null);
+  // Mantener referencia a las suscripciones para limpiar (pueden ser varias)
+  const subscriptionRef = useRef<any[]>([]);
 
   // Cargar tareas y suscribirse en tiempo real
   useEffect(() => {
@@ -29,9 +29,10 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     };
     if (user && (user.username || user.id)) {
       fetchAssignedTasks();
-      // Suscribirse a cambios en calendar_assignments
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
+      // Limpiar suscripciones previas
+      if (subscriptionRef.current && subscriptionRef.current.length > 0) {
+        subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
+        subscriptionRef.current = [];
       }
       // Suscribirse por ambos campos
       subscriptionRef.current = realtimeService.subscribeToCalendarAssignments(user.username || String(user.id), (payload: any) => {
@@ -40,9 +41,9 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     }
     return () => {
       isMounted = false;
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
+      if (subscriptionRef.current && subscriptionRef.current.length > 0) {
+        subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
+        subscriptionRef.current = [];
       }
     };
   }, [user]);

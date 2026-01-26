@@ -3,8 +3,9 @@ export function subscribeToCalendarAssignments(employeeId: string, callback: (da
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a calendar_assignments para empleado:', employeeId);
     const supabase = getSupabaseClient();
-    const channel = supabase
-      .channel(`calendar-assignments-changes-${employeeId}`)
+    // Suscribirse por employee_id
+    const channelId = supabase
+      .channel(`calendar-assignments-changes-id-${employeeId}`)
       .on(
         'postgres_changes',
         {
@@ -14,7 +15,7 @@ export function subscribeToCalendarAssignments(employeeId: string, callback: (da
           filter: `employee_id=eq.${employeeId}`
         },
         (payload: any) => {
-          console.log('⚡ [Realtime Service] Evento recibido:', payload);
+          console.log('⚡ [Realtime Service] Evento recibido (employee_id):', payload);
           callback({
             eventType: payload.eventType,
             new: payload.new,
@@ -23,9 +24,35 @@ export function subscribeToCalendarAssignments(employeeId: string, callback: (da
         }
       )
       .subscribe((status: any) => {
-        console.log('📡 [Realtime Service] Estado de suscripción:', status);
+        console.log('📡 [Realtime Service] Estado de suscripción (employee_id):', status);
       });
-    return channel;
+
+    // Suscribirse por employee (username)
+    const channelUsername = supabase
+      .channel(`calendar-assignments-changes-username-${employeeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_assignments',
+          filter: `employee=eq.${employeeId}`
+        },
+        (payload: any) => {
+          console.log('⚡ [Realtime Service] Evento recibido (employee):', payload);
+          callback({
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          });
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Realtime Service] Estado de suscripción (employee):', status);
+      });
+
+    // Retornar ambos canales para poder limpiar después
+    return [channelId, channelUsername];
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse:', error);
     return null;
