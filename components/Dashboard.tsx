@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../utils/supabaseClient';
 import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
