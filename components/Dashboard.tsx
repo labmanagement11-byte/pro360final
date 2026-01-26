@@ -8,6 +8,10 @@ import Tasks from './Tasks';
 
 // Tarjeta personalizada para tareas asignadas
 const AssignedTasksCard = ({ user }: { user: any }) => {
+    useEffect(() => {
+      console.log('[AssignedTasksCard] Usuario:', user);
+      console.log('[AssignedTasksCard] Tareas asignadas recibidas:', assignedTasks);
+    }, [assignedTasks, user]);
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,7 +66,9 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       {loading ? (
         <p>Cargando tareas...</p>
       ) : assignedTasks.length === 0 ? (
-        <p>No tienes tareas asignadas.</p>
+        <div>
+          <p>No tienes tareas asignadas.</p>
+        </div>
       ) : (
         <ul className="dashboard-assigned-tasks-list">
           {assignedTasks.map(task => (
@@ -77,6 +83,13 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
           ))}
         </ul>
       )}
+      {/* Bloque de debug siempre visible */}
+      <div style={{marginTop:'2rem', color:'#ccc'}}>
+        <strong>Debug: Datos recibidos</strong>
+        <pre style={{fontSize:'0.9rem', background:'#222', padding:'1rem', borderRadius:'8px', maxHeight:'300px', overflow:'auto'}}>
+{JSON.stringify({user, assignedTasks}, null, 2)}
+        </pre>
+      </div>
     </div>
   );
 };
@@ -250,6 +263,12 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, deleteUser, setUser, onLogout }) => {
+  // Debug global: mostrar datos principales en la pantalla
+  useEffect(() => {
+    console.log('[Dashboard] Usuario:', user);
+    console.log('[Dashboard] CalendarAssignments:', calendarAssignments);
+    console.log('[Dashboard] TasksList:', tasksList);
+  }, [user, calendarAssignments, tasksList]);
 
     // Estado para edición de recordatorio
     const [editIdx, setEditIdx] = useState(-1);
@@ -336,17 +355,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
     // Iniciar con las dos casas correctas (para evitar Hydration errors)
     // Estos valores serán reemplazados por getHouses() tan pronto cargue desde Supabase
-    return [
-      { name: 'EPIC D1', tasks: [], inventory: [], users: [] },
-      { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] }
+    return (
+      <div className="dashboard-root">
+        {/* Bloque de debug global */}
+        <div style={{margin:'2rem 0', color:'#ccc'}}>
+          <strong>Debug global: Datos principales</strong>
+          <pre style={{fontSize:'0.9rem', background:'#222', padding:'1rem', borderRadius:'8px', maxHeight:'300px', overflow:'auto'}}>
+  {JSON.stringify({user, calendarAssignments, tasksList}, null, 2)}
+          </pre>
+        </div>
+        {/* ...existing code... */}
     ];
   });
   // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
   const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
-  const employeeHouseIdx = isRestrictedUser && user.house
+  const employeeHouseIdx = (isRestrictedUser && user.house)
     ? houses.findIndex(h => h.name === user.house)
     : -1;
-  
+
   // LOG: Ver qué está pasando con la búsqueda de casa
   if (isRestrictedUser) {
     console.log(`👤 ${user.username} (${user.role}): buscando user.house="${user.house}" en houses=[${houses.map(h => `"${h.name}"`).join(', ')}], índice encontrado: ${employeeHouseIdx}`);
