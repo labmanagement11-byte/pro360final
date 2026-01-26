@@ -125,7 +125,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   return (
     <div className="dashboard-assigned-tasks-modal">
-      <h2>{isManager ? 'Progreso de Tareas de Empleados' : 'Tareas Asignadas'}</h2>
+      <h2 style={{ color: '#111827' }}>{isManager ? 'Progreso de Tareas de Empleados' : 'Tareas Asignadas'}</h2>
       {loading ? (
         <p>Cargando tareas...</p>
       ) : Object.keys(groupedTasks).length === 0 ? (
@@ -196,7 +196,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                   // Calcular el índice global de la subtarea para el array de progreso
                                   const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                   return (
-                                    <li key={idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem'}}>
+                                    <li key={zona + '-' + idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem'}}>
                                       <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked)} />
                                       <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
                                     </li>
