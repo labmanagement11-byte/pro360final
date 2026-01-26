@@ -61,6 +61,45 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     setAssignedTasks(tasks => tasks.map(t => t.id === assignmentId ? { ...t, completed: true } : t));
   };
 
+  // Mapas de subtareas por tipo
+  const LIMPIEZA_REGULAR = {
+    'LIMPIEZA GENERAL': [
+      'Barrer y trapear toda la casa.',
+      'Quitar el polvo de todas las superficies y decoración usando un trapo húmedo.',
+      'Limpiar los televisores cuidadosamente sin dejar marcas en la pantalla.',
+      'Revisar zócalos y esquinas para asegurarse de que estén limpios.',
+      'Limpiar telaraña'
+    ],
+    // ... puedes agregar más zonas si lo deseas ...
+  };
+  const LIMPIEZA_PROFUNDA = {
+    'LIMPIEZA PROFUNDA': [
+      'Lavar los forros de los muebles (sofás, sillas y cojines).',
+      'Limpiar todas las ventanas y ventanales de la casa, por dentro y por fuera.',
+      'Limpiar con hidrolavadora el piso exterior, incluyendo escaleras, terraza y placas vehiculares.',
+      'Lavar la caneca grande de basura ubicada debajo de la escalera.',
+      'Limpiar las paredes y los guardaescobas de toda la casa.'
+    ]
+  };
+  const MANTENIMIENTO = {
+    'PISCINA Y AGUA': [
+      'Mantener la piscina limpia y en funcionamiento.',
+      'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.'
+    ],
+    'SISTEMAS ELÉCTRICOS': [
+      'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
+      'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.'
+    ]
+  };
+
+  // Función para obtener subtareas según tipo
+  function getSubtasks(type: string) {
+    if (type.toLowerCase().includes('profunda')) return LIMPIEZA_PROFUNDA;
+    if (type.toLowerCase().includes('regular')) return LIMPIEZA_REGULAR;
+    if (type.toLowerCase().includes('mantenimiento')) return MANTENIMIENTO;
+    return null;
+  }
+
   return (
     <div className="dashboard-assigned-tasks-modal">
       <h2>Tareas Asignadas</h2>
@@ -72,70 +111,82 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         </div>
       ) : (
         <div className="assigned-tasks-list-modern">
-          {assignedTasks.map(task => (
-            <div key={task.id} className={`assigned-task-card ${task.completed ? 'completed' : 'incomplete'}`} style={{
-              background: task.completed ? '#e0f7e9' : '#fff8e1',
-              border: task.completed ? '2px solid #22c55e' : '2px solid #fbbf24',
-              borderRadius: '12px',
-              marginBottom: '1.2rem',
-              padding: '1.2rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '1.5rem',
-              transition: 'background 0.2s, border 0.2s'
-            }}>
-              <div style={{flex: 1}}>
-                <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
-                <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
-                  {task.title || task.description || ''}
+          {assignedTasks.map(task => {
+            const subtasksMap = getSubtasks(task.type || '');
+            return (
+              <div key={task.id} className={`assigned-task-card ${task.completed ? 'completed' : 'incomplete'}`} style={{
+                background: task.completed ? '#e0f7e9' : '#fff8e1',
+                border: task.completed ? '2px solid #22c55e' : '2px solid #fbbf24',
+                borderRadius: '12px',
+                marginBottom: '1.2rem',
+                padding: '1.2rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1.5rem',
+                transition: 'background 0.2s, border 0.2s'
+              }}>
+                <div style={{flex: 1}}>
+                  <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
+                  <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
+                    {task.title || task.description || ''}
+                  </div>
+                  <div style={{fontSize: '0.95rem', color: '#64748b'}}>
+                    Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
+                  </div>
+                  <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
+                    Estado: {task.completed ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
+                  </div>
+                  {/* Subtareas */}
+                  {subtasksMap && (
+                    <div style={{marginTop: '1rem'}}>
+                      <div style={{fontWeight: 500, color: '#0284c7', marginBottom: '0.3rem'}}>Lista de subtareas:</div>
+                      {Object.entries(subtasksMap).map(([zona, subtasks]) => (
+                        <div key={zona} style={{marginBottom: '0.5rem'}}>
+                          <div style={{fontWeight: 500, color: '#374151', fontSize: '0.98rem'}}>{zona}</div>
+                          <ul style={{margin: 0, paddingLeft: '1.2rem'}}>
+                            {(subtasks as string[]).map((st, idx) => (
+                              <li key={idx} style={{color: '#64748b', fontSize: '0.97rem'}}>{st}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div style={{fontSize: '0.95rem', color: '#64748b'}}>
-                  Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
-                </div>
-                <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
-                  Estado: {task.completed ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
+                <div>
+                  {task.completed ? (
+                    <button style={{
+                      background: '#22c55e',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.7rem 1.2rem',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      cursor: 'not-allowed',
+                      opacity: 0.7
+                    }} disabled>Completada</button>
+                  ) : (
+                    <button style={{
+                      background: '#fbbf24',
+                      color: '#222',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.7rem 1.2rem',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                    }} onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
+                  )}
                 </div>
               </div>
-              <div>
-                {task.completed ? (
-                  <button style={{
-                    background: '#22c55e',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.7rem 1.2rem',
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                    cursor: 'not-allowed',
-                    opacity: 0.7
-                  }} disabled>Completada</button>
-                ) : (
-                  <button style={{
-                    background: '#fbbf24',
-                    color: '#222',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.7rem 1.2rem',
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
-                  }} onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-      {/* Bloque de debug siempre visible */}
-      <div style={{marginTop:'2rem', color:'#ccc'}}>
-        <strong>Debug: Datos recibidos</strong>
-        <pre style={{fontSize:'0.9rem', background:'#222', padding:'1rem', borderRadius:'8px', maxHeight:'300px', overflow:'auto'}}>
-{JSON.stringify({user, assignedTasks}, null, 2)}
-        </pre>
-      </div>
     </div>
   );
 };
