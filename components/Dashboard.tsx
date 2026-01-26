@@ -82,7 +82,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   useEffect(() => {
     if (!user || !user.id) return;
     const fetchProgress = async () => {
-      const { data, error } = await supabase
+      if (!supabase) return;
+      const { data, error } = await (supabase as any)
         .from('subtask_progress')
         .select('assignment_id, subtasks_progress')
         .eq('user_id', user.id);
