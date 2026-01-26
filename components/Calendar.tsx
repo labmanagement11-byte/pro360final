@@ -55,7 +55,7 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
     setLoading(true);
     if (!supabase) return;
     const { data, error } = await (supabase as any)
-      .from('calendar')
+      .from('calendar_assignments')
       .select('*')
       .eq('house', house)
       .order('date', { ascending: true });
@@ -74,11 +74,11 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
 
     if (!supabase) return;
 
-    // Suscripción realtime a cambios en calendar
+    // Suscripción realtime a cambios en calendar_assignments
     const channel = supabase
-      .channel('calendar-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar' }, (payload: any) => {
-        console.log('Cambio en calendar:', payload);
+      .channel('calendar-assignments-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_assignments' }, (payload: any) => {
+        console.log('Cambio en calendar_assignments:', payload);
         fetchEvents(house);
       })
       .subscribe();
@@ -137,7 +137,7 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
 
   const deleteEvent = async (eventId: number) => {
     if (!supabase) return;
-    await (supabase as any).from('calendar').delete().eq('id', eventId);
+    await (supabase as any).from('calendar_assignments').delete().eq('id', eventId);
     // Realtime actualizará automáticamente
   };
 
