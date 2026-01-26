@@ -93,11 +93,24 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   };
 
   // Función para obtener subtareas según tipo
+  // Estado para progreso de subtareas por tarea
+  const [subtaskProgress, setSubtaskProgress] = useState<{ [taskId: number]: boolean[] }>({});
+
   function getSubtasks(type: string) {
     if (type.toLowerCase().includes('profunda')) return LIMPIEZA_PROFUNDA;
     if (type.toLowerCase().includes('regular')) return LIMPIEZA_REGULAR;
     if (type.toLowerCase().includes('mantenimiento')) return MANTENIMIENTO;
     return null;
+  }
+
+  // Guardar progreso de subtareas en Supabase (puedes mejorar esto usando una tabla aparte si lo deseas)
+  async function handleSubtaskToggle(taskId: number, idx: number, checked: boolean) {
+    setSubtaskProgress(prev => {
+      const arr = prev[taskId] ? [...prev[taskId]] : [];
+      arr[idx] = checked;
+      return { ...prev, [taskId]: arr };
+    });
+    // Aquí podrías guardar el progreso en Supabase si lo deseas
   }
 
   return (
@@ -113,10 +126,15 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         <div className="assigned-tasks-list-modern">
           {assignedTasks.map(task => {
             const subtasksMap = getSubtasks(task.type || '');
+            // Unificar todas las subtareas en un solo array para progreso
+            const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
+            const progressArr = subtaskProgress[task.id] || Array(allSubtasks.length).fill(false);
+            const completedCount = progressArr.filter(Boolean).length;
+            const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
             return (
               <div key={task.id} className={`assigned-task-card ${task.completed ? 'completed' : 'incomplete'}`} style={{
-                background: task.completed ? '#e0f7e9' : '#fff8e1',
-                border: task.completed ? '2px solid #22c55e' : '2px solid #fbbf24',
+                background: allComplete ? '#e0f7e9' : '#fff8e1',
+                border: allComplete ? '2px solid #22c55e' : '2px solid #fbbf24',
                 borderRadius: '12px',
                 marginBottom: '1.2rem',
                 padding: '1.2rem',
@@ -136,27 +154,36 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                     Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
                   </div>
                   <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
-                    Estado: {task.completed ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
+                    Estado: {allComplete ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
                   </div>
-                  {/* Subtareas */}
+                  {/* Subtareas con checkboxes */}
                   {subtasksMap && (
                     <div style={{marginTop: '1rem'}}>
                       <div style={{fontWeight: 500, color: '#0284c7', marginBottom: '0.3rem'}}>Lista de subtareas:</div>
-                      {Object.entries(subtasksMap).map(([zona, subtasks]) => (
+                      {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => (
                         <div key={zona} style={{marginBottom: '0.5rem'}}>
                           <div style={{fontWeight: 500, color: '#374151', fontSize: '0.98rem'}}>{zona}</div>
                           <ul style={{margin: 0, paddingLeft: '1.2rem'}}>
-                            {(subtasks as string[]).map((st, idx) => (
-                              <li key={idx} style={{color: '#64748b', fontSize: '0.97rem'}}>{st}</li>
-                            ))}
+                            {(subtasks as string[]).map((st, idx) => {
+                              const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
+                              return (
+                                <li key={idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                  <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked)} />
+                                  <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       ))}
+                      <div style={{marginTop: '0.5rem', fontWeight: 500, color: allComplete ? '#22c55e' : '#64748b'}}>
+                        Progreso: {completedCount} / {allSubtasks.length} subtareas completadas
+                      </div>
                     </div>
                   )}
                 </div>
                 <div>
-                  {task.completed ? (
+                  {allComplete ? (
                     <button style={{
                       background: '#22c55e',
                       color: '#fff',
