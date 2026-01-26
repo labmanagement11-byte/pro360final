@@ -27,8 +27,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       const { data } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
-        .eq('house', user.house)
-        .eq('employee', user.username)
+        .eq('house_id', user.house_id || user.house)
+        .eq('employee_id', user.id)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
       if (isMounted) setAssignedTasks(data || []);
       setLoading(false);
