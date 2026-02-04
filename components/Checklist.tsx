@@ -339,22 +339,33 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
 
   // Reiniciar checklist (manager/owner)
   const resetChecklist = async () => {
-    // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist si hay assignmentId
-    if (assignmentId) {
-      const supabase = getSupabaseClient();
-      await (supabase
-        .from('cleaning_checklist') as any)
-        .update({ completed: false, completed_by: null, completed_at: null })
-        .eq('calendar_assignment_id_bigint', assignmentId);
-    }
-    // Además, reiniciar los ítems legacy si existen
-    const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
-    const { data, error } = await (checklistTable() as any)
-      .update({ complete: false })
-      .in('id', allIds);
-    if (!error) {
-      setCleaning(cleaning.map(i => ({ ...i, complete: false })));
-      setMaintenance(maintenance.map(i => ({ ...i, complete: false })));
+    try {
+      setLoading(true);
+      // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist si hay assignmentId
+      if (assignmentId) {
+        const supabase = getSupabaseClient();
+        await (supabase
+          .from('cleaning_checklist') as any)
+          .update({ completed: false, completed_by: null, completed_at: null })
+          .eq('calendar_assignment_id_bigint', assignmentId);
+      }
+      // Además, reiniciar los ítems legacy si existen
+      const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
+      if (allIds.length > 0) {
+        const { data, error } = await (checklistTable() as any)
+          .update({ complete: false })
+          .in('id', allIds);
+        if (error) {
+          console.error('Error reiniciando legacy items:', error);
+        }
+      }
+      // Recargar los datos desde la base de datos
+      await fetchChecklist();
+      console.log('✅ Checklist reiniciado correctamente');
+    } catch (error) {
+      console.error('Error al reiniciar checklist:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -362,28 +373,38 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
   const confirmAllCompleted = async () => {
     // Marcar la asignación como completada y reiniciar checklist e inventario
     if (!assignmentId) return;
-    const supabase = getSupabaseClient();
-    // 1. Marcar la asignación como completada
-    await supabase
-      .from('calendar_assignments')
-      // @ts-ignore
-      .update({ completed: true })
-      .eq('id', assignmentId);
+    try {
+      setLoading(true);
+      const supabase = getSupabaseClient();
+      // 1. Marcar la asignación como completada
+      await supabase
+        .from('calendar_assignments')
+        // @ts-ignore
+        .update({ completed: true })
+        .eq('id', assignmentId);
 
-    // 2. Reiniciar checklist de limpieza/mantenimiento
-    await (supabase
-      .from('cleaning_checklist') as any)
-      .update({ completed: false, completed_by: null, completed_at: null })
-      .eq('calendar_assignment_id_bigint', assignmentId);
+      // 2. Reiniciar checklist de limpieza/mantenimiento
+      await (supabase
+        .from('cleaning_checklist') as any)
+        .update({ completed: false, completed_by: null, completed_at: null })
+        .eq('calendar_assignment_id_bigint', assignmentId);
 
-    // 3. Reiniciar inventario de la asignación
-    await (supabase
-      .from('assignment_inventory') as any)
-      .update({ is_complete: false, checked_by: null, checked_at: null })
-      .eq('calendar_assignment_id', assignmentId);
+      // 3. Reiniciar inventario de la asignación
+      await (supabase
+        .from('assignment_inventory') as any)
+        .update({ is_complete: false, checked_by: null, checked_at: null })
+        .eq('calendar_assignment_id', assignmentId);
 
-    setShowManagerConfirmMsg(true);
-    setTimeout(() => setShowManagerConfirmMsg(false), 2000);
+      // 4. Recargar datos desde la base de datos
+      await fetchChecklist();
+      
+      setShowManagerConfirmMsg(true);
+      setTimeout(() => setShowManagerConfirmMsg(false), 2000);
+    } catch (error) {
+      console.error('Error al confirmar checklist:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
