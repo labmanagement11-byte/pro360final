@@ -302,8 +302,57 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     cleaningByZone[zone].push(i);
   });
 
-  // Marcar/desmarcar ítem de limpieza
-  const toggleCleaning = async (idx: number) => {
+  // Agregar nueva tarea (solo HYNTIBA2)
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskForm.item.trim()) return;
+    
+    try {
+      setLoading(true);
+      const newTask = {
+        house: 'HYNTIBA2 APTO 406',
+        item: taskForm.item,
+        room: taskForm.room || 'LIMPIEZA',
+        assigned_to: taskForm.assigned_to || null,
+        complete: false
+      };
+      
+      const { data, error } = await (checklistTable() as any)
+        .insert([newTask])
+        .select();
+      
+      if (!error && data) {
+        setCleaning([...cleaning, data[0]]);
+        setTaskForm({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
+        console.log('✅ Tarea agregada:', taskForm.item);
+      } else {
+        console.error('Error agregando tarea:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Eliminar tarea (solo HYNTIBA2)
+  const handleDeleteTask = async (taskId: number) => {
+    if (!confirm('¿Eliminar esta tarea?')) return;
+    
+    try {
+      setLoading(true);
+      const { error } = await (checklistTable() as any)
+        .delete()
+        .eq('id', taskId);
+      
+      if (!error) {
+        setCleaning(cleaning.filter(t => t.id !== taskId));
+        console.log('✅ Tarea eliminada');
+      } else {
+        console.error('Error eliminando tarea:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
     const item = cleaning[idx];
     if (!item || !item.id) return;
     console.log('✏️ [Checklist] Actualizando item:', item.item, 'completada:', !item.complete, 'usuario:', user.username);
@@ -505,7 +554,43 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
 
       {/* Formulario para agregar/editar tareas solo para managers de HYNTIBA2 */}
       {!loading && user.house === 'HYNTIBA2 APTO 406' && (user.role === 'manager' || user.role === 'owner') && (
-        <></>
+        <div style={{background:'#f0f9ff',padding:'15px',borderRadius:'8px',marginBottom:'15px',border:'1px solid #bfdbfe'}}>
+          <h3 style={{marginTop:0,color:'#1e40af'}}>➕ Agregar Nueva Tarea</h3>
+          <form onSubmit={handleAddTask} style={{display:'grid',gap:'10px'}}>
+            <div>
+              <input
+                type="text"
+                placeholder="Descripción de la tarea"
+                value={taskForm.item}
+                onChange={(e) => setTaskForm({...taskForm, item: e.target.value})}
+                style={{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #cbd5e1'}}
+              />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+              <select
+                value={taskForm.room}
+                onChange={(e) => setTaskForm({...taskForm, room: e.target.value})}
+                style={{padding:'8px',borderRadius:'4px',border:'1px solid #cbd5e1'}}
+              >
+                <option value="">- Seleccionar zona -</option>
+                <option value="LIMPIEZA">Limpieza</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="Habitaciones">Habitaciones</option>
+                <option value="Cocina">Cocina</option>
+                <option value="Baños">Baños</option>
+                <option value="Sala">Sala</option>
+                <option value="Terraza">Terraza</option>
+              </select>
+              <button 
+                type="submit" 
+                disabled={loading || !taskForm.item.trim()}
+                style={{padding:'8px',background:'#2563eb',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',opacity: loading || !taskForm.item.trim() ? 0.5 : 1}}
+              >
+                Agregar Tarea
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {/* Mostrar solo lo que corresponde según tipo de asignación activa para empleados */}
