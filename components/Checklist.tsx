@@ -136,10 +136,10 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       // Usar servicio realtime para obtener checklist específico
       const { getCleaningChecklistItems } = await import('../utils/supabaseRealtimeService');
       let items = await getCleaningChecklistItems(String(assignmentId));
-      // Normalizar: asegurar que todos los items tengan 'complete' (legacy: 'complete', moderno: 'completed')
+      // Normalizar: priorizar 'completed' (campo moderno) sobre 'complete' (legacy)
       items = items.map((i: any) => ({
         ...i,
-        complete: typeof i.complete === 'boolean' ? i.complete : (typeof i.completed === 'boolean' ? i.completed : false)
+        complete: typeof i.completed === 'boolean' ? i.completed : (typeof i.complete === 'boolean' ? i.complete : false)
       }));
       // Separar limpieza y mantenimiento por tipo/zona
       setCleaning(items.filter((i: any) => i.task && (!i.zone || !i.zone.toLowerCase().includes('mantenimiento'))));
@@ -341,15 +341,17 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
   const resetChecklist = async () => {
     try {
       setLoading(true);
+      const supabase = getSupabaseClient();
+      
       // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist si hay assignmentId
       if (assignmentId) {
-        const supabase = getSupabaseClient();
         await (supabase
           .from('cleaning_checklist') as any)
           .update({ completed: false, completed_by: null, completed_at: null })
           .eq('calendar_assignment_id_bigint', assignmentId);
       }
-      // Además, reiniciar los ítems legacy si existen
+      
+      // Reiniciar los ítems legacy si existen
       const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
       if (allIds.length > 0) {
         const { data, error } = await (checklistTable() as any)
@@ -359,6 +361,16 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
           console.error('Error reiniciando legacy items:', error);
         }
       }
+      
+      // Limpiar el estado local primero para mostrar indicador de carga
+      setCleaning(cleaning.map(i => ({ ...i, complete: false })));
+      setMaintenance(maintenance.map(i => ({ ...i, complete: false })));
+      
+      // Limpiar localStorage para evitar datos cacheados
+      if (user.house === 'HYNTIBA2 APTO 406') {
+        localStorage.removeItem('plantilla_checklist_hyntiba2');
+      }
+      
       // Recargar los datos desde la base de datos
       await fetchChecklist();
       console.log('✅ Checklist reiniciado correctamente');
