@@ -343,8 +343,21 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       setLoading(true);
       const supabase = getSupabaseClient();
       
-      // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist
-      if (assignmentId) {
+      // Para HYNTIBA2: usar tabla legacy, para otros: tabla moderna
+      const isHyntiba = user.house === 'HYNTIBA2 APTO 406';
+      
+      if (isHyntiba) {
+        // HYNTIBA2 usa tabla legacy 'checklist'
+        console.log('🔄 [HYNTIBA2] Reiniciando items de tabla legacy...');
+        
+        // Reiniciar todos los items de HYNTIBA2 en la tabla legacy
+        const { error } = await (checklistTable() as any)
+          .update({ complete: false })
+          .eq('house', 'HYNTIBA2 APTO 406');
+        
+        console.log('🔄 [HYNTIBA2] Reset completado:', error ? `Error: ${error}` : 'OK');
+      } else if (assignmentId) {
+        // Para otras casas: tabla moderna cleaning_checklist
         // Primero obtener la asignación para tener datos del employee y house
         const { data: assignment } = await (supabase
           .from('calendar_assignments') as any)
@@ -380,19 +393,6 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         console.log('🔄 Reset por house solamente:', user.house, 'Resultado:', updateByHouseOnly);
       }
       
-      // Reiniciar los ítems legacy si existen
-      const allIds = [...cleaning, ...maintenance].map(i => i.id).filter(Boolean);
-      if (allIds.length > 0) {
-        const { data, error } = await (checklistTable() as any)
-          .update({ complete: false })
-          .in('id', allIds);
-        
-        console.log('🔄 Reset legacy items:', allIds.length, 'Error:', error);
-        if (error) {
-          console.error('Error reiniciando legacy items:', error);
-        }
-      }
-      
       // Limpiar el estado local primero para mostrar indicador de carga
       setCleaning(cleaning.map(i => ({ ...i, complete: false })));
       setMaintenance(maintenance.map(i => ({ ...i, complete: false })));
@@ -425,6 +425,8 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       setLoading(true);
       const supabase = getSupabaseClient();
       
+      const isHyntiba = user.house === 'HYNTIBA2 APTO 406';
+      
       // 0. Obtener datos de la asignación
       const { data: assignment } = await (supabase
         .from('calendar_assignments') as any)
@@ -440,26 +442,33 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         .eq('id', assignmentId);
 
       // 2. Reiniciar checklist de limpieza/mantenimiento
-      // UPDATE 1: Por assignment ID
-      await (supabase
-        .from('cleaning_checklist') as any)
-        .update({ completed: false, completed_by: null, completed_at: null })
-        .eq('calendar_assignment_id_bigint', assignmentId);
-      
-      // UPDATE 2: Por employee + house (orfanos)
-      if (assignment) {
+      if (isHyntiba) {
+        // HYNTIBA2 usa tabla legacy
+        await (checklistTable() as any)
+          .update({ complete: false })
+          .eq('house', 'HYNTIBA2 APTO 406');
+      } else {
+        // UPDATE 1: Por assignment ID
         await (supabase
           .from('cleaning_checklist') as any)
           .update({ completed: false, completed_by: null, completed_at: null })
-          .eq('employee', assignment.employee)
-          .eq('house', assignment.house);
+          .eq('calendar_assignment_id_bigint', assignmentId);
+        
+        // UPDATE 2: Por employee + house (orfanos)
+        if (assignment) {
+          await (supabase
+            .from('cleaning_checklist') as any)
+            .update({ completed: false, completed_by: null, completed_at: null })
+            .eq('employee', assignment.employee)
+            .eq('house', assignment.house);
+        }
+        
+        // UPDATE 3: Por house solamente (fallback adicional)
+        await (supabase
+          .from('cleaning_checklist') as any)
+          .update({ completed: false, completed_by: null, completed_at: null })
+          .eq('house', user.house);
       }
-      
-      // UPDATE 3: Por house solamente (fallback adicional)
-      await (supabase
-        .from('cleaning_checklist') as any)
-        .update({ completed: false, completed_by: null, completed_at: null })
-        .eq('house', user.house);
 
       // 3. Reiniciar inventario de la asignación
       await (supabase
