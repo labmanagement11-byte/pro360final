@@ -31,8 +31,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       try {
         setLoading(true);
         
-        // Si es jonathan, cargar desde Supabase
-        if (user?.username.toLowerCase() === 'jonathan') {
+        // Si es owner, cargar desde Supabase
+        if (user?.role === 'owner') {
           const fetchedUsers = await realtimeService.getUsers();
           setUsers(fetchedUsers || []);
           
@@ -59,8 +59,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     loadData();
 
-    // Suscribirse a cambios en tiempo real
-    if (user?.username.toLowerCase() === 'jonathan') {
+    // Suscribirse a cambios en tiempo real para owners
+    if (user?.role === 'owner') {
       const channelUsers = realtimeService.subscribeToUsers((updatedUsers) => {
         setUsers(updatedUsers || []);
       });
@@ -75,7 +75,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     }
   }, [user, propUsers, propHouses]);
 
-  if (!user || (user.role !== 'dueno' && (user.role !== 'manager' || user.username.toLowerCase() !== 'jonathan'))) {
+  if (!user || (user.role !== 'dueno' && user.role !== 'owner' && user.role !== 'manager')) {
     return (
       <div className="users-container">
         <h2>Gestión de Usuarios</h2>
@@ -100,8 +100,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     e.preventDefault();
     if (username && role && house) {
       try {
-        if (user?.username.toLowerCase() === 'jonathan') {
-          // Usar Supabase para jonathan
+        if (user?.role === 'owner') {
+          // Usar Supabase para owner
           const newUser = await realtimeService.createUser({ username, password: password || '', role, house });
           // Agregar el usuario al estado local inmediatamente
           if (newUser) {
@@ -126,8 +126,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     e.preventDefault();
     if (editData.username && editData.role) {
       try {
-        if (user?.username.toLowerCase() === 'jonathan') {
-          // Usar Supabase para jonathan
+        if (user?.role === 'owner') {
+          // Usar Supabase para owner
           const editedUser = users[editIdx];
           if (editedUser?.id) {
             await realtimeService.updateUser(String(editedUser.id), {
@@ -152,8 +152,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
   const handleDeleteUser = async (idx: number) => {
     try {
-      if (user?.username.toLowerCase() === 'jonathan') {
-        // Usar Supabase para jonathan
+      if (user?.role === 'owner') {
+        // Usar Supabase para owner
         const userToDelete = users[idx];
         if (userToDelete?.id) {
           await realtimeService.deleteUser(String(userToDelete.id));
@@ -206,15 +206,20 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         {users && users.length > 0 ? (
           users
             .filter(u => {
-              // Jonathan ve todos los usuarios o solo los de la casa seleccionada
-              if (user?.username.toLowerCase() === 'jonathan' && selectedHouse) {
-                return u.house === selectedHouse;
+              // Owner (incluyendo Jonathan) ve todos los usuarios
+              if (user?.role === 'owner') {
+                // Si hay casa seleccionada, filtrar por ella
+                if (selectedHouse) {
+                  return u.house === selectedHouse;
+                }
+                // Si no hay casa seleccionada, mostrar todos
+                return true;
               }
               // Managers solo ven usuarios de su propia casa
               if (user?.role === 'manager' && user.house) {
                 return u.house === user.house;
               }
-              // Dueño ve todos
+              // Por defecto, mostrar todos
               return true;
             })
             .map((u, idx) => (

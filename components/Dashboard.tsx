@@ -3,6 +3,8 @@ import { supabase } from '../utils/supabaseClient';
 import { FaHome, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
 import * as realtimeService from '../utils/supabaseRealtimeService';
+import { RealtimeNotificationsManager } from './RealtimeNotification';
+import './RealtimeNotification.css';
 
 import Tasks from './Tasks';
 
@@ -566,6 +568,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [selectedAssignmentForInventory, setSelectedAssignmentForInventory] = useState<string | null>(null);
   const [inventorySubscriptions, setInventorySubscriptions] = useState<Map<string, any>>(new Map());
 
+  // Estado para notificaciones en tiempo real
+  const [realtimeNotifications, setRealtimeNotifications] = useState<Array<{
+    id: string;
+    message: string;
+    type: 'success' | 'info' | 'warning' | 'error';
+  }>>([]);
+  const [isRealtimeSyncing, setIsRealtimeSyncing] = useState(true);
+
+  // Función para agregar notificación
+  const addRealtimeNotification = (message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
+    const id = `notification-${Date.now()}-${Math.random()}`;
+    setRealtimeNotifications(prev => [...prev, { id, message, type }]);
+  };
+
+  // Función para remover notificación
+  const removeRealtimeNotification = (id: string) => {
+    setRealtimeNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   // Estado para template de inventario (manager edita el template)
   const [inventoryTemplate, setInventoryTemplate] = useState<any[]>([]);
   const [loadingInventoryTemplate, setLoadingInventoryTemplate] = useState(true);
@@ -593,8 +614,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] }
     ];
   });
-  // Si el usuario es empleado O es manager (pero no jonathan), forzar la casa asignada
-  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && user.username.toLowerCase() !== 'jonathan');
+  // Si el usuario es empleado o manager (no owner), forzar la casa asignada
+  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager');
   const employeeHouseIdx = (isRestrictedUser && user.house)
     ? houses.findIndex(h => h.name === user.house)
     : -1;
@@ -734,19 +755,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('⚡ Evento recibido en tiempo real:', payload);
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nueva tarea insertada:', payload.new);
-          console.log('   - ID:', payload.new?.id);
-          console.log('   - Title:', payload.new?.title);
-          console.log('   - AssignedTo:', payload.new?.assignedTo);
-          console.log('   - Type:', payload.new?.type);
+          addRealtimeNotification(`Nueva tarea: ${payload.new?.title || 'Sin título'}`, 'info');
           setTasksList(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
           console.log('✏️ Tarea actualizada:', payload.new);
-          console.log('   - ID:', payload.new?.id);
-          console.log('   - AssignedTo:', payload.new?.assignedTo);
-          console.log('   - Completed:', payload.new?.completed);
+          addRealtimeNotification(`Tarea actualizada: ${payload.new?.title || 'Sin título'}`, 'info');
           setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
         } else if (payload?.eventType === 'DELETE') {
           console.log('🗑️ Tarea eliminada:', payload.old);
+          addRealtimeNotification('Tarea eliminada', 'warning');
           setTasksList(prev => prev.filter(t => t.id !== payload.old?.id));
         }
       });
@@ -791,10 +808,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     try {
       subscription = realtimeService.subscribeToInventory(selectedHouse, (payload: any) => {
         if (payload?.eventType === 'INSERT') {
+          addRealtimeNotification(`Nuevo item: ${payload.new?.item || 'Sin nombre'}`, 'info');
           setInventoryList(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
+          addRealtimeNotification(`Item actualizado: ${payload.new?.item || 'Sin nombre'}`, 'info');
           setInventoryList(prev => prev.map(i => i.id === payload.new?.id ? payload.new : i));
         } else if (payload?.eventType === 'DELETE') {
+          addRealtimeNotification('Item eliminado del inventario', 'warning');
           setInventoryList(prev => prev.filter(i => i.id !== payload.old?.id));
         }
       });
@@ -841,12 +861,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('⚡ Evento de recordatorios recibido:', payload);
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nuevo recordatorio insertado:', payload.new);
+          addRealtimeNotification(`Nuevo recordatorio: ${payload.new?.title || 'Sin título'}`, 'info');
           setReminders(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
           console.log('✏️ Recordatorio actualizado:', payload.new);
+          addRealtimeNotification('Recordatorio actualizado', 'info');
           setReminders(prev => prev.map(r => r.id === payload.new?.id ? payload.new : r));
         } else if (payload?.eventType === 'DELETE') {
           console.log('🗑️ Recordatorio eliminado:', payload.old);
+          addRealtimeNotification('Recordatorio eliminado', 'warning');
           setReminders(prev => prev.filter(r => r.id !== payload.old?.id));
         }
       });
@@ -896,8 +919,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           }
         }
 
-        // Cargar usuarios solo si es jonathan
-        if (user.username.toLowerCase() === 'jonathan') {
+        // Cargar usuarios para owners
+        if (user.role === 'owner') {
           const usersData = await realtimeService.getUsers();
           console.log('👥 Usuarios cargados:', usersData);
         }
@@ -1436,18 +1459,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
       show: user.role === 'owner' || user.role === 'manager',
     },
-    // Solo mostrar la tarjeta de seleccionar casa si es owner (no jonathan)
+    // Mostrar selector de casa para todos los owners
     {
       key: 'house',
       title: 'Seleccionar Casa',
       desc: 'Elige y administra la casa actual.',
-      show: user.role === 'owner' && user.username.toLowerCase() !== 'jonathan',
+      show: user.role === 'owner',
     },
     {
       key: 'users',
       title: 'Usuarios',
       desc: 'Administra roles: dueño, manager, empleado.',
-      show: user.role === 'owner' && user.username.toLowerCase() !== 'jonathan',
+      show: user.role === 'owner',
     },
   ];
 
@@ -1479,18 +1502,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const subscription = realtimeService.subscribeToShoppingList(selectedHouse, (payload: any) => {
       if (payload.eventType === 'INSERT') {
         if (!payload.new.is_purchased) {
+          addRealtimeNotification(`Nuevo item en lista: ${payload.new.item_name}`, 'info');
           setShoppingList(prev => [payload.new, ...prev]);
         }
       } else if (payload.eventType === 'UPDATE') {
         if (payload.new.is_purchased) {
           // Movido a comprado
+          addRealtimeNotification(`Item comprado: ${payload.new.item_name}`, 'success');
           setShoppingList(prev => prev.filter(i => i.id !== payload.new.id));
           setShoppingHistory(prev => [payload.new, ...prev]);
         } else {
+          addRealtimeNotification('Item de compras actualizado', 'info');
           // Actualizado
           setShoppingList(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
         }
       } else if (payload.eventType === 'DELETE') {
+        addRealtimeNotification('Item eliminado de la lista', 'warning');
         setShoppingList(prev => prev.filter(i => i.id !== payload.old.id));
         setShoppingHistory(prev => prev.filter(i => i.id !== payload.old.id));
       }
@@ -1608,6 +1635,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   }
   return (
     <div className="dashboard-container">
+      {/* Notificaciones en tiempo real */}
+      <RealtimeNotificationsManager 
+        notifications={realtimeNotifications}
+        onRemove={removeRealtimeNotification}
+      />
+      
+      {/* Indicador de sincronización */}
+      {isRealtimeSyncing && (
+        <div className="realtime-sync-indicator">
+          <div className="realtime-sync-indicator-pulse"></div>
+          <span>Sincronización en tiempo real activa</span>
+        </div>
+      )}
+      
       {/* Logo y Header */}
       <div className="dashboard-header-row">
         <div className="dashboard-title-block">
@@ -1619,7 +1660,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           />
           <h1>Dashboard</h1>
           <span className="dashboard-user-pill" aria-label="Usuario en sesión">👤 {user.username}</span>
-          {user.username.toLowerCase() === 'jonathan' ? (
+          {user.role === 'owner' ? (
             <select
               value={selectedHouseIdx}
               onChange={(e) => setSelectedHouseIdx(parseInt(e.target.value, 10))}
@@ -1910,7 +1951,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               >
                 <span className="house-icon">🏠</span>
                 <span className="house-name">{house.houseName || house.name}</span>
-                {user.username.toLowerCase() === 'jonathan' && (
+                {user.role === 'owner' && (
                   <div className="house-card-actions" onClick={(e) => e.stopPropagation()}>
                     <button 
                       onClick={async () => {
@@ -1959,8 +2000,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 e.preventDefault();
                 if (newHouseName.trim()) {
                   try {
-                    if (user.username.toLowerCase() === 'jonathan') {
-                      // Usar Supabase para jonathan
+                    if (user.role === 'owner') {
+                      // Usar Supabase para owner
                       const newHouse = await realtimeService.createHouse({ houseName: newHouseName.trim() });
                       // Agregar la casa al estado local inmediatamente
                       if (newHouse) {

@@ -1,0 +1,45 @@
+# Vercel Deployment Configuration
+
+# Ignore files and directories during deployment
+node_modules/
+.env.local
+.env.*.local
+.git
+.gitignore
+.github
+.vercel
+.vercelignore
+README.md
+*.md
+
+# Build files
+.next
+out
+build
+dist
+
+# Development files
+.DS_Store
+*.pem
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+.jest_cache
+coverage
+
+# Database/scripts (no necesarios en producción)
+*.sql
+scripts/
+tests/
+*check*.js
+*test*.js
+*demo*.js
+*fix*.js
+*sync*.js
+*verify*.js

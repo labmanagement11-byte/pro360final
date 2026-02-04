@@ -32,6 +32,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setLoading(true);
     setError('');
     
+    // Limpiar sesión anterior corrupta
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(SESSION_KEY);
+    }
+    
     if (!supabase) {
       setError('No se pudo conectar con Supabase. Verifica configuración.');
       setLoading(false);
@@ -47,63 +52,95 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       });
 
       if (authError || !authData.user) {
+        console.error('❌ [Login] Error en autenticación:', authError);
         setError('Email o contraseña incorrectos');
         setLoading(false);
         return;
       }
 
+      console.log('✅ [Login] Autenticación exitosa, User ID:', authData.user.id);
+      
+      // Esperar un momento para que Supabase actualice la sesión
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Buscar perfil robustamente en varias fuentes (users, profiles)
       const localPart = email.split('@')[0].toLowerCase();
+      const userId = authData.user.id;
       let record: any = null;
 
-      // 1) Buscar en tabla users por username
-      try {
-        const { data: u } = await supabase.from('users').select('*').ilike('username', localPart).single();
-        if (u) record = u;
-      } catch (e) { /* ignored */ }
+      console.log('🔍 [Login] Buscando perfil para:', { userId, email, localPart });
 
-      // 2) Si no existe, buscar en profiles por username
+      // 1) PRIMERO: Buscar en profiles por ID de usuario (más confiable)
+      try {
+        const { data: profileById, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (profileError) {
+          console.log('⚠️ [Login] Error buscando en profiles por ID:', profileError.message);
+        }
+        if (profileById) {
+          record = profileById;
+          console.log('✅ [Login] Perfil encontrado por ID en profiles:', record);
+        }
+      } catch (e: any) {
+        console.log('⚠️ [Login] Excepción buscando en profiles por ID:', e.message);
+      }
+
+      // 2) Si no existe, buscar en tabla users por ID
+      if (!record) {
+        try {
+          const { data: userById } = await supabase.from('users').select('*').eq('id', userId).single();
+          if (userById) {
+            record = userById;
+            console.log('✅ [Login] Perfil encontrado por ID en users');
+          }
+        } catch (e) { /* ignored */ }
+      }
+
+      // 3) Si no existe, buscar en profiles por username
       if (!record) {
         try {
           const { data: p } = await supabase.from('profiles').select('*').ilike('username', localPart).single();
-          if (p) record = p;
+          if (p) {
+            record = p;
+            console.log('✅ [Login] Perfil encontrado por username en profiles');
+          }
         } catch (e) { /* ignored */ }
       }
 
-      // 3) Si no existe, buscar en profiles por full_name
+      // 4) Si no existe, buscar en tabla users por username
       if (!record) {
         try {
-          const { data: p2 } = await supabase.from('profiles').select('*').ilike('full_name', localPart).single();
-          if (p2) record = p2;
-        } catch (e) { /* ignored */ }
-      }
-
-      // 4) Si sigue sin existir, buscar por email en users o profiles (si tenemos email)
-      const userEmail = authData?.user?.email;
-      if (!record && userEmail) {
-        try {
-          const { data: u2 } = await supabase.from('users').select('*').eq('email', userEmail).single();
-          if (u2) record = u2;
-        } catch (e) { /* ignored */ }
-      }
-
-      if (!record && userEmail) {
-        try {
-          const { data: p3 } = await supabase.from('profiles').select('*').eq('email', userEmail).single();
-          if (p3) record = p3;
+          const { data: u } = await supabase.from('users').select('*').ilike('username', localPart).single();
+          if (u) {
+            record = u;
+            console.log('✅ [Login] Perfil encontrado por username en users');
+          }
         } catch (e) { /* ignored */ }
       }
 
       if (!record) {
-        setError('Usuario no encontrado en base de datos');
+        console.error('❌ [Login] No se encontró perfil para:', { userId, email, localPart });
+        console.error('❌ [Login] Intentó buscar en profiles y users sin éxito');
+        setError('Usuario no encontrado en base de datos. Por favor contacte al administrador.');
         setLoading(false);
         return;
+      }
+
+      console.log('✅ [Login] Perfil obtenido:', { 
+        username: record.username, 
+        role: record.role, 
+        house: record.house 
+      });
+
+      // Normalizar rol 'dueno' a 'owner' para compatibilidad con el código existente
+      let userRole = record.role || (record.user_metadata && record.user_metadata.role) || 'empleado';
+      if (userRole === 'dueno') {
+        userRole = 'owner';
       }
 
       const user: User = {
         username: record.username || record.full_name || localPart,
         password: '',
-        role: record.role || (record.user_metadata && record.user_metadata.role) || 'empleado',
+        role: userRole,
         house: record.house || 'EPIC D1',
       };
 
