@@ -353,6 +353,9 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       setLoading(false);
     }
   };
+
+  // Marcar/desmarcar ítem de limpieza
+  const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
     console.log('✏️ [Checklist] Actualizando item:', item.item, 'completada:', !item.complete, 'usuario:', user.username);
