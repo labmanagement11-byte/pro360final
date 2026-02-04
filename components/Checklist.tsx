@@ -352,7 +352,7 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
           .eq('id', assignmentId)
           .single();
         
-        // Reiniciar por ID de asignación (si está disponible)
+        // UPDATE 1: Reiniciar por ID de asignación (si está disponible)
         const updateByAssignmentId = await (supabase
           .from('cleaning_checklist') as any)
           .update({ completed: false, completed_by: null, completed_at: null })
@@ -360,7 +360,7 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         
         console.log('🔄 Reset por assignment ID:', assignmentId, 'Resultado:', updateByAssignmentId);
         
-        // Fallback: reiniciar por employee + house también
+        // UPDATE 2: Reiniciar por employee + house (para items orfanos)
         if (assignment) {
           const updateByEmployeeHouse = await (supabase
             .from('cleaning_checklist') as any)
@@ -368,8 +368,16 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
             .eq('employee', assignment.employee)
             .eq('house', assignment.house);
           
-          console.log('🔄 Reset por employee+house:', assignment.employee, assignment.house, 'Resultado:', updateByEmployeeHouse);
+          console.log('🔄 Reset por employee+house (orfanos):', assignment.employee, assignment.house, 'Resultado:', updateByEmployeeHouse);
         }
+        
+        // UPDATE 3: Reiniciar por house solamente (fallback adicional)
+        const updateByHouseOnly = await (supabase
+          .from('cleaning_checklist') as any)
+          .update({ completed: false, completed_by: null, completed_at: null })
+          .eq('house', user.house);
+        
+        console.log('🔄 Reset por house solamente:', user.house, 'Resultado:', updateByHouseOnly);
       }
       
       // Reiniciar los ítems legacy si existen
@@ -393,6 +401,8 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       if (user.house === 'HYNTIBA2 APTO 406') {
         localStorage.removeItem('plantilla_checklist_hyntiba2');
       }
+      localStorage.removeItem('dashboard_checklist');
+      localStorage.removeItem(CHECKLIST_KEY);
       
       // Pequeño delay para asegurar que la BD haya actualizado
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -429,13 +439,14 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         .update({ completed: true })
         .eq('id', assignmentId);
 
-      // 2. Reiniciar checklist de limpieza/mantenimiento por assignment ID
+      // 2. Reiniciar checklist de limpieza/mantenimiento
+      // UPDATE 1: Por assignment ID
       await (supabase
         .from('cleaning_checklist') as any)
         .update({ completed: false, completed_by: null, completed_at: null })
         .eq('calendar_assignment_id_bigint', assignmentId);
       
-      // Fallback: reiniciar por employee + house
+      // UPDATE 2: Por employee + house (orfanos)
       if (assignment) {
         await (supabase
           .from('cleaning_checklist') as any)
@@ -443,12 +454,25 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
           .eq('employee', assignment.employee)
           .eq('house', assignment.house);
       }
+      
+      // UPDATE 3: Por house solamente (fallback adicional)
+      await (supabase
+        .from('cleaning_checklist') as any)
+        .update({ completed: false, completed_by: null, completed_at: null })
+        .eq('house', user.house);
 
       // 3. Reiniciar inventario de la asignación
       await (supabase
         .from('assignment_inventory') as any)
         .update({ is_complete: false, checked_by: null, checked_at: null })
         .eq('calendar_assignment_id', assignmentId);
+      
+      // Limpiar localStorage
+      if (user.house === 'HYNTIBA2 APTO 406') {
+        localStorage.removeItem('plantilla_checklist_hyntiba2');
+      }
+      localStorage.removeItem('dashboard_checklist');
+      localStorage.removeItem(CHECKLIST_KEY);
       
       // Pequeño delay para asegurar que la BD haya actualizado
       await new Promise(resolve => setTimeout(resolve, 500));
