@@ -343,12 +343,33 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       setLoading(true);
       const supabase = getSupabaseClient();
       
-      // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist si hay assignmentId
+      // Reiniciar los ítems del checklist en la tabla moderna cleaning_checklist
       if (assignmentId) {
-        await (supabase
+        // Primero obtener la asignación para tener datos del employee y house
+        const { data: assignment } = await (supabase
+          .from('calendar_assignments') as any)
+          .select('employee, house')
+          .eq('id', assignmentId)
+          .single();
+        
+        // Reiniciar por ID de asignación (si está disponible)
+        const updateByAssignmentId = await (supabase
           .from('cleaning_checklist') as any)
           .update({ completed: false, completed_by: null, completed_at: null })
           .eq('calendar_assignment_id_bigint', assignmentId);
+        
+        console.log('🔄 Reset por assignment ID:', assignmentId, 'Resultado:', updateByAssignmentId);
+        
+        // Fallback: reiniciar por employee + house también
+        if (assignment) {
+          const updateByEmployeeHouse = await (supabase
+            .from('cleaning_checklist') as any)
+            .update({ completed: false, completed_by: null, completed_at: null })
+            .eq('employee', assignment.employee)
+            .eq('house', assignment.house);
+          
+          console.log('🔄 Reset por employee+house:', assignment.employee, assignment.house, 'Resultado:', updateByEmployeeHouse);
+        }
       }
       
       // Reiniciar los ítems legacy si existen
@@ -357,6 +378,8 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         const { data, error } = await (checklistTable() as any)
           .update({ complete: false })
           .in('id', allIds);
+        
+        console.log('🔄 Reset legacy items:', allIds.length, 'Error:', error);
         if (error) {
           console.error('Error reiniciando legacy items:', error);
         }
@@ -370,6 +393,9 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       if (user.house === 'HYNTIBA2 APTO 406') {
         localStorage.removeItem('plantilla_checklist_hyntiba2');
       }
+      
+      // Pequeño delay para asegurar que la BD haya actualizado
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Recargar los datos desde la base de datos
       await fetchChecklist();
@@ -388,6 +414,14 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
     try {
       setLoading(true);
       const supabase = getSupabaseClient();
+      
+      // 0. Obtener datos de la asignación
+      const { data: assignment } = await (supabase
+        .from('calendar_assignments') as any)
+        .select('employee, house')
+        .eq('id', assignmentId)
+        .single();
+      
       // 1. Marcar la asignación como completada
       await supabase
         .from('calendar_assignments')
@@ -395,18 +429,30 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
         .update({ completed: true })
         .eq('id', assignmentId);
 
-      // 2. Reiniciar checklist de limpieza/mantenimiento
+      // 2. Reiniciar checklist de limpieza/mantenimiento por assignment ID
       await (supabase
         .from('cleaning_checklist') as any)
         .update({ completed: false, completed_by: null, completed_at: null })
         .eq('calendar_assignment_id_bigint', assignmentId);
+      
+      // Fallback: reiniciar por employee + house
+      if (assignment) {
+        await (supabase
+          .from('cleaning_checklist') as any)
+          .update({ completed: false, completed_by: null, completed_at: null })
+          .eq('employee', assignment.employee)
+          .eq('house', assignment.house);
+      }
 
       // 3. Reiniciar inventario de la asignación
       await (supabase
         .from('assignment_inventory') as any)
         .update({ is_complete: false, checked_by: null, checked_at: null })
         .eq('calendar_assignment_id', assignmentId);
-
+      
+      // Pequeño delay para asegurar que la BD haya actualizado
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // 4. Recargar datos desde la base de datos
       await fetchChecklist();
       
