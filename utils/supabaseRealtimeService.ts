@@ -617,7 +617,7 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
   Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
     tasks.forEach((task) => {
       checklistItems.push({
-        calendar_assignment_id_bigint: assignmentId,
+        calendar_assignment_id: assignmentId,
         employee: employee,
         house: house,
         zone: zone,
@@ -674,21 +674,21 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
     // Obtener tareas desde la tabla cleaning_checklist vinculadas a la asignación
-    // Primero buscar por calendar_assignment_id_bigint (nueva columna no destructiva)
+    // Buscar por calendar_assignment_id (columna correcta)
     let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id_bigint', assignmentId)
+      .eq('calendar_assignment_id', assignmentId)
       .order('order_num', { ascending: true });
 
     if (error) {
-      console.error('❌ [Checklist] Error fetching cleaning_checklist items by bigint id:', error);
+      console.error('❌ [Checklist] Error fetching cleaning_checklist items:', error);
       return [];
     }
 
-    // Si no hay resultados con la columna bigint, intentar fallback por employee + house
+    // Si no hay resultados, intentar fallback por employee + house
     if (!data || data.length === 0) {
-      console.log('⚠️ [Checklist] No items found by bigint id, falling back to employee+house search');
+      console.log('⚠️ [Checklist] No items found by assignment id, falling back to employee+house search');
       const assignmentEmployee = assignment.employee;
       const assignmentHouse = assignment.house;
       const fallbackQuery = (supabase
@@ -715,8 +715,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       completed_by: item.completed_by || null,
       completed_at: item.completed_at || null,
       order_num: item.order_num || 0,
-      // preferir calendar_assignment_id_bigint si existe
-      calendar_assignment_id: item.calendar_assignment_id_bigint || item.calendar_assignment_id,
+      calendar_assignment_id: item.calendar_assignment_id,
       house: item.house,
       assigned_to: item.employee
     }));
