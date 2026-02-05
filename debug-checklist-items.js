@@ -31,7 +31,7 @@ async function debugChecklist() {
     console.log('\n🧹 CLEANING_CHECKLIST (últimos 20):');
     const { data: cleaningItems, error: cleaningError } = await supabase
       .from('cleaning_checklist')
-      .select('id, task, zone, calendar_assignment_id_bigint, employee, house, completed')
+      .select('id, task, zone, calendar_assignment_id, employee, house, completed')
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -41,7 +41,7 @@ async function debugChecklist() {
       console.log(`Total: ${cleaningItems?.length || 0}`);
       if (cleaningItems && cleaningItems.length > 0) {
         cleaningItems.slice(0, 5).forEach(item => {
-          console.log(`  Task: ${item.task?.substring(0, 40)} | Assignment ID: ${item.calendar_assignment_id_bigint} | Employee: ${item.employee}`);
+          console.log(`  Task: ${item.task?.substring(0, 40)} | Assignment ID: ${item.calendar_assignment_id} | Employee: ${item.employee}`);
         });
       }
     }
@@ -54,7 +54,7 @@ async function debugChecklist() {
       const { data: itemsForAssignment, error: itemsError } = await supabase
         .from('cleaning_checklist')
         .select('*')
-        .eq('calendar_assignment_id_bigint', latestAssignment.id);
+        .eq('calendar_assignment_id', latestAssignment.id);
       
       if (itemsError) {
         console.log('❌ Error:', itemsError.message);

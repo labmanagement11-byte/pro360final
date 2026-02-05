@@ -489,7 +489,10 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
   
-  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentId, 'Tipo:', assignmentType, 'Empleado:', employee, 'Casa:', house);
+  // Asegurar que assignmentId es un string
+  const assignmentIdStr = String(assignmentId);
+  
+  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentIdStr, 'Tipo:', assignmentType, 'Empleado:', employee, 'Casa:', house);
   
   // Listas de limpieza por tipo
   const LIMPIEZA_REGULAR: Record<string, string[]> = {
@@ -617,7 +620,7 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
   Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
     tasks.forEach((task) => {
       checklistItems.push({
-        calendar_assignment_id: assignmentId,
+        calendar_assignment_id: assignmentIdStr,
         employee: employee,
         house: house,
         zone: zone,
@@ -656,7 +659,10 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
 
 export async function getCleaningChecklistItems(assignmentId: string) {
   try {
-    console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentId);
+    // Asegurar que assignmentId es un string
+    const assignmentIdStr = String(assignmentId);
+    
+    console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentIdStr);
     const supabase = getSupabaseClient();
     
     // Primero obtener la casa y el tipo de la asignación
@@ -674,11 +680,11 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
     // Obtener tareas desde la tabla cleaning_checklist vinculadas a la asignación
-    // Buscar por calendar_assignment_id (columna correcta)
+    // Buscar por calendar_assignment_id (convertir a string)
     let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignmentId)
+      .eq('calendar_assignment_id', assignmentIdStr)
       .order('order_num', { ascending: true });
 
     if (error) {
