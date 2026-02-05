@@ -411,6 +411,17 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
 // ==================== CALENDAR ASSIGNMENTS ====================
 export async function createCalendarAssignment(assignment: any) {
   const supabase = getSupabaseClient();
+  
+  // Generate UUID for checklist reference
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+  
+  const checklistUUID = generateUUID();
+  
   const { data, error } = await (supabase
     .from('calendar_assignments') as any)
     .insert([{
@@ -419,6 +430,7 @@ export async function createCalendarAssignment(assignment: any) {
       time: assignment.time,
       type: assignment.type,
       house: assignment.house || 'HYNTIBA2 APTO 406',
+      checklist_uuid: checklistUUID,
       created_at: new Date().toISOString()
     }])
     .select();
@@ -427,7 +439,12 @@ export async function createCalendarAssignment(assignment: any) {
     console.error('Error creating calendar assignment:', error);
     return null;
   }
-  return data?.[0] || null;
+  
+  const result = data?.[0] || null;
+  if (result) {
+    console.log('✅ Calendar assignment created with checklist_uuid:', checklistUUID);
+  }
+  return result;
 }
 
 export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406', employee?: string) {
@@ -486,13 +503,40 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 
 
 // ==================== CLEANING CHECKLIST ====================
-export async function createCleaningChecklistItems(assignmentId: string, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406') {
+export async function createCleaningChecklistItems(assignmentId: string | number, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406', checklistUUID?: string) {
   const supabase = getSupabaseClient();
   
-  // Asegurar que assignmentId es un string
-  const assignmentIdStr = String(assignmentId);
+  // If no UUID provided, try to fetch it from calendar_assignments
+  let calendarAssignmentUUID = checklistUUID;
+  if (!calendarAssignmentUUID) {
+    try {
+      const { data } = await (supabase
+        .from('calendar_assignments') as any)
+        .select('checklist_uuid')
+        .eq('id', assignmentId)
+        .single();
+      
+      if (data?.checklist_uuid) {
+        calendarAssignmentUUID = data.checklist_uuid;
+        console.log('🔑 [Checklist] Retrieved checklist_uuid:', calendarAssignmentUUID);
+      }
+    } catch (err) {
+      console.log('⚠️ [Checklist] Could not retrieve checklist_uuid, generating new one');
+    }
+  }
   
-  console.log('🧹 [Checklist] Iniciando creación de items para asignación:', assignmentIdStr, 'Tipo:', assignmentType, 'Empleado:', employee, 'Casa:', house);
+  // If still no UUID, generate one
+  if (!calendarAssignmentUUID) {
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    calendarAssignmentUUID = generateUUID();
+  }
+  
+  console.log('🧹 [Checklist] Creating items for assignment UUID:', calendarAssignmentUUID, 'Type:', assignmentType, 'Employee:', employee, 'House:', house);
   
   // Listas de limpieza por tipo
   const LIMPIEZA_REGULAR: Record<string, string[]> = {
@@ -620,7 +664,7 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
   Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
     tasks.forEach((task) => {
       checklistItems.push({
-        calendar_assignment_id: assignmentIdStr,
+        calendar_assignment_id: calendarAssignmentUUID,
         employee: employee,
         house: house,
         zone: zone,
@@ -665,10 +709,10 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentIdStr);
     const supabase = getSupabaseClient();
     
-    // Primero obtener la casa y el tipo de la asignación
+    // Primero obtener los datos de la asignación incluyendo el checklist_uuid
     const { data: assignment, error: assignmentError } = await (supabase
       .from('calendar_assignments') as any)
-      .select('house, employee, type')
+      .select('house, employee, type, checklist_uuid')
       .eq('id', assignmentId)
       .single();
     
@@ -677,14 +721,13 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       return [];
     }
     
-    console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
+    console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type, 'UUID:', assignment.checklist_uuid);
     
-    // Obtener tareas desde la tabla cleaning_checklist vinculadas a la asignación
-    // Buscar por calendar_assignment_id (convertir a string)
+    // Obtener tareas desde la tabla cleaning_checklist usando el checklist_uuid
     let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignmentIdStr)
+      .eq('calendar_assignment_id', assignment.checklist_uuid)
       .order('order_num', { ascending: true });
 
     if (error) {
@@ -694,7 +737,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
 
     // Si no hay resultados, intentar fallback por employee + house
     if (!data || data.length === 0) {
-      console.log('⚠️ [Checklist] No items found by assignment id, falling back to employee+house search');
+      console.log('⚠️ [Checklist] No items found by assignment UUID, falling back to employee+house search');
       const assignmentEmployee = assignment.employee;
       const assignmentHouse = assignment.house;
       const fallbackQuery = (supabase
