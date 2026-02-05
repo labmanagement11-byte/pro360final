@@ -422,7 +422,8 @@ export async function createCalendarAssignment(assignment: any) {
   
   const checklistUUID = generateUUID();
   
-  const { data, error } = await (supabase
+  // Try to insert with checklist_uuid first
+  let { data, error } = await (supabase
     .from('calendar_assignments') as any)
     .insert([{
       employee: assignment.employee,
@@ -434,6 +435,34 @@ export async function createCalendarAssignment(assignment: any) {
       created_at: new Date().toISOString()
     }])
     .select();
+  
+  // If the column doesn't exist, try without it
+  if (error && error.message && error.message.includes('checklist_uuid')) {
+    console.log('⚠️ checklist_uuid column not found, creating without it. Run this SQL in Supabase: ALTER TABLE calendar_assignments ADD COLUMN checklist_uuid UUID;');
+    const { data: data2, error: error2 } = await (supabase
+      .from('calendar_assignments') as any)
+      .insert([{
+        employee: assignment.employee,
+        date: assignment.date,
+        time: assignment.time,
+        type: assignment.type,
+        house: assignment.house || 'HYNTIBA2 APTO 406',
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    
+    data = data2;
+    error = error2;
+    
+    // Store UUID in localStorage as fallback
+    if (data && data[0]) {
+      const fallbackKey = `assignment_${data[0].id}_uuid`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(fallbackKey, checklistUUID);
+      }
+      console.log(`💾 Stored UUID ${checklistUUID} in localStorage with key: ${fallbackKey}`);
+    }
+  }
   
   if (error) {
     console.error('Error creating calendar assignment:', error);
@@ -723,11 +752,23 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type, 'UUID:', assignment.checklist_uuid);
     
-    // Obtener tareas desde la tabla cleaning_checklist usando el checklist_uuid
+    // Intentar usar checklist_uuid si existe
+    let checklist_uuid = assignment.checklist_uuid;
+    
+    // Si no existe UUID en BD, intentar localStorage
+    if (!checklist_uuid && typeof window !== 'undefined') {
+      const fallbackKey = `assignment_${assignmentId}_uuid`;
+      checklist_uuid = localStorage.getItem(fallbackKey) || undefined;
+      if (checklist_uuid) {
+        console.log('📱 [Checklist] UUID recuperado de localStorage:', checklist_uuid);
+      }
+    }
+    
+    // Obtener tareas desde la tabla cleaning_checklist
     let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignment.checklist_uuid)
+      .eq('calendar_assignment_id', checklist_uuid || '')
       .order('order_num', { ascending: true });
 
     if (error) {
