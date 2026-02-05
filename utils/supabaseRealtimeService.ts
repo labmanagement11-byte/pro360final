@@ -612,18 +612,46 @@ export async function createCleaningChecklistItems(assignmentId: string, employe
   console.log('📋 [Checklist] Usando template:', Object.keys(checklistTemplate).length, 'zonas');
 
   // Convertir el template a items
-  const checklistItems: { zone: string; task: string; order: number }[] = [];
+  const checklistItems: any[] = [];
+  let orderNum = 0;
   Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
-    tasks.forEach((task, index) => {
+    tasks.forEach((task) => {
       checklistItems.push({
+        calendar_assignment_id_bigint: assignmentId,
+        employee: employee,
+        house: house,
         zone: zone,
         task: task,
-        order: index
+        completed: false,
+        completed_by: null,
+        completed_at: null,
+        order_num: orderNum
       });
+      orderNum++;
     });
   });
-  // Aquí no se debe usar 'data', solo retornar checklistItems
-  return checklistItems;
+
+  // Intentar insertar en cleaning_checklist
+  try {
+    console.log('💾 [Checklist] Insertando', checklistItems.length, 'items en cleaning_checklist');
+    const { data, error } = await (supabase
+      .from('cleaning_checklist') as any)
+      .insert(checklistItems)
+      .select();
+    
+    if (error) {
+      console.error('⚠️ [Checklist] Error inserting into cleaning_checklist:', error);
+      console.warn('⚠️ [Checklist] Continuando solo con items en memoria (sin persistencia)');
+      return checklistItems;
+    }
+    
+    console.log('✅ [Checklist] Items insertados exitosamente en cleaning_checklist:', data?.length);
+    return data || checklistItems;
+  } catch (err) {
+    console.error('❌ [Checklist] Exception inserting into cleaning_checklist:', err);
+    console.warn('⚠️ [Checklist] Retornando items en memoria sin persistencia');
+    return checklistItems;
+  }
 }
 
 export async function getCleaningChecklistItems(assignmentId: string) {
