@@ -645,7 +645,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       return [];
     }
 
-    // Buscar items SOLO por calendar_assignment_id
+    // PASO 1: Buscar items por calendar_assignment_id (datos nuevos)
     const { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
@@ -653,11 +653,52 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       .order('order_num', { ascending: true });
 
     if (!error && data && data.length > 0) {
-      console.log('✅ [Checklist] Items obtenidos:', data.length, 'items para', assignment.type);
+      console.log('✅ [Checklist] Items obtenidos por assignment_id:', data.length, 'items para', assignment.type);
       return data;
     }
 
-    // Si no hay items, crear desde plantillas específicas de la casa y tipo
+    // PASO 2: Si no hay items por assignment_id, buscar inteligentemente en datos existentes
+    // Obtener las zonas que corresponden a este tipo de tarea desde las plantillas
+    const { data: templates, error: templatesError } = await (supabase
+      .from('checklist_templates') as any)
+      .select('zone')
+      .eq('house', assignment.house)
+      .eq('task_type', assignment.type)
+      .eq('active', true);
+
+    if (templates && templates.length > 0) {
+      // Extraer zonas únicas
+      const zonesForType = [...new Set(templates.map((t: any) => t.zone))];
+      console.log('🔍 [Checklist] Buscando items por employee+house+zonas para tipo:', assignment.type, 'Zonas:', zonesForType);
+      
+      // Buscar items que coincidan con employee + house + zonas del tipo
+      const { data: existingItems, error: existingError } = await (supabase
+        .from('cleaning_checklist') as any)
+        .select('*')
+        .eq('employee', assignment.employee)
+        .eq('house', assignment.house)
+        .in('zone', zonesForType)
+        .order('order_num', { ascending: true });
+
+      if (!existingError && existingItems && existingItems.length > 0) {
+        console.log('✅ [Checklist] Items existentes encontrados:', existingItems.length, 'para', assignment.type);
+        
+        // Actualizar estos items con el calendar_assignment_id (migración lenta)
+        for (const item of existingItems) {
+          if (!item.calendar_assignment_id || item.calendar_assignment_id === '') {
+            await (supabase
+              .from('cleaning_checklist') as any)
+              .update({ calendar_assignment_id: assignmentIdStr })
+              .eq('id', item.id)
+              .catch((err: any) => console.warn('⚠️ [Checklist] No se pudo actualizar item:', item.id));
+          }
+        }
+        
+        return existingItems;
+      }
+    }
+
+    // PASO 3: Si no hay items en ninguna forma, crear desde plantillas específicas
     console.log('⚠️ [Checklist] No items found; creando desde plantillas para', assignment.type, assignment.house);
     const created = await createChecklistFromTemplate(
       assignmentIdStr,
