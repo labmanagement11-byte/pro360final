@@ -412,17 +412,7 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
 export async function createCalendarAssignment(assignment: any) {
   const supabase = getSupabaseClient();
   
-  // Generate UUID for checklist reference
-  const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  };
-  
-  const checklistUUID = generateUUID();
-  
-  // First, try to insert with checklist_uuid
+  // Insert assignment - cleaning_checklist uses numeric IDs, not UUIDs
   let { data, error } = await (supabase
     .from('calendar_assignments') as any)
     .insert([{
@@ -431,50 +421,18 @@ export async function createCalendarAssignment(assignment: any) {
       time: assignment.time,
       type: assignment.type,
       house: assignment.house || 'HYNTIBA2 APTO 406',
-      checklist_uuid: checklistUUID,
       created_at: new Date().toISOString()
     }])
     .select();
   
-  // If column doesn't exist, try without it and use localStorage
   if (error) {
-    console.log('⚠️ Column issue detected, inserting without checklist_uuid and using localStorage fallback');
-    const { data: data2, error: error2 } = await (supabase
-      .from('calendar_assignments') as any)
-      .insert([{
-        employee: assignment.employee,
-        date: assignment.date,
-        time: assignment.time,
-        type: assignment.type,
-        house: assignment.house || 'HYNTIBA2 APTO 406',
-        created_at: new Date().toISOString()
-      }])
-      .select();
-    
-    if (error2) {
-      console.error('Error creating calendar assignment:', error2);
-      return null;
-    }
-    
-    data = data2;
-    
-    // Store UUID in localStorage as fallback
-    if (data && data[0]) {
-      const fallbackKey = `assignment_${data[0].id}_uuid`;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(fallbackKey, checklistUUID);
-        console.log(`💾 Using localStorage fallback: key=${fallbackKey}, uuid=${checklistUUID}`);
-      }
-    }
+    console.error('❌ Error creating calendar assignment:', error);
+    return null;
   }
   
   const result = data?.[0] || null;
   if (result) {
-    // Always log both direct UUID and localStorage fallback
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`assignment_${result.id}_uuid`, checklistUUID);
-    }
-    console.log(`✅ Assignment ${result.id} created | UUID: ${checklistUUID}`);
+    console.log(`✅ Assignment ${result.id} created for ${result.employee}`);
   }
   return result;
 }
@@ -538,42 +496,10 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 export async function createCleaningChecklistItems(assignmentId: string | number, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406', checklistUUID?: string) {
   const supabase = getSupabaseClient();
   
-  // If no UUID provided, try to fetch it from calendar_assignments
-  let calendarAssignmentUUID = checklistUUID;
-  if (!calendarAssignmentUUID) {
-    try {
-      const { data } = await (supabase
-        .from('calendar_assignments') as any)
-        .select('checklist_uuid')
-        .eq('id', assignmentId)
-        .single();
-      
-      if (data?.checklist_uuid) {
-        calendarAssignmentUUID = data.checklist_uuid;
-        console.log('🔑 [Checklist] Retrieved checklist_uuid:', calendarAssignmentUUID);
-      }
-    } catch (err) {
-      console.log('⚠️ [Checklist] Could not retrieve checklist_uuid, generating new one');
-    }
-  }
+  // Use numeric assignment ID directly - cleaning_checklist expects bigint
+  const numericAssignmentId = typeof assignmentId === 'string' ? parseInt(assignmentId) : assignmentId;
   
-  // If still no UUID, generate one
-  if (!calendarAssignmentUUID) {
-    const generateUUID = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
-    calendarAssignmentUUID = generateUUID();
-  }
-  
-  // Always store UUID in localStorage for fallback
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(`assignment_${assignmentId}_uuid`, calendarAssignmentUUID);
-  }
-  
-  console.log('🧹 [Checklist] Creating items for assignment UUID:', calendarAssignmentUUID, 'Type:', assignmentType, 'Employee:', employee, 'House:', house);
+  console.log('🧹 [Checklist] Creating items for assignment:', numericAssignmentId, 'Type:', assignmentType, 'Employee:', employee, 'House:', house);
   
   // Listas de limpieza por tipo
   const LIMPIEZA_REGULAR: Record<string, string[]> = {
@@ -695,13 +621,13 @@ export async function createCleaningChecklistItems(assignmentId: string | number
 
   console.log('📋 [Checklist] Usando template:', Object.keys(checklistTemplate).length, 'zonas');
 
-  // Convertir el template a items
+  // Convertir el template a items - use numeric assignment ID
   const checklistItems: any[] = [];
   let orderNum = 0;
   Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
     tasks.forEach((task) => {
       checklistItems.push({
-        calendar_assignment_id: calendarAssignmentUUID,
+        calendar_assignment_id: numericAssignmentId,
         employee: employee,
         house: house,
         zone: zone,
@@ -758,25 +684,16 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       return [];
     }
     
-    console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type, 'UUID:', assignment.checklist_uuid);
+    console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
-    // Intentar usar checklist_uuid si existe
-    let checklist_uuid = assignment.checklist_uuid;
+    // Use numeric assignment ID - cleaning_checklist stores bigint IDs
+    const numericAssignmentId = typeof assignmentId === 'string' ? parseInt(assignmentId) : assignmentId;
     
-    // Si no existe UUID en BD, intentar localStorage
-    if (!checklist_uuid && typeof window !== 'undefined') {
-      const fallbackKey = `assignment_${assignmentId}_uuid`;
-      checklist_uuid = localStorage.getItem(fallbackKey) || undefined;
-      if (checklist_uuid) {
-        console.log('📱 [Checklist] UUID recuperado de localStorage:', checklist_uuid);
-      }
-    }
-    
-    // Obtener tareas desde la tabla cleaning_checklist
+    // Obtener tareas desde la tabla cleaning_checklist usando el ID numérico
     let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', checklist_uuid || '')
+      .eq('calendar_assignment_id', numericAssignmentId)
       .order('order_num', { ascending: true });
 
     if (error) {
