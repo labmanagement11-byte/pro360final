@@ -1874,11 +1874,12 @@ export async function createChecklistFromTemplate(assignmentId: string, taskType
     console.log('📋 Creando checklist desde plantilla:', { assignmentId, taskType, employee, house });
     const supabase = getSupabaseClient();
     
-    // Obtener plantillas activas para este tipo de tarea
+    // Obtener plantillas activas para este tipo de tarea Y esta casa específica
     const { data: templates, error: templateError } = await (supabase
       .from('checklist_templates') as any)
       .select('*')
       .eq('task_type', taskType)
+      .eq('house', house)
       .eq('active', true)
       .order('order_num', { ascending: true });
     
@@ -1888,8 +1889,8 @@ export async function createChecklistFromTemplate(assignmentId: string, taskType
     }
     
     if (!templates || templates.length === 0) {
-      console.warn('⚠️ No hay plantillas para', taskType);
-      return { success: true, count: 0 };
+      console.warn(`⚠️ No hay plantillas para ${taskType} en casa ${house}`);
+      return { success: true, count: 0, items: [] };
     }
     
     console.log(`✅ ${templates.length} plantillas encontradas para ${taskType}`);
@@ -1921,6 +1922,250 @@ export async function createChecklistFromTemplate(assignmentId: string, taskType
     
   } catch (error) {
     console.error('❌ Exception en createChecklistFromTemplate:', error);
+    return { success: false, error };
+  }
+}
+
+// ==================== TEMPLATE MANAGEMENT (CRUD) ====================
+
+// Checklist Templates
+export async function getChecklistTemplates(house: string, taskType?: string) {
+  try {
+    const supabase = getSupabaseClient();
+    let query = supabase.from('checklist_templates').select('*').eq('house', house);
+    
+    if (taskType) {
+      query = query.eq('task_type', taskType);
+    }
+    
+    const { data, error } = await query.order('order_num', { ascending: true });
+    
+    if (error) {
+      console.error('❌ Error obteniendo templates de checklist:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en getChecklistTemplates:', error);
+    return [];
+  }
+}
+
+export async function createChecklistTemplate(template: {
+  house: string;
+  task_type: string;
+  zone: string;
+  task: string;
+  order_num?: number;
+  active?: boolean;
+}) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist_templates') as any)
+      .insert([template])
+      .select();
+    
+    if (error) {
+      console.error('❌ Error creando template de checklist:', error);
+      return null;
+    }
+    
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ Exception en createChecklistTemplate:', error);
+    return null;
+  }
+}
+
+export async function updateChecklistTemplate(id: string, updates: any) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist_templates') as any)
+      .update(updates)
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      console.error('❌ Error actualizando template de checklist:', error);
+      return null;
+    }
+    
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ Exception en updateChecklistTemplate:', error);
+    return null;
+  }
+}
+
+export async function deleteChecklistTemplate(id: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await (supabase
+      .from('checklist_templates') as any)
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('❌ Error eliminando template de checklist:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Exception en deleteChecklistTemplate:', error);
+    return false;
+  }
+}
+
+// Inventory Templates
+export async function getInventoryTemplates(house: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory_templates') as any)
+      .select('*')
+      .eq('house', house)
+      .order('order_num', { ascending: true });
+    
+    if (error) {
+      console.error('❌ Error obteniendo templates de inventario:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en getInventoryTemplates:', error);
+    return [];
+  }
+}
+
+export async function createInventoryTemplate(template: {
+  house: string;
+  item_name: string;
+  quantity: number;
+  category: string;
+  location?: string;
+  order_num?: number;
+  active?: boolean;
+}) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory_templates') as any)
+      .insert([template])
+      .select();
+    
+    if (error) {
+      console.error('❌ Error creando template de inventario:', error);
+      return null;
+    }
+    
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ Exception en createInventoryTemplate:', error);
+    return null;
+  }
+}
+
+export async function updateInventoryTemplate(id: string, updates: any) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory_templates') as any)
+      .update(updates)
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      console.error('❌ Error actualizando template de inventario:', error);
+      return null;
+    }
+    
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ Exception en updateInventoryTemplate:', error);
+    return null;
+  }
+}
+
+export async function deleteInventoryTemplate(id: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await (supabase
+      .from('inventory_templates') as any)
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('❌ Error eliminando template de inventario:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Exception en deleteInventoryTemplate:', error);
+    return false;
+  }
+}
+
+// Crear inventario desde templates para una asignación
+export async function createInventoryFromTemplate(assignmentId: string, employee: string, house: string) {
+  try {
+    console.log('📦 Creando inventario desde plantilla:', { assignmentId, employee, house });
+    const supabase = getSupabaseClient();
+    
+    // Obtener templates activos para esta casa
+    const { data: templates, error: templateError } = await (supabase
+      .from('inventory_templates') as any)
+      .select('*')
+      .eq('house', house)
+      .eq('active', true)
+      .order('order_num', { ascending: true });
+    
+    if (templateError) {
+      console.error('❌ Error obteniendo templates de inventario:', templateError);
+      return { success: false, error: templateError };
+    }
+    
+    if (!templates || templates.length === 0) {
+      console.warn(`⚠️ No hay templates de inventario para casa ${house}`);
+      return { success: true, count: 0, items: [] };
+    }
+    
+    console.log(`✅ ${templates.length} templates de inventario encontrados para ${house}`);
+    
+    // Crear items de inventario desde templates
+    const inventoryItems = templates.map((template: any) => ({
+      calendar_assignment_id: assignmentId,
+      employee: employee,
+      house: house,
+      item_name: template.item_name,
+      quantity: template.quantity,
+      category: template.category,
+      location: template.location,
+      complete: false,
+      order_num: template.order_num
+    }));
+    
+    // Insertar en assignment_inventory
+    const { data, error } = await (supabase
+      .from('assignment_inventory') as any)
+      .insert(inventoryItems)
+      .select();
+    
+    if (error) {
+      console.error('❌ Error insertando inventario:', error);
+      return { success: false, error };
+    }
+    
+    console.log(`✅ ${data?.length || 0} items de inventario creados para asignación ${assignmentId}`);
+    return { success: true, count: data?.length || 0, items: data };
+    
+  } catch (error) {
+    console.error('❌ Exception en createInventoryFromTemplate:', error);
     return { success: false, error };
   }
 }
