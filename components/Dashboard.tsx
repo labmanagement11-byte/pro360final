@@ -3141,7 +3141,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           item_name: newTemplateItem.item_name,
                           quantity: parseInt(newTemplateItem.quantity),
                           category: newTemplateItem.category,
-                          location: newTemplateItem.location || null
+                          location: newTemplateItem.location || undefined
                         });
                         if (updated) {
                           setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
@@ -3154,7 +3154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           item_name: newTemplateItem.item_name,
                           quantity: parseInt(newTemplateItem.quantity),
                           category: newTemplateItem.category,
-                          location: newTemplateItem.location || null
+                          location: newTemplateItem.location || undefined
                         });
                         if (created) {
                           setInventoryTemplate(prev => [...prev, created]);
