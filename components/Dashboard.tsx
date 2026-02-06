@@ -27,19 +27,32 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     let refreshInterval: NodeJS.Timeout | null = null;
     
     const fetchAssignedTasks = async () => {
-      console.log(`📅 [Dashboard] Cargando asignaciones para ${user.username} en casa ${user.house || user.house_id}`);
+      console.log(`📅 [Dashboard] Cargando asignaciones para usuario:`, {
+        username: user.username,
+        house: user.house,
+        house_id: user.house_id
+      });
       
       // Query usando columnas correctas (house y employee como texto)
-      const { data } = await (supabase as any)
+      // Query SIN filtro de employee para ver si el problema es ese
+      const { data, error } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
         .eq('house', user.house || user.house_id)
-        .eq('employee', user.username)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
       
+      if (error) {
+        console.error(`❌ [Dashboard] Error fetching assignments:`, error);
+      }
+      
       if (isMounted) {
-        console.log(`✅ [Dashboard] Asignaciones cargadas:`, data?.length || 0);
-        setAssignedTasks(data || []);
+        // Filter by employee on client side
+        const filtered = (data || []).filter((a: any) => a.employee === user.username);
+        console.log(`✅ [Dashboard] Total asignaciones en casa:`, data?.length, `| Para usuario:`, filtered.length);
+        (data || []).forEach((a: any) => {
+          console.log(`  - ID:${a.id} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
+        });
+        setAssignedTasks(filtered || []);
       }
       setLoading(false);
     };
