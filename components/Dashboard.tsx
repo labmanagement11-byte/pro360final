@@ -2405,7 +2405,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               >
                                 ✅ Ver Checklist
                               </button>
-                              {assignment.type === 'Limpieza profunda' && (
+                              {(assignment.type === 'Limpieza profunda' || assignment.type === 'Limpieza regular') && (
                                 <button 
                                   className="dashboard-btn success"
                                   onClick={() => {
@@ -3665,7 +3665,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               <h2>
                 {currentAssignmentType?.toLowerCase().includes('mantenimiento')
                   ? '🔧 Tareas de Mantenimiento'
-                  : '🧹 Checklist de Limpieza Regular'}
+                  : currentAssignmentType?.toLowerCase().includes('profunda')
+                  ? '🧹 Checklist de Limpieza Profunda'
+                  : '✨ Checklist de Limpieza Regular'}
               </h2>
               <button className="modal-close" onClick={() => {
                 setSelectedAssignmentForChecklist(null);
