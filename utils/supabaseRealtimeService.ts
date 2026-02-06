@@ -1076,23 +1076,47 @@ export async function getCleaningChecklistItems(assignmentId: string) {
 }
 
 export async function updateCleaningChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('cleaning_checklist') as any)
-    .update({
-      completed: completed,
-      completed_by: completed ? completedBy || null : null,
-      completed_at: completed ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', itemId)
-    .select();
+  try {
+    console.log('🔄 [updateCleaningChecklistItem] Actualizando:', {
+      itemId,
+      completed,
+      completedBy,
+      timestamp: new Date().toISOString()
+    });
+    
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('cleaning_checklist') as any)
+      .update({
+        completed: completed,
+        completed_by: completed ? completedBy || null : null,
+        completed_at: completed ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId)
+      .select();
 
-  if (error) {
-    console.error('❌ [Checklist] Error updating cleaning_checklist item:', error);
+    if (error) {
+      console.error('❌ [updateCleaningChecklistItem] Error:', {
+        error: error.message,
+        itemId,
+        code: error.code
+      });
+      return null;
+    }
+    
+    console.log('✅ [updateCleaningChecklistItem] Actualizado exitosamente:', {
+      itemId,
+      completed,
+      dataLength: data?.length,
+      updated_by: completedBy
+    });
+    
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ [updateCleaningChecklistItem] Exception:', error);
     return null;
   }
-  return data?.[0] || null;
 }
 
 export function subscribeToChecklist(assignmentId: string, callback: (data: any) => void) {

@@ -3690,11 +3690,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                       checked={item.completed}
                                       onChange={async (e) => {
                                         console.log('📝 Actualizando item:', item.id, 'a', e.target.checked);
-                                        await realtimeService.updateCleaningChecklistItem(
-                                          item.id,
-                                          e.target.checked,
-                                          user.username
-                                        );
+                                        try {
+                                          const result = await realtimeService.updateCleaningChecklistItem(
+                                            item.id,
+                                            e.target.checked,
+                                            user.username
+                                          );
+                                          if (result) {
+                                            console.log('✅ Item actualizado exitosamente:', result);
+                                          } else {
+                                            console.error('❌ updateCleaningChecklistItem retornó null');
+                                          }
+                                        } catch (err) {
+                                          console.error('❌ Error en onChange:', err);
+                                        }
                                       }}
                                       disabled={user.role === 'manager' && user.username !== assignment.employee}
                                     />
