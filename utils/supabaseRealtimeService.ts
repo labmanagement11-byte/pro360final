@@ -1046,7 +1046,7 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
     console.log('📦 [Inventory Template] Obteniendo template para:', house);
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
-      .from('inventory_template') as any)
+      .from('inventory_templates') as any)
       .select('*')
       .eq('house', house)
       .order('category', { ascending: true })

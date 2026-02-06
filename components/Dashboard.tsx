@@ -634,6 +634,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     item_name: '',
     quantity: '',
     category: 'Cocina',
+    location: ''
+  });
+
+  // Estado para template de checklist (por casa)
+  const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
+  const [loadingChecklistTemplates, setLoadingChecklistTemplates] = useState(true);
+  const [editingChecklistTemplateId, setEditingChecklistTemplateId] = useState<string | null>(null);
+  const [newChecklistTemplate, setNewChecklistTemplate] = useState({
+    zone: '',
+    task: ''
   });
 
   // Casas y selección de casa
@@ -710,6 +720,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Estado para checklist
   const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
+  const getChecklistTaskType = (type: 'regular' | 'profunda' | 'mantenimiento') => {
+    if (type === 'profunda') return 'Limpieza profunda';
+    if (type === 'mantenimiento') return 'Mantenimiento';
+    return 'Limpieza regular';
+  };
   const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
   const [taskMaintenanceData, setTaskMaintenanceData] = useState<any>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_task_maintenance') : null;
@@ -1228,7 +1243,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const loadTemplate = async () => {
       try {
         setLoadingInventoryTemplate(true);
-        const template = await realtimeService.getInventoryTemplate(selectedHouse);
+        const template = await realtimeService.getInventoryTemplates(selectedHouse);
         setInventoryTemplate(template);
         setLoadingInventoryTemplate(false);
       } catch (error) {
@@ -1238,24 +1253,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
     
     loadTemplate();
-    
-    // Suscribirse a cambios en el template
-    const subscription = realtimeService.subscribeToInventoryTemplate(selectedHouse, (payload: any) => {
-      if (payload.eventType === 'INSERT') {
-        setInventoryTemplate(prev => [...prev, payload.new]);
-      } else if (payload.eventType === 'UPDATE') {
-        setInventoryTemplate(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
-      } else if (payload.eventType === 'DELETE') {
-        setInventoryTemplate(prev => prev.filter(item => item.id !== payload.old.id));
-      }
-    });
-    
-    return () => {
-      if (subscription) {
-        supabase?.removeChannel(subscription);
+  }, [selectedModalCard, allowedHouseIdx, houses]);
+
+  // useEffect para cargar templates de checklist por casa
+  useEffect(() => {
+    if (selectedModalCard !== 'checklist') return;
+
+    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    const taskType = getChecklistTaskType(checklistType);
+
+    const loadChecklistTemplates = async () => {
+      try {
+        setLoadingChecklistTemplates(true);
+        const templates = await realtimeService.getChecklistTemplates(selectedHouse, taskType);
+        setChecklistTemplates(templates);
+        setLoadingChecklistTemplates(false);
+      } catch (error) {
+        console.error('Error loading checklist templates:', error);
+        setLoadingChecklistTemplates(false);
       }
     };
-  }, [selectedModalCard, allowedHouseIdx, houses]);
+
+    loadChecklistTemplates();
+  }, [selectedModalCard, allowedHouseIdx, houses, checklistType]);
 
   // Cargar checklist desde Supabase y sincronizar en tiempo real
   useEffect(() => {
@@ -2779,7 +2799,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               
               {selectedModalCard === 'checklist' && (
                 <>
-                  {/* Controles de tipo de limpieza */}
+                  {/* Controles de tipo de checklist */}
                   <div className="checklist-controls" style={{marginBottom: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap'}}>
                     <button 
                       onClick={() => setChecklistType('regular')}
@@ -2804,267 +2824,179 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </button>
                   </div>
 
-                  {/* Formulario para agregar nueva tarea (solo manager/owner) */}
+                  {/* Formulario para agregar/editar tarea (solo manager/owner) */}
                   {(user.role === 'owner' || user.role === 'manager') && (
                     <div className="modal-assignment-form" style={{marginBottom: '2rem'}}>
-                      <h3>➕ Agregar Nueva Tarea al Checklist</h3>
-                      <form onSubmit={(e) => {
+                      <h3>➕ {editingChecklistTemplateId ? 'Editar Tarea del Template' : 'Agregar Tarea al Template'}</h3>
+                      <form onSubmit={async (e) => {
                         e.preventDefault();
-                        const form = e.target as HTMLFormElement;
-                        const taskText = (form.elements.namedItem('taskText') as HTMLInputElement).value;
-                        const zona = (form.elements.namedItem('zona') as HTMLSelectElement).value;
-                        
-                        if (!taskText.trim() || !zona) return;
-                        
-                        const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
-                        
-                        // Agregar tarea a Supabase para sincronización en tiempo real
-                        (async () => {
-                          try {
-                            if (!supabase) {
-                              console.error('❌ Supabase no está disponible');
-                              alert('Error: Supabase no configurado');
-                              return;
-                            }
-                            
-                            console.log('📝 Insertando tarea en checklist:', {
-                              house: selectedHouse,
-                              item: taskText,
-                              room: zona,
-                              type: checklistType
-                            });
-                            
-                            const { data, error } = await (supabase as any)
-                              .from('checklist')
-                              .insert([{
-                                house: selectedHouse,
-                                item: taskText,
-                                room: zona,
-                                complete: false,
-                                assigned_to: null
-                              }])
-                              .select();
-                            
-                            if (error) {
-                              console.error('❌ Error agregando tarea al checklist:', {
-                                code: error.code,
-                                message: error.message,
-                                details: error.details,
-                                hint: error.hint
-                              });
-                              alert(`❌ Error al guardar: ${error.message}`);
-                            } else {
-                              console.log('✅ Tarea agregada correctamente al checklist:', data);
-                              alert('✅ Tarea guardada en Supabase');
-                            }
-                          } catch (error: any) {
-                            console.error('❌ Error en insert checklist:', error);
-                            alert(`❌ Error: ${error?.message || 'Error desconocido'}`);
+                        const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+                        const taskType = getChecklistTaskType(checklistType);
+
+                        if (!newChecklistTemplate.task.trim() || !newChecklistTemplate.zone.trim()) return;
+
+                        const maxOrder = checklistTemplates.reduce((max, item) => {
+                          const val = Number(item.order_num || 0);
+                          return val > max ? val : max;
+                        }, 0);
+
+                        if (editingChecklistTemplateId) {
+                          const updated = await realtimeService.updateChecklistTemplate(editingChecklistTemplateId, {
+                            zone: newChecklistTemplate.zone.trim(),
+                            task: newChecklistTemplate.task.trim()
+                          });
+                          if (updated) {
+                            setChecklistTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
                           }
-                        })();
-                        
-                        // También actualizar el estado local para UI inmediata
-                        const updatedZone = {
-                          ...checklistData[zona],
-                          tasks: [...(checklistData[zona]?.tasks || []), { text: taskText, completed: false }]
-                        };
-                        setChecklistData({
-                          ...checklistData,
-                          [zona]: updatedZone
-                        });
-                        
-                        form.reset();
+                          setEditingChecklistTemplateId(null);
+                        } else {
+                          const created = await realtimeService.createChecklistTemplate({
+                            house: selectedHouse,
+                            task_type: taskType,
+                            zone: newChecklistTemplate.zone.trim(),
+                            task: newChecklistTemplate.task.trim(),
+                            order_num: maxOrder + 1,
+                            active: true
+                          });
+                          if (created) {
+                            setChecklistTemplates(prev => [...prev, created]);
+                          }
+                        }
+
+                        setNewChecklistTemplate({ zone: '', task: '' });
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
-                            <label>📋 Descripción de la tarea</label>
+                            <label>📍 Zona</label>
                             <input
                               type="text"
-                              name="taskText"
+                              value={newChecklistTemplate.zone}
+                              onChange={(e) => setNewChecklistTemplate({ ...newChecklistTemplate, zone: e.target.value })}
                               required
-                              placeholder="Ej: Limpiar lavamanos"
-                              style={{padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb'}}
+                              placeholder="Ej: COCINA"
+                              title="Zona"
                             />
                           </div>
                           <div className="form-group">
-                            <label>📍 Zona</label>
-                            <select
-                              name="zona"
+                            <label>📋 Tarea</label>
+                            <input
+                              type="text"
+                              value={newChecklistTemplate.task}
+                              onChange={(e) => setNewChecklistTemplate({ ...newChecklistTemplate, task: e.target.value })}
                               required
-                              style={{padding: '0.75rem', borderRadius: '0.5rem', border: '2px solid #e5e7eb'}}
-                            >
-                              <option value="">Seleccionar zona...</option>
-                              {Object.keys(checklistData)
-                                .filter(zona => checklistData[zona].type === checklistType)
-                                .map(zona => (
-                                  <option key={zona} value={zona}>{zona}</option>
-                                ))
-                              }
-                            </select>
+                              placeholder="Ej: Limpiar estufa"
+                              title="Tarea"
+                            />
                           </div>
                         </div>
-                        <button type="submit" className="dashboard-btn main" style={{marginTop: '1rem'}}>
-                          ➕ Agregar Tarea
-                        </button>
+                        <div style={{display: 'flex', gap: '1rem'}}>
+                          <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
+                            {editingChecklistTemplateId ? '✏️ Actualizar' : '➕ Agregar Tarea'}
+                          </button>
+                          {editingChecklistTemplateId && (
+                            <button 
+                              type="button" 
+                              className="dashboard-btn danger" 
+                              onClick={() => {
+                                setEditingChecklistTemplateId(null);
+                                setNewChecklistTemplate({ zone: '', task: '' });
+                              }}
+                            >
+                              ❌ Cancelar
+                            </button>
+                          )}
+                        </div>
                       </form>
                     </div>
                   )}
 
                   {/* Estadísticas generales */}
-                  {(() => {
-                    const stats = Object.entries(checklistData)
-                      .filter(([_, data]: any) => data.type === checklistType)
-                      .reduce((acc, [_, data]: any) => {
-                        const totalTasks = data.tasks.length;
-                        const completedTasks = data.tasks.filter((t: any) => t.completed).length;
-                        return {
-                          total: acc.total + totalTasks,
-                          completed: acc.completed + completedTasks
-                        };
-                      }, { total: 0, completed: 0 });
-                    
-                    return (
-                      <div className="modal-stats" style={{marginBottom: '2rem'}}>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{stats.total}</p>
-                          <p className="stat-box-label">Tareas totales</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{stats.completed}</p>
-                          <p className="stat-box-label">Completadas</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{stats.total - stats.completed}</p>
-                          <p className="stat-box-label">Pendientes</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</p>
-                          <p className="stat-box-label">Progreso</p>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <div className="modal-stats" style={{marginBottom: '2rem'}}>
+                    <div className="stat-box">
+                      <p className="stat-box-number">{checklistTemplates.length}</p>
+                      <p className="stat-box-label">Tareas en Template</p>
+                    </div>
+                    <div className="stat-box">
+                      <p className="stat-box-number">{new Set(checklistTemplates.map(t => t.zone)).size}</p>
+                      <p className="stat-box-label">Zonas</p>
+                    </div>
+                    <div className="stat-box">
+                      <p className="stat-box-number">{houses[allowedHouseIdx]?.name || 'EPIC D1'}</p>
+                      <p className="stat-box-label">Casa</p>
+                    </div>
+                  </div>
 
                   {/* Zonas con tareas */}
                   <div className="subcards-grid">
-                    {Object.entries(checklistData)
-                      .filter(([_, data]: any) => data.type === checklistType)
-                      .map(([zona, data]: any) => {
-                        const completedCount = data.tasks.filter((t: any) => t.completed).length;
-                        const totalCount = data.tasks.length;
-                        
+                    {loadingChecklistTemplates ? (
+                      <div className="modal-body-empty">
+                        <p>Cargando template...</p>
+                      </div>
+                    ) : checklistTemplates.length > 0 ? (
+                      (() => {
+                        const zones = new Map<string, any[]>();
+                        checklistTemplates.forEach(item => {
+                          if (!zones.has(item.zone)) zones.set(item.zone, []);
+                          zones.get(item.zone)!.push(item);
+                        });
+
                         return (
-                          <div key={zona} className="subcard" style={{border: '2px solid #e5e7eb'}}>
-                            <div className="subcard-header" style={{backgroundColor: completedCount === totalCount ? '#dcfce7' : '#fef3c7'}}>
-                              <h3 style={{flex: 1}}>{zona}</h3>
-                              <span style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#374151'}}>
-                                {completedCount}/{totalCount}
-                              </span>
-                            </div>
-                            <div className="subcard-content" style={{padding: '1rem'}}>
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
-                                {data.tasks.map((task: any, idx: number) => (
-                                  <div key={idx} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: task.completed ? '#f0fdf4' : '#fafafa', transition: 'background-color 0.2s'}}>
-                                    <label style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', flex: 1}}>
-                                      <input
-                                        type="checkbox"
-                                        checked={task.completed}
-                                        onChange={(e) => {
-                                          const updatedZone = {
-                                            ...checklistData[zona],
-                                            tasks: checklistData[zona].tasks.map((t: any, i: number) => 
-                                              i === idx ? { ...t, completed: e.target.checked } : t
-                                            )
-                                          };
-                                          setChecklistData({
-                                            ...checklistData,
-                                            [zona]: updatedZone
-                                          });
-                                        }}
-                                        style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
-                                      />
-                                      <span style={{flex: 1, color: task.completed ? '#6b7280' : '#1f2937', textDecoration: task.completed ? 'line-through' : 'none', fontSize: '0.95rem', lineHeight: '1.5'}}>
-                                        {task.text}
-                                      </span>
-                                    </label>
-                                    {(user.role === 'owner' || user.role === 'manager') && (
-                                      <div style={{display: 'flex', gap: '0.25rem', marginLeft: 'auto'}}>
-                                        <button
-                                          onClick={() => {
-                                            const newText = prompt('Editar tarea:', task.text);
-                                            if (newText && newText.trim()) {
-                                              const updatedZone = {
-                                                ...checklistData[zona],
-                                                tasks: checklistData[zona].tasks.map((t: any, i: number) => 
-                                                  i === idx ? { ...t, text: newText.trim() } : t
-                                                )
-                                              };
-                                              setChecklistData({
-                                                ...checklistData,
-                                                [zona]: updatedZone
-                                              });
-                                            }
-                                          }}
-                                          style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white'}}
-                                          title="Editar tarea"
-                                        >
-                                          ✏️
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            if (confirm(`¿Eliminar la tarea "${task.text}"?`)) {
-                                              const updatedZone = {
-                                                ...checklistData[zona],
-                                                tasks: checklistData[zona].tasks.filter((t: any, i: number) => i !== idx)
-                                              };
-                                              setChecklistData({
-                                                ...checklistData,
-                                                [zona]: updatedZone
-                                              });
-                                            }
-                                          }}
-                                          style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', backgroundColor: '#ef4444', color: 'white'}}
-                                          title="Eliminar tarea"
-                                        >
-                                          🗑️
-                                        </button>
+                          <div style={{gridColumn: '1 / -1'}}>
+                            {Array.from(zones.entries()).map(([zone, items]) => (
+                              <div key={zone} style={{marginBottom: '2rem'}}>
+                                <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
+                                  {zone} ({items.length} tareas)
+                                </h3>
+                                <div className="subcards-grid">
+                                  {items.map((item: any) => (
+                                    <div key={item.id} className="subcard">
+                                      <div className="subcard-header">
+                                        <div className="subcard-icon">📋</div>
+                                        <h3>{item.task}</h3>
                                       </div>
-                                    )}
-                                  </div>
-                                ))}
+                                      <div className="subcard-content">
+                                        <p><strong>🏷️ Tipo:</strong> {item.task_type}</p>
+                                        <p><strong>📍 Zona:</strong> {item.zone}</p>
+                                      </div>
+                                      {(user.role === 'owner' || user.role === 'manager') && (
+                                        <div className="subcard-actions">
+                                          <button
+                                            onClick={() => {
+                                              setEditingChecklistTemplateId(item.id);
+                                              setNewChecklistTemplate({ zone: item.zone, task: item.task });
+                                            }}
+                                          >
+                                            ✏️ Editar
+                                          </button>
+                                          <button
+                                            className="danger"
+                                            onClick={async () => {
+                                              if (confirm(`¿Eliminar "${item.task}" del template?`)) {
+                                                const ok = await realtimeService.deleteChecklistTemplate(item.id);
+                                                if (ok) {
+                                                  setChecklistTemplates(prev => prev.filter(t => t.id !== item.id));
+                                                }
+                                              }
+                                            }}
+                                          >
+                                            🗑️ Eliminar
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
+                            ))}
                           </div>
                         );
-                      })
-                    }
+                      })()
+                    ) : (
+                      <div className="modal-body-empty">
+                        <p>📭 No hay tareas en el template</p>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Botón para limpiar/resetear */}
-                  {Object.entries(checklistData)
-                    .filter(([_, data]: any) => data.type === checklistType)
-                    .some(([_, data]: any) => data.tasks.some((t: any) => t.completed)) && (
-                    <div style={{marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center'}}>
-                      <button 
-                        onClick={() => {
-                          const resetData = { ...checklistData };
-                          Object.entries(resetData).forEach(([zona, data]: any) => {
-                            if (data.type === checklistType) {
-                              resetData[zona] = {
-                                ...data,
-                                tasks: data.tasks.map((t: any) => ({ ...t, completed: false }))
-                              };
-                            }
-                          });
-                          setChecklistData(resetData);
-                        }}
-                        className="dashboard-btn danger"
-                        style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
-                      >
-                        🔄 Resetear Checklist
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
               {selectedTaskMaintenance && (
@@ -3201,25 +3133,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     <h3>📦 {editingTemplateItemId ? 'Editar Item del Template' : 'Agregar Item al Template'}</h3>
                     <form onSubmit={async (e) => {
                       e.preventDefault();
+                      const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
                       
                       if (editingTemplateItemId) {
                         // Actualizar item existente
-                        await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
+                        const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
                           item_name: newTemplateItem.item_name,
                           quantity: parseInt(newTemplateItem.quantity),
-                          category: newTemplateItem.category
+                          category: newTemplateItem.category,
+                          location: newTemplateItem.location || null
                         });
+                        if (updated) {
+                          setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
+                        }
                         setEditingTemplateItemId(null);
                       } else {
                         // Crear nuevo item
-                        await realtimeService.createInventoryTemplateItem({
+                        const created = await realtimeService.createInventoryTemplate({
+                          house: selectedHouse,
                           item_name: newTemplateItem.item_name,
                           quantity: parseInt(newTemplateItem.quantity),
-                          category: newTemplateItem.category
-                        }, 'HYNTIBA2 APTO 406');
+                          category: newTemplateItem.category,
+                          location: newTemplateItem.location || null
+                        });
+                        if (created) {
+                          setInventoryTemplate(prev => [...prev, created]);
+                        }
                       }
                       
-                      setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
+                      setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina', location: '' });
                     }}>
                       <div className="assignment-form-grid">
                         <div className="form-group">
@@ -3263,6 +3205,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <option value="Limpieza">Limpieza</option>
                           </select>
                         </div>
+
+                        <div className="form-group">
+                          <label>📍 Ubicación (opcional)</label>
+                          <input
+                            type="text"
+                            value={newTemplateItem.location}
+                            onChange={(e) => setNewTemplateItem({...newTemplateItem, location: e.target.value})}
+                            placeholder="Ej: Gabinete cocina"
+                            title="Ubicación"
+                          />
+                        </div>
                       </div>
                       
                       <div style={{display: 'flex', gap: '1rem'}}>
@@ -3275,7 +3228,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             className="dashboard-btn danger" 
                             onClick={() => {
                               setEditingTemplateItemId(null);
-                              setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
+                              setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina', location: '' });
                             }}
                           >
                             ❌ Cancelar
@@ -3337,6 +3290,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                       <div className="subcard-content">
                                         <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
                                         <p><strong>🏷️ Categoría:</strong> {item.category}</p>
+                                        {item.location && <p><strong>📍 Ubicación:</strong> {item.location}</p>}
                                       </div>
                                       <div className="subcard-actions">
                                         <button 
@@ -3344,7 +3298,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                             setNewTemplateItem({
                                               item_name: item.item_name,
                                               quantity: item.quantity.toString(),
-                                              category: item.category
+                                              category: item.category,
+                                              location: item.location || ''
                                             });
                                             setEditingTemplateItemId(item.id);
                                           }}
@@ -3355,7 +3310,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                           className="danger"
                                           onClick={async () => {
                                             if (confirm(`¿Eliminar "${item.item_name}" del template?`)) {
-                                              await realtimeService.deleteInventoryTemplateItem(item.id);
+                                              const ok = await realtimeService.deleteInventoryTemplate(item.id);
+                                              if (ok) {
+                                                setInventoryTemplate(prev => prev.filter(i => i.id !== item.id));
+                                              }
                                             }
                                           }}
                                         >
