@@ -3844,16 +3844,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                             } : i
                                           );
                                           newMap.set(selectedAssignmentForInventory, updatedItems);
+                                          console.log('🔄 Estado local inventario actualizado:', item.id);
                                           return newMap;
                                         });
                                         
                                         // Luego actualizar en Supabase
-                                        await realtimeService.updateAssignmentInventoryItem(
-                                          item.id,
-                                          newCheckedState,
-                                          item.notes,
-                                          user.username
-                                        );
+                                        try {
+                                          const result = await realtimeService.updateAssignmentInventoryItem(
+                                            item.id,
+                                            newCheckedState,
+                                            item.notes,
+                                            user.username
+                                          );
+                                          if (result) {
+                                            console.log('✅ Item inventario actualizado en BD:', result);
+                                          } else {
+                                            console.error('❌ updateAssignmentInventoryItem retornó null');
+                                          }
+                                        } catch (err) {
+                                          console.error('❌ Error actualizando inventario:', err);
+                                        }
                                       }}
                                       disabled={user.role === 'manager' && user.username !== assignment.employee}
                                     />

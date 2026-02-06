@@ -1354,22 +1354,48 @@ export async function getAssignmentInventory(assignmentId: string) {
 
 // Actualizar item de inventario
 export async function updateAssignmentInventoryItem(itemId: string, isComplete: boolean, notes?: string, checkedBy?: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('inventory') as any)
-    .update({
-      complete: isComplete,
-      notes: notes || null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', itemId)
-    .select();
+  try {
+    console.log('🔄 [updateAssignmentInventoryItem] Actualizando:', {
+      itemId,
+      isComplete,
+      checkedBy,
+      timestamp: new Date().toISOString()
+    });
+    
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory') as any)
+      .update({
+        complete: isComplete,
+        notes: notes || null,
+        checked_by: isComplete ? checkedBy || null : null,
+        checked_at: isComplete ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId)
+      .select();
 
-  if (error) {
-    console.error('❌ [Assignment Inventory] Error updating:', error);
+    if (error) {
+      console.error('❌ [updateAssignmentInventoryItem] Error:', {
+        error: error.message,
+        itemId,
+        code: error.code
+      });
+      return null;
+    }
+    
+    console.log('✅ [updateAssignmentInventoryItem] Actualizado exitosamente:', {
+      itemId,
+      isComplete,
+      checked_by: checkedBy,
+      dataLength: data?.length
+    });
+    
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ [updateAssignmentInventoryItem] Exception:', error);
     return null;
   }
-  return data?.[0] || null;
 }
 
 // Suscribirse a cambios en inventario de asignación
