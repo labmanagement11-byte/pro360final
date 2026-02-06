@@ -1034,19 +1034,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     
     const loadData = async () => {
       try {
-        // Si es Limpieza Profunda, cargar inventario
-        if (currentAssignmentType?.toLowerCase().includes('profunda')) {
-          console.log('📦 Cargando inventario para asignación:', selectedAssignmentForChecklist);
-          const items = await realtimeService.getAssignmentInventory(selectedAssignmentForChecklist);
-          console.log('✅ Inventario cargado:', items);
-          setSyncedInventories(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
-        } else {
-          // Si es Limpieza Regular o Mantenimiento, cargar checklist
-          console.log('🧹 Cargando checklist para asignación:', selectedAssignmentForChecklist);
-          const items = await realtimeService.getCleaningChecklistItems(selectedAssignmentForChecklist);
-          console.log('✅ Checklist cargado:', items);
-          setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
-        }
+        // Siempre cargar checklist (incluye Limpieza Profunda)
+        console.log('🧹 Cargando checklist para asignación:', selectedAssignmentForChecklist);
+        const items = await realtimeService.getCleaningChecklistItems(selectedAssignmentForChecklist);
+        console.log('✅ Checklist cargado:', items);
+        setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
       } catch (error) {
         console.error('❌ Error loading data:', error);
       }
@@ -1057,73 +1049,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
-      if (currentAssignmentType?.toLowerCase().includes('profunda')) {
-        console.log('🔔 Suscribiendo a cambios del inventario en tiempo real...');
-        subscription = realtimeService.subscribeToInventory(
-          selectedAssignmentForChecklist,
-          (payload: any) => {
-            console.log('⚡ Evento de inventario recibido:', payload);
-            
-            if (payload?.eventType === 'INSERT') {
-              console.log('➕ Nuevo item de inventario:', payload.new);
-              setSyncedInventories(prev => {
-                const newMap = new Map(prev);
-                const items = newMap.get(selectedAssignmentForChecklist) || [];
-                newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
-                return newMap;
-              });
-            } else if (payload?.eventType === 'UPDATE') {
-              console.log('📝 Item de inventario actualizado:', payload.new);
-              setSyncedInventories(prev => {
-                const newMap = new Map(prev);
-                const items = newMap.get(selectedAssignmentForChecklist) || [];
-                newMap.set(
-                  selectedAssignmentForChecklist,
-                  items.map(item => item.id === payload.new.id ? payload.new : item)
-                );
-                return newMap;
-              });
-            }
+      console.log('🔔 Suscribiendo a cambios del checklist en tiempo real...');
+      subscription = realtimeService.subscribeToChecklist(
+        selectedAssignmentForChecklist,
+        (payload: any) => {
+          console.log('⚡ Evento de checklist recibido:', payload);
+          
+          if (payload?.eventType === 'INSERT') {
+            console.log('➕ Nuevo item de checklist:', payload.new);
+            setSyncedChecklists(prev => {
+              const newMap = new Map(prev);
+              const items = newMap.get(selectedAssignmentForChecklist) || [];
+              newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
+              return newMap;
+            });
+          } else if (payload?.eventType === 'UPDATE') {
+            console.log('📝 Item de checklist actualizado:', payload.new);
+            setSyncedChecklists(prev => {
+              const newMap = new Map(prev);
+              const items = newMap.get(selectedAssignmentForChecklist) || [];
+              newMap.set(
+                selectedAssignmentForChecklist,
+                items.map(item => item.id === payload.new.id ? payload.new : item)
+              );
+              return newMap;
+            });
           }
-        );
-      } else {
-        console.log('🔔 Suscribiendo a cambios del checklist en tiempo real...');
-        subscription = realtimeService.subscribeToChecklist(
-          selectedAssignmentForChecklist,
-          (payload: any) => {
-            console.log('⚡ Evento de checklist recibido:', payload);
-            
-            if (payload?.eventType === 'INSERT') {
-              console.log('➕ Nuevo item de checklist:', payload.new);
-              setSyncedChecklists(prev => {
-                const newMap = new Map(prev);
-                const items = newMap.get(selectedAssignmentForChecklist) || [];
-                newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
-                return newMap;
-              });
-            } else if (payload?.eventType === 'UPDATE') {
-              console.log('📝 Item de checklist actualizado:', payload.new);
-              setSyncedChecklists(prev => {
-                const newMap = new Map(prev);
-                const items = newMap.get(selectedAssignmentForChecklist) || [];
-                newMap.set(
-                  selectedAssignmentForChecklist,
-                  items.map(item => item.id === payload.new.id ? payload.new : item)
-                );
-                return newMap;
-              });
-            }
-          }
-        );
-      }
+        }
+      );
       
       if (subscription) {
-        console.log('✅ Suscripción activa:', subscription);
-        if (currentAssignmentType?.toLowerCase().includes('profunda')) {
-          setInventorySubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
-        } else {
-          setChecklistSubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
-        }
+        console.log('✅ Suscripción de checklist activa:', subscription);
+        setChecklistSubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
       }
     } catch (error) {
       console.error('❌ Error subscribing:', error);
@@ -1132,26 +1089,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return () => {
       try {
         console.log('🔌 Desconectando suscripción...');
-        if (currentAssignmentType?.toLowerCase().includes('profunda')) {
-          const sub = inventorySubscriptions.get(selectedAssignmentForChecklist);
-          if (sub) {
-            supabase?.removeChannel(sub);
-            setInventorySubscriptions(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(selectedAssignmentForChecklist);
-              return newMap;
-            });
-          }
-        } else {
-          const sub = checklistSubscriptions.get(selectedAssignmentForChecklist);
-          if (sub) {
-            supabase?.removeChannel(sub);
-            setChecklistSubscriptions(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(selectedAssignmentForChecklist);
-              return newMap;
-            });
-          }
+        const sub = checklistSubscriptions.get(selectedAssignmentForChecklist);
+        if (sub) {
+          supabase?.removeChannel(sub);
+          setChecklistSubscriptions(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(selectedAssignmentForChecklist);
+            return newMap;
+          });
         }
       } catch (error) {
         console.error('❌ Error unsubscribing:', error);
