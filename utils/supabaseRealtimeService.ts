@@ -600,197 +600,29 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 
 
 // ==================== CLEANING CHECKLIST ====================
-export async function createCleaningChecklistItems(assignmentId: string | number, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406', checklistUUID?: string) {
-  const supabase = getSupabaseClient();
+// ==================== CLEANING CHECKLIST ====================
+export async function createCleaningChecklistItems(
+  assignmentId: string | number, 
+  employee: string, 
+  assignmentType: string, 
+  house: string = 'HYNTIBA2 APTO 406'
+) {
+  console.log('🧹 [Checklist] Creando desde plantillas:', { assignmentId, employee, assignmentType, house });
   
-  // Get UUID from assignment or use provided one
-  let calendarAssignmentUUID = checklistUUID;
+  // Usar la nueva función de plantillas que consulta checklist_templates
+  const result = await createChecklistFromTemplate(
+    String(assignmentId),
+    assignmentType,
+    employee,
+    house
+  );
   
-  if (!calendarAssignmentUUID) {
-    // Try to get from localStorage first (for assignments created without column)
-    if (typeof window !== 'undefined') {
-      const storedUUID = localStorage.getItem(`assignment_${assignmentId}_uuid`);
-      if (storedUUID) {
-        calendarAssignmentUUID = storedUUID;
-        console.log(`📱 [Checklist] UUID recuperado de localStorage: ${calendarAssignmentUUID}`);
-      }
-    }
-  }
-  
-  // If still no UUID, generate one
-  if (!calendarAssignmentUUID) {
-    const generateUUID = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
-    calendarAssignmentUUID = generateUUID();
-    console.log(`🆕 [Checklist] UUID generado: ${calendarAssignmentUUID}`);
-  }
-  
-  console.log('🧹 [Checklist] Creating items for assignment UUID:', calendarAssignmentUUID, 'Type:', assignmentType);
-  
-  // Listas de limpieza por tipo
-  const LIMPIEZA_REGULAR: Record<string, string[]> = {
-    'LIMPIEZA GENERAL': [
-      'Barrer y trapear toda la casa.',
-      'Quitar el polvo de todas las superficies y decoración usando un trapo húmedo.',
-      'Limpiar los televisores cuidadosamente sin dejar marcas en la pantalla.',
-      'Revisar zócalos y esquinas para asegurarse de que estén limpios.',
-      'Limpiar telaraña'
-    ],
-    'SALA': [
-      'Limpiar todas las superficies.',
-      'Mover los cojines del sofá y verificar que no haya suciedad ni hormigas debajo.',
-      'Organizar cojines y dejar la sala ordenada.'
-    ],
-    'COMEDOR': [
-      'Limpiar mesa, sillas y superficies.',
-      'Asegurarse de que el área quede limpia y ordenada.'
-    ],
-    'COCINA': [
-      'Limpiar superficies, gabinetes por fuera y por dentro.',
-      'Verificar que los gabinetes estén limpios y organizados y funcionales.',
-      'Limpiar la cafetera y su filtro.',
-      'Verificar que el dispensador de jabón de loza esté lleno.',
-      'Dejar toallas de cocina limpias y disponibles para los visitantes.',
-      'Limpiar microondas por dentro y por fuera.',
-      'Limpiar el filtro de agua.',
-      'Limpiar la nevera por dentro y por fuera (no dejar alimentos).',
-      'Lavar las canecas de basura y colocar bolsas nuevas.'
-    ],
-    'BAÑOS': [
-      'Limpiar ducha (pisos y paredes).',
-      'Limpiar divisiones de vidrio y asegurarse de que no queden marcas.',
-      'Limpiar espejo, sanitario y lavamanos con Clorox.',
-      'Lavar las canecas de basura y colocar bolsas nuevas.',
-      'Verificar disponibilidad de toallas (Máximo 10 toallas blancas de cuerpo en toda la casa, Máximo 4 toallas de mano en total).',
-      'Dejar un rollo de papel higiénico nuevo instalado en cada baño.',
-      'Dejar un rollo extra en el cuarto de lavado.',
-      'Lavar y volver a colocar los tapetes de baño.'
-    ],
-    'HABITACIONES': [
-      'Revisar que no haya objetos dentro de los cajones.',
-      'Lavar sábanas y hacer las camas correctamente.',
-      'Limpiar el polvo de todas las superficies.',
-      'Lavar los tapetes de la habitación y volver a colocarlos limpios.'
-    ],
-    'ZONA DE LAVADO': [
-      'Limpiar el filtro de la lavadora en cada lavada.',
-      'Limpiar el gabinete debajo del lavadero.',
-      'Dejar ganchos de ropa disponibles.',
-      'Dejar toallas disponibles para la piscina.'
-    ],
-    'ÁREA DE BBQ': [
-      'Barrer y trapear el área.',
-      'Limpiar mesa y superficies.',
-      'Limpiar la mini nevera y no dejar ningún alimento dentro.',
-      'Limpiar la parrilla con el cepillo (no usar agua).',
-      'Retirar las cenizas del carbón.',
-      'Dejar toda el área limpia y ordenada.'
-    ],
-    'ÁREA DE PISCINA': [
-      'Barrer y trapear el área.',
-      'Organizar los muebles alrededor de la piscina.'
-    ],
-    'TERRAZA': [
-      'Limpiar el piso de la terraza.',
-      'Limpiar superficies.',
-      'Organizar los cojines de la sala exterior.'
-    ]
-  };
-
-  const LIMPIEZA_PROFUNDA: Record<string, string[]> = {
-    'LIMPIEZA PROFUNDA': [
-      'Lavar los forros de los muebles (sofás, sillas y cojines).',
-      'Limpiar todas las ventanas y ventanales de la casa, por dentro y por fuera.',
-      'Limpiar con hidrolavadora el piso exterior, incluyendo escaleras, terraza y placas vehiculares.',
-      'Lavar la caneca grande de basura ubicada debajo de la escalera.',
-      'Limpiar las paredes y los guardaescobas de toda la casa.'
-    ]
-  };
-
-  const MANTENIMIENTO: Record<string, string[]> = {
-    'PISCINA Y AGUA': [
-      'Mantener la piscina limpia y en funcionamiento.',
-      'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.'
-    ],
-    'SISTEMAS ELÉCTRICOS': [
-      'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
-      'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.'
-    ],
-    'ÁREAS VERDES': [
-      'Cortar el césped cada mes y medio a dos meses, y limpiar restos de césped.',
-      'Mantenimiento de palmeras: remover hojas secas.',
-      'Mantener la matera de la terraza libre de maleza y deshierbar regularmente.',
-      'Regar las plantas vivas según necesidad.'
-    ],
-    'RUTINA DE MANTENIMIENTO': [
-      'Mantener la piscina limpia y en funcionamiento.',
-      'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.',
-      'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
-      'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.',
-      'Cortar el césped cada mes y medio a dos meses, y limpiar restos de césped.',
-      'Mantenimiento de palmeras: remover hojas secas.',
-      'Mantener la matera de la terraza libre de maleza y deshierbar regularmente.',
-      'Regar las plantas vivas según necesidad.'
-    ]
-  };
-
-  // Seleccionar la lista según el tipo de asignación
-  let checklistTemplate: Record<string, string[]> = {};
-  
-  if (assignmentType === 'Limpieza regular') {
-    checklistTemplate = LIMPIEZA_REGULAR;
-  } else if (assignmentType === 'Limpieza profunda') {
-    checklistTemplate = LIMPIEZA_PROFUNDA;
-  } else if (assignmentType === 'Mantenimiento') {
-    checklistTemplate = MANTENIMIENTO;
-  }
-
-  console.log('📋 [Checklist] Usando template:', Object.keys(checklistTemplate).length, 'zonas');
-
-  // Convertir el template a items - use UUID
-  const checklistItems: any[] = [];
-  let orderNum = 0;
-  Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
-    tasks.forEach((task) => {
-      checklistItems.push({
-        calendar_assignment_id: calendarAssignmentUUID,
-        employee: employee,
-        house: house,
-        zone: zone,
-        task: task,
-        completed: false,
-        completed_by: null,
-        completed_at: null,
-        order_num: orderNum
-      });
-      orderNum++;
-    });
-  });
-
-  // Intentar insertar en cleaning_checklist
-  try {
-    console.log('💾 [Checklist] Insertando', checklistItems.length, 'items en cleaning_checklist');
-    const { data, error } = await (supabase
-      .from('cleaning_checklist') as any)
-      .insert(checklistItems)
-      .select();
-    
-    if (error) {
-      console.error('⚠️ [Checklist] Error inserting into cleaning_checklist:', error);
-      console.warn('⚠️ [Checklist] Continuando solo con items en memoria (sin persistencia)');
-      return checklistItems;
-    }
-    
-    console.log('✅ [Checklist] Items insertados exitosamente en cleaning_checklist:', data?.length);
-    return data || checklistItems;
-  } catch (err) {
-    console.error('❌ [Checklist] Exception inserting into cleaning_checklist:', err);
-    console.warn('⚠️ [Checklist] Retornando items en memoria sin persistencia');
-    return checklistItems;
+  if (result.success) {
+    console.log(`✅ ${result.count} items creados desde plantillas`);
+    return result.items || [];
+  } else {
+    console.error('❌ Error creando desde plantillas:', result.error);
+    return [];
   }
 }
 
@@ -2034,4 +1866,61 @@ export function unsubscribeFromAll(subscriptions: any[]) {
       sub?.unsubscribe?.();
     }
   });
+}
+
+// ==================== CHECKLIST TEMPLATES ====================
+export async function createChecklistFromTemplate(assignmentId: string, taskType: string, employee: string, house: string) {
+  try {
+    console.log('📋 Creando checklist desde plantilla:', { assignmentId, taskType, employee, house });
+    const supabase = getSupabaseClient();
+    
+    // Obtener plantillas activas para este tipo de tarea
+    const { data: templates, error: templateError } = await (supabase
+      .from('checklist_templates') as any)
+      .select('*')
+      .eq('task_type', taskType)
+      .eq('active', true)
+      .order('order_num', { ascending: true });
+    
+    if (templateError) {
+      console.error('❌ Error obteniendo plantillas:', templateError);
+      return { success: false, error: templateError };
+    }
+    
+    if (!templates || templates.length === 0) {
+      console.warn('⚠️ No hay plantillas para', taskType);
+      return { success: true, count: 0 };
+    }
+    
+    console.log(`✅ ${templates.length} plantillas encontradas para ${taskType}`);
+    
+    // Crear items del checklist desde las plantillas
+    const checklistItems = templates.map((template: any) => ({
+      calendar_assignment_id: assignmentId,
+      employee: employee,
+      house: house,
+      zone: template.zone,
+      task: template.task,
+      completed: false,
+      order_num: template.order_num
+    }));
+    
+    // Insertar en cleaning_checklist
+    const { data, error } = await (supabase
+      .from('cleaning_checklist') as any)
+      .insert(checklistItems)
+      .select();
+    
+    if (error) {
+      console.error('❌ Error insertando checklist:', error);
+      return { success: false, error };
+    }
+    
+    console.log(`✅ ${data?.length || 0} items de checklist creados para asignación ${assignmentId}`);
+    return { success: true, count: data?.length || 0, items: data };
+    
+  } catch (error) {
+    console.error('❌ Exception en createChecklistFromTemplate:', error);
+    return { success: false, error };
+  }
 }
