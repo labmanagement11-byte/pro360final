@@ -2396,9 +2396,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <button 
                                 className="dashboard-btn main"
                                 onClick={() => {
-                                  console.log('🧹 Abriendo checklist para asignación:', assignment.id, 'Tipo:', assignment.type);
-                                  setSelectedAssignmentForChecklist(assignment.id);
-                                  setCurrentAssignmentType(assignment.type);
+                                  console.log('🧹 Abriendo modal para asignación:', assignment.id, 'Tipo:', assignment.type);
+                                  if (assignment.type === 'Limpieza profunda') {
+                                    // Para Limpieza Profunda, abrir modal de inventario
+                                    console.log('📦 Abriendo inventario (Limpieza profunda)');
+                                    setSelectedAssignmentForInventory(assignment.id);
+                                  } else {
+                                    // Para Limpieza Regular y Mantenimiento, abrir modal de checklist
+                                    console.log('🧹 Abriendo checklist');
+                                    setSelectedAssignmentForChecklist(assignment.id);
+                                    setCurrentAssignmentType(assignment.type);
+                                  }
                                 }}
                               >
                                 ✅ Ver Checklist
