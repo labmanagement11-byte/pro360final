@@ -657,34 +657,27 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       return data;
     }
 
-    // PASO 2: Si no hay items por assignment_id, buscar inteligentemente en datos existentes
-    // Obtener las zonas que corresponden a este tipo de tarea desde las plantillas
-    const { data: templates, error: templatesError } = await (supabase
-      .from('checklist_templates') as any)
-      .select('zone')
+    // PASO 2: Búsqueda inteligente por employee + house, luego filtrar por tipo
+    console.log('🔍 [Checklist] Buscando items existentes por employee+house para tipo:', assignment.type);
+    
+    const { data: existingItems, error: existingError } = await (supabase
+      .from('cleaning_checklist') as any)
+      .select('*')
+      .eq('employee', assignment.employee)
       .eq('house', assignment.house)
-      .eq('task_type', assignment.type)
-      .eq('active', true);
+      .order('order_num', { ascending: true });
 
-    if (templates && templates.length > 0) {
-      // Extraer zonas únicas
-      const zonesForType = [...new Set(templates.map((t: any) => t.zone))];
-      console.log('🔍 [Checklist] Buscando items por employee+house+zonas para tipo:', assignment.type, 'Zonas:', zonesForType);
+    if (!existingError && existingItems && existingItems.length > 0) {
+      console.log(`📊 [Checklist] ${existingItems.length} items encontrados para ${assignment.employee} en ${assignment.house}`);
       
-      // Buscar items que coincidan con employee + house + zonas del tipo
-      const { data: existingItems, error: existingError } = await (supabase
-        .from('cleaning_checklist') as any)
-        .select('*')
-        .eq('employee', assignment.employee)
-        .eq('house', assignment.house)
-        .in('zone', zonesForType)
-        .order('order_num', { ascending: true });
-
-      if (!existingError && existingItems && existingItems.length > 0) {
-        console.log('✅ [Checklist] Items existentes encontrados:', existingItems.length, 'para', assignment.type);
+      // Filtrar por tipo basado en el contenido de la zona/tarea
+      const filteredItems = filterItemsByType(existingItems, assignment.type);
+      
+      if (filteredItems.length > 0) {
+        console.log('✅ [Checklist] Items filtrados por tipo:', filteredItems.length);
         
-        // Actualizar estos items con el calendar_assignment_id (migración lenta)
-        for (const item of existingItems) {
+        // Actualizar con assignment_id (migración lenta)
+        for (const item of filteredItems) {
           if (!item.calendar_assignment_id || item.calendar_assignment_id === '') {
             await (supabase
               .from('cleaning_checklist') as any)
@@ -694,7 +687,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
           }
         }
         
-        return existingItems;
+        return filteredItems;
       }
     }
 
@@ -711,6 +704,42 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.error('❌ [Checklist] Exception fetching checklist items:', error);
     return [];
   }
+}
+
+// Helper: Filtrar items por tipo basándose en el contenido de zona/tarea
+function filterItemsByType(items: any[], assignmentType: string): any[] {
+  const type = assignmentType.toLowerCase();
+  
+  // Palabras clave para identificar cada tipo
+  const regularPatterns = [
+    'cocina', 'baño', 'habitaciones', 'sala', 'lavadero', 'limpieza general',
+    'barrer', 'trapear', 'polvo', 'limpiar', 'lavar platos', 'tender camas'
+  ];
+  
+  const profundaPatterns = [
+    'profunda', 'lavar forros', 'ventanas', 'nevera completa', 'desinfectar'
+  ];
+  
+  const mantenimientoPatterns = [
+    'eléctrico', 'plomería', 'electrodomésticos', 'revisar', 'funcionamiento',
+    'enchufes', 'bombillas', 'fugas', 'sanitario', 'lavadora', 'puertas', 'ventanas'
+  ];
+  
+  return items.filter((item: any) => {
+    const zone = (item.zone || '').toLowerCase();
+    const task = (item.task || '').toLowerCase();
+    const content = `${zone} ${task}`;
+    
+    if (type.includes('regular') || type.includes('limpieza regular')) {
+      return regularPatterns.some(p => content.includes(p));
+    } else if (type.includes('profunda')) {
+      return profundaPatterns.some(p => content.includes(p));
+    } else if (type.includes('mantenimiento')) {
+      return mantenimientoPatterns.some(p => content.includes(p));
+    }
+    
+    return false;
+  });
 }
 
 export async function updateCleaningChecklistItem(itemId: string, completed: boolean, completedBy?: string) {
