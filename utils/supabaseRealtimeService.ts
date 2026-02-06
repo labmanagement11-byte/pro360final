@@ -422,7 +422,7 @@ export async function createCalendarAssignment(assignment: any) {
   
   const checklistUUID = generateUUID();
   
-  // Try to insert with checklist_uuid first
+  // First, try to insert with checklist_uuid
   let { data, error } = await (supabase
     .from('calendar_assignments') as any)
     .insert([{
@@ -436,9 +436,9 @@ export async function createCalendarAssignment(assignment: any) {
     }])
     .select();
   
-  // If the column doesn't exist, try without it
-  if (error && error.message && error.message.includes('checklist_uuid')) {
-    console.log('⚠️ checklist_uuid column not found, creating without it. Run this SQL in Supabase: ALTER TABLE calendar_assignments ADD COLUMN checklist_uuid UUID;');
+  // If column doesn't exist, try without it and use localStorage
+  if (error) {
+    console.log('⚠️ Column issue detected, inserting without checklist_uuid and using localStorage fallback');
     const { data: data2, error: error2 } = await (supabase
       .from('calendar_assignments') as any)
       .insert([{
@@ -451,27 +451,30 @@ export async function createCalendarAssignment(assignment: any) {
       }])
       .select();
     
+    if (error2) {
+      console.error('Error creating calendar assignment:', error2);
+      return null;
+    }
+    
     data = data2;
-    error = error2;
     
     // Store UUID in localStorage as fallback
     if (data && data[0]) {
       const fallbackKey = `assignment_${data[0].id}_uuid`;
       if (typeof window !== 'undefined') {
         localStorage.setItem(fallbackKey, checklistUUID);
+        console.log(`💾 Using localStorage fallback: key=${fallbackKey}, uuid=${checklistUUID}`);
       }
-      console.log(`💾 Stored UUID ${checklistUUID} in localStorage with key: ${fallbackKey}`);
     }
-  }
-  
-  if (error) {
-    console.error('Error creating calendar assignment:', error);
-    return null;
   }
   
   const result = data?.[0] || null;
   if (result) {
-    console.log('✅ Calendar assignment created with checklist_uuid:', checklistUUID);
+    // Always log both direct UUID and localStorage fallback
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`assignment_${result.id}_uuid`, checklistUUID);
+    }
+    console.log(`✅ Assignment ${result.id} created | UUID: ${checklistUUID}`);
   }
   return result;
 }
@@ -563,6 +566,11 @@ export async function createCleaningChecklistItems(assignmentId: string | number
       });
     };
     calendarAssignmentUUID = generateUUID();
+  }
+  
+  // Always store UUID in localStorage for fallback
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(`assignment_${assignmentId}_uuid`, calendarAssignmentUUID);
   }
   
   console.log('🧹 [Checklist] Creating items for assignment UUID:', calendarAssignmentUUID, 'Type:', assignmentType, 'Employee:', employee, 'House:', house);
