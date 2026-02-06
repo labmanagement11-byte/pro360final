@@ -114,13 +114,15 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
       time: form.time,
       tasks: form.tasks,
       inventory: form.inventory,
-      created_at: new Date().toISOString(),
     };
-    // Insertar el evento en la tabla calendar_assignments y obtener el id
-    const { data: inserted, error } = await (supabase as any).from('calendar_assignments').insert(newAssignment).select();
+    
+    // Usar createCalendarAssignment que genera UUID automáticamente
+    const insertedAssignment = await realtimeService.createCalendarAssignment(newAssignment);
     let assignmentId = null;
-    if (!error && inserted && inserted.length > 0) {
-      assignmentId = inserted[0].id;
+    
+    if (insertedAssignment) {
+      assignmentId = insertedAssignment.id;
+      console.log('✅ Assignment created with ID:', assignmentId, 'UUID:', insertedAssignment.checklist_uuid);
     }
 
     // Crear checklist e inventario automáticamente si hay empleado y tipo
