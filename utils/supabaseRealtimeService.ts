@@ -457,17 +457,29 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
 export async function createCalendarAssignment(assignment: any) {
   const supabase = getSupabaseClient();
   
-  console.log('🔄 [Assignment] Creando asignación:', {
+  // Generate UUID for this assignment
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+  
+  const assignmentUUID = generateUUID();
+  
+  console.log('🔄 [Assignment] Creando asignación con UUID:', {
+    uuid: assignmentUUID,
     employee: assignment.employee,
     house: assignment.house || 'HYNTIBA2 APTO 406',
     type: assignment.type,
     date: assignment.date
   });
   
-  // Insert assignment - cleaning_checklist uses numeric IDs, not UUIDs
+  // Try to insert with calendar_assignment_uuid column
   let { data, error } = await (supabase
     .from('calendar_assignments') as any)
     .insert([{
+      calendar_assignment_uuid: assignmentUUID,
       employee: assignment.employee,
       date: assignment.date,
       time: assignment.time,
@@ -477,13 +489,35 @@ export async function createCalendarAssignment(assignment: any) {
     }])
     .select();
   
-  if (error) {
-    console.error('❌ [Assignment] Error creating:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint
-    });
+  // If column doesn't exist, try without it
+  if (error && error.message.includes('calendar_assignment_uuid')) {
+    console.log('⚠️ [Assignment] Column calendar_assignment_uuid not found, inserting without it');
+    const { data: data2, error: error2 } = await (supabase
+      .from('calendar_assignments') as any)
+      .insert([{
+        employee: assignment.employee,
+        date: assignment.date,
+        time: assignment.time,
+        type: assignment.type,
+        house: assignment.house || 'HYNTIBA2 APTO 406',
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    
+    if (error2) {
+      console.error('❌ [Assignment] Error creating:', error2);
+      return null;
+    }
+    
+    data = data2;
+    
+    // Store UUID in localStorage for later use
+    if (data && data[0]) {
+      localStorage.setItem(`assignment_${data[0].id}_uuid`, assignmentUUID);
+      console.log(`💾 [Assignment] UUID stored in localStorage for ID ${data[0].id}`);
+    }
+  } else if (error) {
+    console.error('❌ [Assignment] Error creating:', error);
     return null;
   }
   
@@ -493,7 +527,9 @@ export async function createCalendarAssignment(assignment: any) {
   }
   
   const result = data[0];
-  console.log(`✅ [Assignment] Creado exitosamente: ID=${result.id}, Employee=${result.employee}, House=${result.house}`);
+  // Store the UUID in the result for immediate use
+  result.calendar_assignment_uuid = assignmentUUID;
+  console.log(`✅ [Assignment] Creado: ID=${result.id}, UUID=${assignmentUUID}`);
   return result;
 }
 
@@ -556,10 +592,33 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 export async function createCleaningChecklistItems(assignmentId: string | number, employee: string, assignmentType: string, house: string = 'HYNTIBA2 APTO 406', checklistUUID?: string) {
   const supabase = getSupabaseClient();
   
-  // Use numeric assignment ID directly - cleaning_checklist expects bigint
-  const numericAssignmentId = typeof assignmentId === 'string' ? parseInt(assignmentId) : assignmentId;
+  // Get UUID from assignment or use provided one
+  let calendarAssignmentUUID = checklistUUID;
   
-  console.log('🧹 [Checklist] Creating items for assignment:', numericAssignmentId, 'Type:', assignmentType, 'Employee:', employee, 'House:', house);
+  if (!calendarAssignmentUUID) {
+    // Try to get from localStorage first (for assignments created without column)
+    if (typeof window !== 'undefined') {
+      const storedUUID = localStorage.getItem(`assignment_${assignmentId}_uuid`);
+      if (storedUUID) {
+        calendarAssignmentUUID = storedUUID;
+        console.log(`📱 [Checklist] UUID recuperado de localStorage: ${calendarAssignmentUUID}`);
+      }
+    }
+  }
+  
+  // If still no UUID, generate one
+  if (!calendarAssignmentUUID) {
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    calendarAssignmentUUID = generateUUID();
+    console.log(`🆕 [Checklist] UUID generado: ${calendarAssignmentUUID}`);
+  }
+  
+  console.log('🧹 [Checklist] Creating items for assignment UUID:', calendarAssignmentUUID, 'Type:', assignmentType);
   
   // Listas de limpieza por tipo
   const LIMPIEZA_REGULAR: Record<string, string[]> = {
@@ -681,13 +740,13 @@ export async function createCleaningChecklistItems(assignmentId: string | number
 
   console.log('📋 [Checklist] Usando template:', Object.keys(checklistTemplate).length, 'zonas');
 
-  // Convertir el template a items - use numeric assignment ID
+  // Convertir el template a items - use UUID
   const checklistItems: any[] = [];
   let orderNum = 0;
   Object.entries(checklistTemplate).forEach(([zone, tasks]) => {
     tasks.forEach((task) => {
       checklistItems.push({
-        calendar_assignment_id: numericAssignmentId,
+        calendar_assignment_id: calendarAssignmentUUID,
         employee: employee,
         house: house,
         zone: zone,
@@ -746,14 +805,22 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
-    // Use numeric assignment ID - cleaning_checklist stores bigint IDs
-    const numericAssignmentId = typeof assignmentId === 'string' ? parseInt(assignmentId) : assignmentId;
+    // Get UUID from assignment or from localStorage
+    let checklist_uuid = assignment.calendar_assignment_uuid;
     
-    // Obtener tareas desde la tabla cleaning_checklist usando el ID numérico
+    if (!checklist_uuid && typeof window !== 'undefined') {
+      const fallbackKey = `assignment_${assignmentId}_uuid`;
+      checklist_uuid = localStorage.getItem(fallbackKey) || undefined;
+      if (checklist_uuid) {
+        console.log('📱 [Checklist] UUID recuperado de localStorage:', checklist_uuid);
+      }
+    }
+    
+    // Query by UUID
     let { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', numericAssignmentId)
+      .eq('calendar_assignment_id', checklist_uuid || '')
       .order('order_num', { ascending: true });
 
     if (error) {
