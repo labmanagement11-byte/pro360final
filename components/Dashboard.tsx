@@ -24,19 +24,29 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   // Cargar tareas y suscribirse en tiempo real
   useEffect(() => {
     let isMounted = true;
+    let refreshInterval: NodeJS.Timeout | null = null;
+    
     const fetchAssignedTasks = async () => {
-      setLoading(true);
+      console.log(`📅 [Dashboard] Cargando asignaciones para ${user.username} en casa ${user.house || user.house_id}`);
+      
+      // Query usando columnas correctas (house y employee como texto)
       const { data } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
-        .eq('house_id', user.house_id || user.house)
-        .eq('employee_id', user.id)
+        .eq('house', user.house || user.house_id)
+        .eq('employee', user.username)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
-      if (isMounted) setAssignedTasks(data || []);
+      
+      if (isMounted) {
+        console.log(`✅ [Dashboard] Asignaciones cargadas:`, data?.length || 0);
+        setAssignedTasks(data || []);
+      }
       setLoading(false);
     };
+    
     if (user && user.house) {
       fetchAssignedTasks();
+      
       // Limpiar suscripciones previas
       if (subscriptionRef.current && subscriptionRef.current.length > 0) {
         subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
@@ -44,7 +54,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       }
       
       // Suscribirse a TODOS los cambios en calendar_assignments
-      const userHouse = user.house_id || user.house;
+      const userHouse = user.house || user.house_id;
       console.log(`🔔 [Dashboard] Suscribiéndose para ${user.username} en casa ${userHouse}`);
       
       const subHouse = realtimeService.subscribeToAllCalendarAssignmentsByHouse(userHouse, (payload: any) => {
@@ -57,14 +67,22 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
           oldAssignment?.house === userHouse;
         
         if (isRelevant) {
-          console.log(`📲 [Dashboard] Cambio relevante para ${userHouse}, refrescando tareas...`);
+          console.log(`📲 [Dashboard] Cambio detectado en calendario, refrescando tareas...`);
           fetchAssignedTasks();
         }
       });
       subscriptionRef.current = [subHouse].filter(Boolean);
+      
+      // Agregar un intervalo de refresco cada 5 segundos como fallback
+      refreshInterval = setInterval(() => {
+        console.log(`🔄 [Dashboard] Refresco automático de asignaciones...`);
+        fetchAssignedTasks();
+      }, 5000);
     }
+    
     return () => {
       isMounted = false;
+      if (refreshInterval) clearInterval(refreshInterval);
       if (subscriptionRef.current && subscriptionRef.current.length > 0) {
         subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
         subscriptionRef.current = [];
