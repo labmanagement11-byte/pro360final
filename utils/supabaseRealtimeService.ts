@@ -1317,7 +1317,7 @@ export async function getAssignmentInventory(assignmentId: string) {
       return [];
     }
     
-    console.log('🏠 [Assignment Inventory] Casa:', assignment.house);
+    console.log('🏠 [Assignment Inventory] Casa:', assignment.house, 'Empleado:', assignment.employee);
     
     // Obtener inventario de la casa desde la tabla inventory
     const { data, error } = await (supabase
@@ -1327,15 +1327,22 @@ export async function getAssignmentInventory(assignmentId: string) {
       .order('location', { ascending: true });
 
     if (error) {
-      console.error('❌ [Assignment Inventory] Error:', error);
+      console.error('❌ [Assignment Inventory] Error fetching:', error.message);
       return [];
+    }
+    
+    console.log('📊 [Assignment Inventory] Datos crudos de BD:', data?.length || 0, 'items');
+    if (data && data.length > 0) {
+      data.slice(0, 3).forEach((item: any) => {
+        console.log('  - ID:', item.id, '| Name:', item.name || item.item_name, '| Category:', item.category || item.location, '| Complete:', item.complete);
+      });
     }
     
     // Mapear campos de inventory a los campos que espera el Dashboard
     const mappedData = (data || []).map((item: any) => ({
       id: item.id,
-      item_name: item.name || item.item_name,
-      category: item.category || item.location || 'Sin categoría',
+      item_name: item.name, // La columna es 'name', no 'item_name'
+      category: item.location || 'Sin categoría', // Usamos 'location' como categoría
       is_complete: item.complete || false,
       notes: item.notes || null,
       checked_by: null,
@@ -1344,7 +1351,7 @@ export async function getAssignmentInventory(assignmentId: string) {
       calendar_assignment_id: assignmentId
     }));
     
-    console.log('✅ [Assignment Inventory] Items obtenidos:', mappedData.length);
+    console.log('✅ [Assignment Inventory] Items mapeados:', mappedData.length);
     return mappedData;
   } catch (error) {
     console.error('❌ [Assignment Inventory] Exception:', error);
