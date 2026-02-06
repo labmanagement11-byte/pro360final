@@ -97,12 +97,12 @@ export function subscribeToCalendarAssignments(employeeId: string, callback: (da
 // ==================== CALENDAR ASSIGNMENTS REALTIME - SIMPLE (SIN FILTROS) ====================
 export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback: (data: any) => void) {
   try {
-    console.log('🔔 [Realtime Service] Suscripción SIN FILTROS a calendar_assignments para casa:', house);
+    console.log('🔔 [Realtime Service] Suscripción A TODOS los cambios en calendar_assignments');
     const supabase = getSupabaseClient();
     
-    // Subscribe sin filtros específicos - recibir todos los cambios y filtrar en cliente
+    // Subscribe sin NINGUN filtro - recibir TODOS los cambios en la tabla
     const channel = supabase
-      .channel(`calendar-assignments-all-${house}`)
+      .channel(`calendar-assignments-all-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -111,22 +111,27 @@ export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback
           table: 'calendar_assignments'
         },
         (payload: any) => {
-          // Filtrar en cliente para asegurarse que es para esta casa
-          if (payload.new?.house === house || payload.old?.house === house) {
-            console.log('⚡ [Realtime] Cambio en calendar_assignments para casa:', house, payload.eventType);
-            callback({
-              eventType: payload.eventType,
-              new: payload.new,
-              old: payload.old
-            });
-          }
+          // Log de TODOS los cambios
+          console.log('⚡ [Realtime] CAMBIO DETECTADO:', {
+            event: payload.eventType,
+            id: payload.new?.id || payload.old?.id,
+            house: payload.new?.house || payload.old?.house,
+            employee: payload.new?.employee || payload.old?.employee
+          });
+          
+          // Llamar callback sin filtros - dejar que el componente decida
+          callback({
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          });
         }
       )
       .subscribe((status: any) => {
-        console.log('📡 [Realtime] Estado de suscripción (sin filtros):', status);
+        console.log('📡 [Realtime] Estado de suscripción:', status);
       });
     
-    console.log('✅ [Realtime] Canal creado para casa:', house);
+    console.log('✅ [Realtime] Canal creado - escuchando TODOS los cambios');
     return channel;
   } catch (error) {
     console.error('❌ [Realtime] Error al suscribirse:', error);

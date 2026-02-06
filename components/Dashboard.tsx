@@ -42,10 +42,24 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         subscriptionRef.current.forEach(sub => sub?.unsubscribe && sub.unsubscribe());
         subscriptionRef.current = [];
       }
-      // Suscribirse a TODOS los cambios en calendar_assignments para esta casa (sin filtros específicos)
-      const subHouse = realtimeService.subscribeToAllCalendarAssignmentsByHouse(user.house_id || user.house, (payload: any) => {
-        console.log('📲 [Dashboard] Cambio detectado en assignments, refrescando...');
-        fetchAssignedTasks();
+      
+      // Suscribirse a TODOS los cambios en calendar_assignments
+      const userHouse = user.house_id || user.house;
+      console.log(`🔔 [Dashboard] Suscribiéndose para ${user.username} en casa ${userHouse}`);
+      
+      const subHouse = realtimeService.subscribeToAllCalendarAssignmentsByHouse(userHouse, (payload: any) => {
+        const newAssignment = payload.new;
+        const oldAssignment = payload.old;
+        
+        // Verificar si el cambio es relevante para este usuario
+        const isRelevant = 
+          newAssignment?.house === userHouse || 
+          oldAssignment?.house === userHouse;
+        
+        if (isRelevant) {
+          console.log(`📲 [Dashboard] Cambio relevante para ${userHouse}, refrescando tareas...`);
+          fetchAssignedTasks();
+        }
       });
       subscriptionRef.current = [subHouse].filter(Boolean);
     }
