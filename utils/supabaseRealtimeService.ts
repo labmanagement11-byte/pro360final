@@ -457,6 +457,13 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
 export async function createCalendarAssignment(assignment: any) {
   const supabase = getSupabaseClient();
   
+  console.log('🔄 [Assignment] Creando asignación:', {
+    employee: assignment.employee,
+    house: assignment.house || 'HYNTIBA2 APTO 406',
+    type: assignment.type,
+    date: assignment.date
+  });
+  
   // Insert assignment - cleaning_checklist uses numeric IDs, not UUIDs
   let { data, error } = await (supabase
     .from('calendar_assignments') as any)
@@ -471,14 +478,22 @@ export async function createCalendarAssignment(assignment: any) {
     .select();
   
   if (error) {
-    console.error('❌ Error creating calendar assignment:', error);
+    console.error('❌ [Assignment] Error creating:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     return null;
   }
   
-  const result = data?.[0] || null;
-  if (result) {
-    console.log(`✅ Assignment ${result.id} created for ${result.employee}`);
+  if (!data || data.length === 0) {
+    console.error('❌ [Assignment] Insert returned no data');
+    return null;
   }
+  
+  const result = data[0];
+  console.log(`✅ [Assignment] Creado exitosamente: ID=${result.id}, Employee=${result.employee}, House=${result.house}`);
   return result;
 }
 
