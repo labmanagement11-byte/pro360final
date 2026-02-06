@@ -791,10 +791,44 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentIdStr);
     const supabase = getSupabaseClient();
     
-    // Primero obtener los datos de la asignación incluyendo el checklist_uuid
+    // Get UUID from localStorage first (this is the most reliable source)
+    let checklist_uuid: string | null = null;
+    if (typeof window !== 'undefined') {
+      const fallbackKey = `assignment_${assignmentId}_uuid`;
+      checklist_uuid = localStorage.getItem(fallbackKey);
+      if (checklist_uuid) {
+        console.log('📱 [Checklist] UUID recuperado de localStorage:', checklist_uuid);
+      }
+    }
+    
+    // Query by UUID if available
+    let data: any = [];
+    let error: any = null;
+    
+    if (checklist_uuid) {
+      const result = await (supabase
+        .from('cleaning_checklist') as any)
+        .select('*')
+        .eq('calendar_assignment_id', checklist_uuid)
+        .order('order_num', { ascending: true });
+      
+      data = result.data || [];
+      error = result.error;
+      
+      if (error) {
+        console.error('❌ [Checklist] Error fetching by UUID:', error);
+        data = [];
+      } else if (data.length > 0) {
+        console.log('✅ [Checklist] Found', data.length, 'items by UUID');
+        return data;
+      }
+    }
+    
+    // Fallback: get assignment data and search by employee+house
+    console.log('⚠️ [Checklist] No UUID or no items found, trying employee+house fallback');
     const { data: assignment, error: assignmentError } = await (supabase
       .from('calendar_assignments') as any)
-      .select('house, employee, type, checklist_uuid')
+      .select('house, employee, type')
       .eq('id', assignmentId)
       .single();
     
@@ -805,47 +839,20 @@ export async function getCleaningChecklistItems(assignmentId: string) {
     
     console.log('🏠 [Checklist] Casa:', assignment.house, 'Tipo:', assignment.type);
     
-    // Get UUID from assignment or from localStorage
-    let checklist_uuid = assignment.calendar_assignment_uuid;
-    
-    if (!checklist_uuid && typeof window !== 'undefined') {
-      const fallbackKey = `assignment_${assignmentId}_uuid`;
-      checklist_uuid = localStorage.getItem(fallbackKey) || undefined;
-      if (checklist_uuid) {
-        console.log('📱 [Checklist] UUID recuperado de localStorage:', checklist_uuid);
-      }
-    }
-    
-    // Query by UUID
-    let { data, error } = await (supabase
+    // Query by employee + house fallback
+    const fallbackResult = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
-      .eq('calendar_assignment_id', checklist_uuid || '')
+      .eq('employee', assignment.employee)
+      .eq('house', assignment.house)
       .order('order_num', { ascending: true });
+    
+    data = fallbackResult.data || [];
+    error = fallbackResult.error;
 
     if (error) {
       console.error('❌ [Checklist] Error fetching cleaning_checklist items:', error);
       return [];
-    }
-
-    // Si no hay resultados, intentar fallback por employee + house
-    if (!data || data.length === 0) {
-      console.log('⚠️ [Checklist] No items found by assignment UUID, falling back to employee+house search');
-      const assignmentEmployee = assignment.employee;
-      const assignmentHouse = assignment.house;
-      const fallbackQuery = (supabase
-        .from('cleaning_checklist') as any)
-        .select('*')
-        .eq('employee', assignmentEmployee)
-        .eq('house', assignmentHouse)
-        .order('order_num', { ascending: true });
-
-      const fallbackRes = await fallbackQuery;
-      data = fallbackRes.data || [];
-      if (fallbackRes.error) {
-        console.error('❌ [Checklist] Error fetching fallback cleaning_checklist items:', fallbackRes.error);
-        return [];
-      }
     }
 
     // Mapear campos de cleaning_checklist a los campos que espera el Dashboard
@@ -864,7 +871,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
 
     // Si no encontramos items en cleaning_checklist, caer hacia la tabla "checklist" (compatibilidad)
     if (!mappedData || mappedData.length === 0) {
-      console.log('⚠️ [Checklist] No items in cleaning_checklist; falling back to legacy checklist table for assignment type', assignment.type);
+      console.log('⚠️ [Checklist] No items in cleaning_checklist; falling back to legacy checklist table');
 
       let query = (supabase
         .from('checklist') as any)
