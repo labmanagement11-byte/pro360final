@@ -536,6 +536,8 @@ export async function createCalendarAssignment(assignment: any) {
 export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406', employee?: string) {
   try {
     const supabase = getSupabaseClient();
+    console.log('🔍 [getCalendarAssignments] Buscando en house:', house, 'employee:', employee);
+    
     let query = (supabase
       .from('calendar_assignments') as any)
       .select('*')
@@ -543,17 +545,26 @@ export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406'
     
     if (employee) {
       query = query.eq('employee', employee);
+      console.log('👤 [getCalendarAssignments] Filtrando por employee:', employee);
     }
     
     const { data, error } = await query.order('date', { ascending: true });
     
     if (error) {
-      console.error('Error fetching calendar assignments:', error);
+      console.error('❌ [getCalendarAssignments] Error:', error);
       return [];
     }
+    
+    console.log('✅ [getCalendarAssignments] Resultados:', data?.length || 0, 'items');
+    if (data && data.length > 0) {
+      data.forEach((a: any) => {
+        console.log(`   - ID:${a.id} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
+      });
+    }
+    
     return data || [];
   } catch (error) {
-    console.error('Exception fetching calendar assignments:', error);
+    console.error('❌ Exception fetching calendar assignments:', error);
     return [];
   }
 }
