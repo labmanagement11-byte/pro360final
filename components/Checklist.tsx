@@ -212,18 +212,35 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
 
     if (!supabase) return;
 
-    // Si hay assignmentId, suscribirse a cambios solo de esa asignación
+    // Si hay assignmentId, suscribirse a cambios de esa asignación
     if (assignmentId) {
+      console.log('📡 [Checklist] Suscribiéndose a cambios para assignment:', assignmentId);
+      
+      // Obtener el UUID del localStorage para filtrar por UUID también
+      const assignmentUUID = typeof window !== 'undefined' 
+        ? localStorage.getItem(`assignment_${assignmentId}_uuid`) 
+        : null;
+      
       const channel = supabase
         .channel(`checklist-changes-assignment-${assignmentId}`)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
-          table: 'cleaning_checklist',
-          filter: `calendar_assignment_id_bigint=eq.${assignmentId}`
+          table: 'cleaning_checklist'
         }, (payload: any) => {
-          console.log('⚡ [Checklist] Cambio realtime en asignación:', assignmentId, payload);
-          fetchChecklist();
+          // Filtrar localmente por assignment ID (bigint) o UUID
+          const isRelevant = 
+            payload.new?.calendar_assignment_id_bigint === parseInt(String(assignmentId)) ||
+            payload.old?.calendar_assignment_id_bigint === parseInt(String(assignmentId)) ||
+            (assignmentUUID && (
+              payload.new?.calendar_assignment_id === assignmentUUID ||
+              payload.old?.calendar_assignment_id === assignmentUUID
+            ));
+          
+          if (isRelevant) {
+            console.log('⚡ [Checklist] Cambio realtime relevante:', payload.eventType);
+            fetchChecklist();
+          }
         })
         .subscribe((status) => {
           console.log('📡 [Checklist] Estado de suscripción assignment:', status);
@@ -358,34 +375,110 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
   const toggleCleaning = async (idx: number) => {
     const item = cleaning[idx];
     if (!item || !item.id) return;
-    console.log('✏️ [Checklist] Actualizando item:', item.item, 'completada:', !item.complete, 'usuario:', user.username);
-    const { data, error } = await (checklistTable() as any)
-      .update({ complete: !item.complete })
-      .eq('id', item.id)
-      .select();
-    if (!error && data && data.length > 0) {
-      setCleaning(cleaning.map((i, iidx) => iidx === idx ? data[0] : i));
-      setShowCompleteMsg(true);
-      setTimeout(() => setShowCompleteMsg(false), 1500);
-    } else {
-      console.error('❌ [Checklist] Error actualizando:', error);
+    
+    const isChecked = !item.complete;
+    console.log('✏️ [Checklist] Actualizando item:', item.item, 'completada:', isChecked, 'usuario:', user.username);
+    
+    const supabase = getSupabaseClient();
+    
+    try {
+      // Si hay assignmentId, actualizar tabla moderna (cleaning_checklist)
+      if (assignmentId) {
+        const { data, error } = await (supabase
+          .from('cleaning_checklist') as any)
+          .update({ 
+            completed: isChecked,
+            completed_by: isChecked ? user.username : null,
+            completed_at: isChecked ? new Date().toISOString() : null
+          })
+          .eq('id', item.id)
+          .select();
+        
+        if (!error && data && data.length > 0) {
+          // Actualizar estado local
+          const updatedItem = {
+            ...data[0],
+            complete: data[0].completed
+          };
+          setCleaning(cleaning.map((i, iidx) => iidx === idx ? updatedItem : i));
+          setShowCompleteMsg(true);
+          setTimeout(() => setShowCompleteMsg(false), 1500);
+          console.log('✅ [Checklist] Item actualizado en cleaning_checklist');
+        } else {
+          console.error('❌ [Checklist] Error actualizando:', error);
+        }
+      } else {
+        // Fallback: actualizar tabla legacy
+        const { data, error } = await (checklistTable() as any)
+          .update({ complete: isChecked })
+          .eq('id', item.id)
+          .select();
+        
+        if (!error && data && data.length > 0) {
+          setCleaning(cleaning.map((i, iidx) => iidx === idx ? data[0] : i));
+          setShowCompleteMsg(true);
+          setTimeout(() => setShowCompleteMsg(false), 1500);
+        } else {
+          console.error('❌ [Checklist] Error actualizando:', error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Exception actualizando item:', error);
     }
   };
   // Marcar/desmarcar ítem de mantenimiento
   const toggleMaintenance = async (idx: number) => {
     const item = maintenance[idx];
     if (!item || !item.id) return;
-    console.log('✏️ [Checklist] Actualizando mantenimiento:', item.item, 'completada:', !item.complete, 'usuario:', user.username);
-    const { data, error } = await (checklistTable() as any)
-      .update({ complete: !item.complete })
-      .eq('id', item.id)
-      .select();
-    if (!error && data && data.length > 0) {
-      setMaintenance(maintenance.map((i, iidx) => iidx === idx ? data[0] : i));
-      setShowCompleteMsg(true);
-      setTimeout(() => setShowCompleteMsg(false), 1500);
-    } else {
-      console.error('❌ [Checklist] Error actualizando mantenimiento:', error);
+    
+    const isChecked = !item.complete;
+    console.log('✏️ [Checklist] Actualizando mantenimiento:', item.item, 'completada:', isChecked, 'usuario:', user.username);
+    
+    const supabase = getSupabaseClient();
+    
+    try {
+      // Si hay assignmentId, actualizar tabla moderna (cleaning_checklist)
+      if (assignmentId) {
+        const { data, error } = await (supabase
+          .from('cleaning_checklist') as any)
+          .update({ 
+            completed: isChecked,
+            completed_by: isChecked ? user.username : null,
+            completed_at: isChecked ? new Date().toISOString() : null
+          })
+          .eq('id', item.id)
+          .select();
+        
+        if (!error && data && data.length > 0) {
+          // Actualizar estado local
+          const updatedItem = {
+            ...data[0],
+            complete: data[0].completed
+          };
+          setMaintenance(maintenance.map((i, iidx) => iidx === idx ? updatedItem : i));
+          setShowCompleteMsg(true);
+          setTimeout(() => setShowCompleteMsg(false), 1500);
+          console.log('✅ [Checklist] Item de mantenimiento actualizado en cleaning_checklist');
+        } else {
+          console.error('❌ [Checklist] Error actualizando:', error);
+        }
+      } else {
+        // Fallback: actualizar tabla legacy
+        const { data, error } = await (checklistTable() as any)
+          .update({ complete: isChecked })
+          .eq('id', item.id)
+          .select();
+        
+        if (!error && data && data.length > 0) {
+          setMaintenance(maintenance.map((i, iidx) => iidx === idx ? data[0] : i));
+          setShowCompleteMsg(true);
+          setTimeout(() => setShowCompleteMsg(false), 1500);
+        } else {
+          console.error('❌ [Checklist] Error actualizando mantenimiento:', error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Exception actualizando item:', error);
     }
   };
 
