@@ -3698,6 +3698,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                           );
                                           if (result) {
                                             console.log('✅ Item actualizado exitosamente:', result);
+                                            
+                                            // Actualizar estado local del checklist
+                                            setSyncedChecklists(prev => {
+                                              const currentChecklist = prev.get(selectedAssignmentForChecklist) || [];
+                                              const updatedChecklist = currentChecklist.map(i => 
+                                                i.id === item.id ? result : i
+                                              );
+                                              return new Map(prev).set(selectedAssignmentForChecklist, updatedChecklist);
+                                            });
+                                            
+                                            console.log('🔄 Estado local actualizado para item:', item.id);
                                           } else {
                                             console.error('❌ updateCleaningChecklistItem retornó null');
                                           }
