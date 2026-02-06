@@ -67,6 +67,10 @@ async function createTestAssignments() {
     
     console.log(`✅ ${data?.length || 0} asignaciones creadas\n`);
     
+    const regularId = data?.find(a => a.type === 'Limpieza regular')?.id;
+    const profundaId = data?.find(a => a.type === 'Limpieza profunda')?.id;
+    const mantenimientoId = data?.find(a => a.type === 'Mantenimiento')?.id;
+    
     data?.forEach((a, i) => {
       console.log(`${i + 1}. ${a.type}`);
       console.log(`   ID: ${a.id}`);
@@ -77,9 +81,18 @@ async function createTestAssignments() {
     });
     
     console.log('\n📋 Resumen:');
-    console.log(`✨ Limpieza Regular: Muestra checklist de tareas diarias`);
-    console.log(`🧹 Limpieza Profunda: Muestra inventario de objetos (${data?.find(a => a.type === 'Limpieza profunda')?.id})`);
-    console.log(`🔧 Mantenimiento: Muestra checklist de tareas de mantenimiento`);
+    console.log(`✨ Limpieza Regular (${regularId}): Muestra checklist de tareas diarias`);
+    console.log(`🧹 Limpieza Profunda (${profundaId}): Muestra inventario de objetos`);
+    console.log(`🔧 Mantenimiento (${mantenimientoId}): Muestra checklist de tareas de mantenimiento`);
+    
+    // Guardar IDs en archivo para uso posterior
+    const fs = await import('fs');
+    fs.writeFileSync('assignment-ids.json', JSON.stringify({
+      regular: regularId,
+      profunda: profundaId,
+      mantenimiento: mantenimientoId
+    }, null, 2));
+    console.log('\n✅ IDs guardados en assignment-ids.json');
     
   } catch (error) {
     console.error('❌ Exception:', error);

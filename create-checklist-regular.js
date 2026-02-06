@@ -9,9 +9,23 @@ const supabase = createClient(
 );
 
 async function createChecklistForRegularCleaning() {
-  const assignmentId = 141; // ID de Limpieza Regular (entero)
+  // Obtener el ID real de la asignación desde la BD
+  const { data: assignments } = await supabase
+    .from('calendar_assignments')
+    .select('id, type')
+    .eq('house', 'EPIC D1')
+    .eq('type', 'Limpieza regular')
+    .single();
   
-  console.log(`📋 Creando checklist para asignación ${assignmentId} (Limpieza Regular)...\n`);
+  if (!assignments) {
+    console.error('❌ No se encontró asignación de Limpieza Regular');
+    return;
+  }
+  
+  const assignmentId = assignments.id;
+  
+  console.log(`📋 Creando checklist para asignación ${assignmentId} (Limpieza Regular)...`);
+  console.log(`   Tipo de ID: ${typeof assignmentId}\n`);
   
   const checklistItems = [
     // LIMPIEZA GENERAL
