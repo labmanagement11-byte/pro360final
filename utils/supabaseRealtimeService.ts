@@ -645,44 +645,20 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       return [];
     }
 
-    // Primero: Buscar items por calendar_assignment_id (datos nuevos)
-    const { data: dataByAssignmentId, error: error1 } = await (supabase
+    // Buscar items SOLO por calendar_assignment_id
+    const { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
       .eq('calendar_assignment_id', assignmentIdStr)
       .order('order_num', { ascending: true });
 
-    if (!error1 && dataByAssignmentId && dataByAssignmentId.length > 0) {
-      console.log('✅ [Checklist] Items obtenidos por assignment_id:', dataByAssignmentId.length);
-      return dataByAssignmentId;
+    if (!error && data && data.length > 0) {
+      console.log('✅ [Checklist] Items obtenidos:', data.length, 'items para', assignment.type);
+      return data;
     }
 
-    // Fallback: Buscar por employee + house (datos legados)
-    console.log('⚠️ [Checklist] No items por assignment_id; buscando por employee+house');
-    const { data: dataByEmployeeHouse, error: error2 } = await (supabase
-      .from('cleaning_checklist') as any)
-      .select('*')
-      .eq('employee', assignment.employee)
-      .eq('house', assignment.house)
-      .order('order_num', { ascending: true });
-
-    if (!error2 && dataByEmployeeHouse && dataByEmployeeHouse.length > 0) {
-      console.log('✅ [Checklist] Items obtenidos por employee+house:', dataByEmployeeHouse.length);
-      // Actualizar estos items para que tengan el calendar_assignment_id (migración lenta)
-      for (const item of dataByEmployeeHouse) {
-        if (!item.calendar_assignment_id) {
-          await (supabase
-            .from('cleaning_checklist') as any)
-            .update({ calendar_assignment_id: assignmentIdStr })
-            .eq('id', item.id)
-            .catch((err: any) => console.warn('⚠️ [Checklist] No se pudo actualizar item:', item.id, err));
-        }
-      }
-      return dataByEmployeeHouse;
-    }
-
-    // Si no hay items en ninguna forma, crear desde plantillas específicas de la casa y tipo
-    console.log('⚠️ [Checklist] No items found anywhere; creando desde plantillas para', assignment.type, assignment.house);
+    // Si no hay items, crear desde plantillas específicas de la casa y tipo
+    console.log('⚠️ [Checklist] No items found; creando desde plantillas para', assignment.type, assignment.house);
     const created = await createChecklistFromTemplate(
       assignmentIdStr,
       assignment.type,
