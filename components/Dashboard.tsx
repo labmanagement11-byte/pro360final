@@ -599,6 +599,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   // Estado para checklist sincronizado en tiempo real por asignación
   const [syncedChecklists, setSyncedChecklists] = useState<Map<string, any[]>>(new Map());
   const [selectedAssignmentForChecklist, setSelectedAssignmentForChecklist] = useState<string | null>(null);
+  const [currentAssignmentType, setCurrentAssignmentType] = useState<string | null>(null);
   const [checklistSubscriptions, setChecklistSubscriptions] = useState<Map<string, any>>(new Map());
 
   // Estado para inventario sincronizado en tiempo real por asignación
@@ -1012,80 +1013,136 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [user.username]);
 
-  // Cargar y sincronizar checklist cuando se selecciona una asignación
+  // Cargar y sincronizar checklist/inventario cuando se selecciona una asignación
   useEffect(() => {
     if (!selectedAssignmentForChecklist) return;
     
-    const loadChecklist = async () => {
+    const loadData = async () => {
       try {
-        console.log('🧹 Cargando checklist para asignación:', selectedAssignmentForChecklist);
-        const items = await realtimeService.getCleaningChecklistItems(selectedAssignmentForChecklist);
-        console.log('✅ Checklist cargado:', items);
-        setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
+        // Si es Limpieza Profunda, cargar inventario
+        if (currentAssignmentType?.toLowerCase().includes('profunda')) {
+          console.log('📦 Cargando inventario para asignación:', selectedAssignmentForChecklist);
+          const items = await realtimeService.getAssignmentInventory(selectedAssignmentForChecklist);
+          console.log('✅ Inventario cargado:', items);
+          setSyncedInventories(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
+        } else {
+          // Si es Limpieza Regular o Mantenimiento, cargar checklist
+          console.log('🧹 Cargando checklist para asignación:', selectedAssignmentForChecklist);
+          const items = await realtimeService.getCleaningChecklistItems(selectedAssignmentForChecklist);
+          console.log('✅ Checklist cargado:', items);
+          setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, items));
+        }
       } catch (error) {
-        console.error('❌ Error loading checklist:', error);
+        console.error('❌ Error loading data:', error);
       }
     };
     
-    loadChecklist();
+    loadData();
     
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
-      console.log('🔔 Suscribiendo a cambios del checklist en tiempo real...');
-      subscription = realtimeService.subscribeToChecklist(
-        selectedAssignmentForChecklist,
-        (payload: any) => {
-          console.log('⚡ Evento de checklist recibido:', payload);
-          
-          if (payload?.eventType === 'INSERT') {
-            console.log('➕ Nuevo item de checklist:', payload.new);
-            setSyncedChecklists(prev => {
-              const newMap = new Map(prev);
-              const items = newMap.get(selectedAssignmentForChecklist) || [];
-              newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
-              return newMap;
-            });
-          } else if (payload?.eventType === 'UPDATE') {
-            console.log('📝 Item de checklist actualizado:', payload.new);
-            setSyncedChecklists(prev => {
-              const newMap = new Map(prev);
-              const items = newMap.get(selectedAssignmentForChecklist) || [];
-              newMap.set(
-                selectedAssignmentForChecklist,
-                items.map(item => item.id === payload.new.id ? payload.new : item)
-              );
-              return newMap;
-            });
+      if (currentAssignmentType?.toLowerCase().includes('profunda')) {
+        console.log('🔔 Suscribiendo a cambios del inventario en tiempo real...');
+        subscription = realtimeService.subscribeToInventory(
+          selectedAssignmentForChecklist,
+          (payload: any) => {
+            console.log('⚡ Evento de inventario recibido:', payload);
+            
+            if (payload?.eventType === 'INSERT') {
+              console.log('➕ Nuevo item de inventario:', payload.new);
+              setSyncedInventories(prev => {
+                const newMap = new Map(prev);
+                const items = newMap.get(selectedAssignmentForChecklist) || [];
+                newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
+                return newMap;
+              });
+            } else if (payload?.eventType === 'UPDATE') {
+              console.log('📝 Item de inventario actualizado:', payload.new);
+              setSyncedInventories(prev => {
+                const newMap = new Map(prev);
+                const items = newMap.get(selectedAssignmentForChecklist) || [];
+                newMap.set(
+                  selectedAssignmentForChecklist,
+                  items.map(item => item.id === payload.new.id ? payload.new : item)
+                );
+                return newMap;
+              });
+            }
           }
-        }
-      );
+        );
+      } else {
+        console.log('🔔 Suscribiendo a cambios del checklist en tiempo real...');
+        subscription = realtimeService.subscribeToChecklist(
+          selectedAssignmentForChecklist,
+          (payload: any) => {
+            console.log('⚡ Evento de checklist recibido:', payload);
+            
+            if (payload?.eventType === 'INSERT') {
+              console.log('➕ Nuevo item de checklist:', payload.new);
+              setSyncedChecklists(prev => {
+                const newMap = new Map(prev);
+                const items = newMap.get(selectedAssignmentForChecklist) || [];
+                newMap.set(selectedAssignmentForChecklist, [...items, payload.new]);
+                return newMap;
+              });
+            } else if (payload?.eventType === 'UPDATE') {
+              console.log('📝 Item de checklist actualizado:', payload.new);
+              setSyncedChecklists(prev => {
+                const newMap = new Map(prev);
+                const items = newMap.get(selectedAssignmentForChecklist) || [];
+                newMap.set(
+                  selectedAssignmentForChecklist,
+                  items.map(item => item.id === payload.new.id ? payload.new : item)
+                );
+                return newMap;
+              });
+            }
+          }
+        );
+      }
       
       if (subscription) {
-        console.log('✅ Suscripción de checklist activa:', subscription);
-        setChecklistSubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
+        console.log('✅ Suscripción activa:', subscription);
+        if (currentAssignmentType?.toLowerCase().includes('profunda')) {
+          setInventorySubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
+        } else {
+          setChecklistSubscriptions(prev => new Map(prev).set(selectedAssignmentForChecklist, subscription));
+        }
       }
     } catch (error) {
-      console.error('❌ Error subscribing to checklist:', error);
+      console.error('❌ Error subscribing:', error);
     }
     
     return () => {
       try {
-        console.log('🔌 Desconectando suscripción de checklist...');
-        const sub = checklistSubscriptions.get(selectedAssignmentForChecklist);
-        if (sub) {
-          supabase?.removeChannel(sub);
-          setChecklistSubscriptions(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(selectedAssignmentForChecklist);
-            return newMap;
-          });
+        console.log('🔌 Desconectando suscripción...');
+        if (currentAssignmentType?.toLowerCase().includes('profunda')) {
+          const sub = inventorySubscriptions.get(selectedAssignmentForChecklist);
+          if (sub) {
+            supabase?.removeChannel(sub);
+            setInventorySubscriptions(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(selectedAssignmentForChecklist);
+              return newMap;
+            });
+          }
+        } else {
+          const sub = checklistSubscriptions.get(selectedAssignmentForChecklist);
+          if (sub) {
+            supabase?.removeChannel(sub);
+            setChecklistSubscriptions(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(selectedAssignmentForChecklist);
+              return newMap;
+            });
+          }
         }
       } catch (error) {
-        console.error('❌ Error unsubscribing from checklist:', error);
+        console.error('❌ Error unsubscribing:', error);
       }
     };
-  }, [selectedAssignmentForChecklist]);
+  }, [selectedAssignmentForChecklist, currentAssignmentType]);
 
   // useEffect para cargar inventario cuando se selecciona una asignación
   useEffect(() => {
@@ -2339,8 +2396,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <button 
                                 className="dashboard-btn main"
                                 onClick={() => {
-                                  console.log('🧹 Abriendo checklist para asignación:', assignment.id);
+                                  console.log('🧹 Abriendo checklist para asignación:', assignment.id, 'Tipo:', assignment.type);
                                   setSelectedAssignmentForChecklist(assignment.id);
+                                  setCurrentAssignmentType(assignment.type);
                                 }}
                               >
                                 ✅ Ver Checklist
@@ -3594,16 +3652,143 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         </div>
       )}
       
-      {/* Modal para Checklist Sincronizado */}
+      {/* Modal para Tareas/Inventario Sincronizado */}
       {selectedAssignmentForChecklist && (
-        <div className="modal-overlay" onClick={() => setSelectedAssignmentForChecklist(null)}>
+        <div className="modal-overlay" onClick={() => {
+          setSelectedAssignmentForChecklist(null);
+          setCurrentAssignmentType(null);
+        }}>
           <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>🧹 Checklist de Limpieza</h2>
-              <button className="modal-close" onClick={() => setSelectedAssignmentForChecklist(null)}>✕</button>
+              <h2>
+                {currentAssignmentType?.toLowerCase().includes('profunda') 
+                  ? '📦 Inventario de la Casa' 
+                  : currentAssignmentType?.toLowerCase().includes('mantenimiento')
+                  ? '🔧 Tareas de Mantenimiento'
+                  : '🧹 Checklist de Limpieza Regular'}
+              </h2>
+              <button className="modal-close" onClick={() => {
+                setSelectedAssignmentForChecklist(null);
+                setCurrentAssignmentType(null);
+              }}>✕</button>
             </div>
             <div className="modal-body">
-              {syncedChecklists.get(selectedAssignmentForChecklist) ? (
+              {/* Mostrar según tipo de asignación */}
+              {currentAssignmentType?.toLowerCase().includes('profunda') ? (
+                // LIMPIEZA PROFUNDA: Mostrar Inventario de la Casa
+                syncedInventories.get(selectedAssignmentForChecklist) ? (
+                  (() => {
+                    const inventoryItems = syncedInventories.get(selectedAssignmentForChecklist) || [];
+                    const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
+                    
+                    if (!assignment) return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
+                    
+                    // Agrupar por categoría
+                    const categories = new Map<string, any[]>();
+                    inventoryItems.forEach(item => {
+                      const cat = item.category || 'Sin categoría';
+                      if (!categories.has(cat)) {
+                        categories.set(cat, []);
+                      }
+                      categories.get(cat)!.push(item);
+                    });
+                    
+                    const totalItems = inventoryItems.length;
+                    const completedItems = inventoryItems.filter(i => i.is_complete).length;
+                    const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+                    
+                    return (
+                      <>
+                        <div className="modal-stats" style={{marginBottom: '2rem'}}>
+                          <div className="stat-box">
+                            <p className="stat-box-number">{assignment.employee}</p>
+                            <p className="stat-box-label">Empleado</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">{progress}%</p>
+                            <p className="stat-box-label">Progreso</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">{completedItems}/{totalItems}</p>
+                            <p className="stat-box-label">Verificados</p>
+                          </div>
+                        </div>
+                        
+                        <div className="progress-bar" style={{marginBottom: '2rem'}}>
+                          <div className="progress-fill" style={{width: `${progress}%`}}></div>
+                        </div>
+                        
+                        <div className="inventory-categories">
+                          {Array.from(categories.entries()).map(([category, items]) => {
+                            const catCompleted = items.filter(i => i.is_complete).length;
+                            const catTotal = items.length;
+                            
+                            return (
+                              <div key={category} className="inventory-category-card">
+                                <div className="inventory-category-header">
+                                  <h3>{category}</h3>
+                                  <span className="category-progress">{catCompleted}/{catTotal}</span>
+                                </div>
+                                <div className="inventory-items">
+                                  {items.map(item => (
+                                    <label key={item.id} className="inventory-item">
+                                      <input
+                                        type="checkbox"
+                                        checked={item.is_complete}
+                                        onChange={async (e) => {
+                                          const newCheckedState = e.target.checked;
+                                          console.log('📦 Actualizando item inventario:', item.id, 'a', newCheckedState);
+                                          
+                                          // Actualizar estado local PRIMERO para respuesta inmediata
+                                          setSyncedInventories(prev => {
+                                            const newMap = new Map(prev);
+                                            const items = newMap.get(selectedAssignmentForChecklist) || [];
+                                            const updatedItems = items.map(i => 
+                                              i.id === item.id ? {...i, is_complete: newCheckedState} : i
+                                            );
+                                            newMap.set(selectedAssignmentForChecklist, updatedItems);
+                                            console.log('🔄 Estado local inventario actualizado:', item.id);
+                                            return newMap;
+                                          });
+                                          
+                                          // Luego actualizar en Supabase
+                                          try {
+                                            const result = await realtimeService.updateAssignmentInventoryItem(
+                                              item.id,
+                                              newCheckedState,
+                                              user.username
+                                            );
+                                            if (result) {
+                                              console.log('✅ Item inventario actualizado en BD:', result);
+                                            }
+                                          } catch (err) {
+                                            console.error('❌ Error actualizando inventario:', err);
+                                          }
+                                        }}
+                                        disabled={user.role === 'manager' && user.username !== assignment.employee}
+                                      />
+                                      <span className={item.is_complete ? 'completed' : ''}>{item.item_name}</span>
+                                      {item.is_complete && item.checked_by && (
+                                        <span className="completed-by">✓ por {item.checked_by}</span>
+                                      )}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <div className="modal-body-empty">
+                    <p>Cargando inventario...</p>
+                  </div>
+                )
+              ) : (
+                // LIMPIEZA REGULAR o MANTENIMIENTO: Mostrar Checklist de Tareas
+              syncedChecklists.get(selectedAssignmentForChecklist) ? (
                 (() => {
                   const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
                   const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
@@ -3736,6 +3921,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 <div className="modal-body-empty">
                   <p>Cargando checklist...</p>
                 </div>
+              )}
               )}
             </div>
           </div>

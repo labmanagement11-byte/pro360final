@@ -1486,3 +1486,106 @@ body,
   background: rgba(2, 132, 199, 0.1);
   border-color: rgba(2, 132, 199, 0.3);
 }
+/* ============================================
+   INVENTARIO - CATEGORÍAS
+   ============================================ */
+
+.inventory-categories {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.inventory-category-card {
+  background: #f9fafb;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.inventory-category-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #d1d5db;
+}
+
+.inventory-category-header {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventory-category-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.category-progress {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.inventory-items {
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.inventory-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+  border: 1px solid #f3f4f6;
+}
+
+.inventory-item:hover {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.inventory-item input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+  accent-color: #10b981;
+}
+
+.inventory-item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.inventory-item span {
+  flex: 1;
+  font-size: 0.9375rem;
+  color: #1f2937;
+  font-weight: 500;
+  user-select: none;
+}
+
+.inventory-item span.completed {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+
+.inventory-item .completed-by {
+  font-size: 0.8125rem;
+  color: #10b981;
+  font-style: italic;
+  margin-left: auto;
+  white-space: nowrap;
+}
