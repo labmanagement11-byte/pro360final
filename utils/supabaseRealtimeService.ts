@@ -1344,6 +1344,7 @@ export async function getAssignmentInventory(assignmentId: string) {
       item_name: item.name, // La columna es 'name', no 'item_name'
       category: item.location || 'Sin categoría', // Usamos 'location' como categoría
       is_complete: item.complete || false,
+      quantity: item.quantity || 1, // Incluir cantidad
       notes: item.notes || null,
       checked_by: null,
       checked_at: null,
