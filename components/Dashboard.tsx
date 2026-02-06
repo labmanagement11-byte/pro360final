@@ -3788,7 +3788,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 )
               ) : (
                 // LIMPIEZA REGULAR o MANTENIMIENTO: Mostrar Checklist de Tareas
-              syncedChecklists.get(selectedAssignmentForChecklist) ? (
+                syncedChecklists.get(selectedAssignmentForChecklist) ? (
                 (() => {
                   const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
                   const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
@@ -3921,7 +3921,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 <div className="modal-body-empty">
                   <p>Cargando checklist...</p>
                 </div>
-              )}
+              )
               )}
             </div>
           </div>
