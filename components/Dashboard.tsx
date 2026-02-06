@@ -2397,21 +2397,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 className="dashboard-btn main"
                                 onClick={() => {
                                   console.log('🧹 Abriendo modal para asignación:', assignment.id, 'Tipo:', assignment.type);
-                                  if (assignment.type === 'Limpieza profunda') {
-                                    // Para Limpieza Profunda, abrir modal de inventario
-                                    console.log('📦 Abriendo inventario (Limpieza profunda)');
-                                    setSelectedAssignmentForInventory(assignment.id);
-                                  } else {
-                                    // Para Limpieza Regular y Mantenimiento, abrir modal de checklist
-                                    console.log('🧹 Abriendo checklist');
-                                    setSelectedAssignmentForChecklist(assignment.id);
-                                    setCurrentAssignmentType(assignment.type);
-                                  }
+                                  // Todos abren el checklist modal ahora
+                                  console.log('🧹 Abriendo checklist');
+                                  setSelectedAssignmentForChecklist(assignment.id);
+                                  setCurrentAssignmentType(assignment.type);
                                 }}
                               >
                                 ✅ Ver Checklist
                               </button>
-                              {assignment.type !== 'Mantenimiento' && (
+                              {assignment.type === 'Limpieza profunda' && (
                                 <button 
                                   className="dashboard-btn success"
                                   onClick={() => {
