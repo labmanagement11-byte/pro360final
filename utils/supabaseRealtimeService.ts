@@ -93,6 +93,46 @@ export function subscribeToCalendarAssignments(employeeId: string, callback: (da
     return null;
   }
 }
+
+// ==================== CALENDAR ASSIGNMENTS REALTIME - SIMPLE (SIN FILTROS) ====================
+export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback: (data: any) => void) {
+  try {
+    console.log('🔔 [Realtime Service] Suscripción SIN FILTROS a calendar_assignments para casa:', house);
+    const supabase = getSupabaseClient();
+    
+    // Subscribe sin filtros específicos - recibir todos los cambios y filtrar en cliente
+    const channel = supabase
+      .channel(`calendar-assignments-all-${house}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_assignments'
+        },
+        (payload: any) => {
+          // Filtrar en cliente para asegurarse que es para esta casa
+          if (payload.new?.house === house || payload.old?.house === house) {
+            console.log('⚡ [Realtime] Cambio en calendar_assignments para casa:', house, payload.eventType);
+            callback({
+              eventType: payload.eventType,
+              new: payload.new,
+              old: payload.old
+            });
+          }
+        }
+      )
+      .subscribe((status: any) => {
+        console.log('📡 [Realtime] Estado de suscripción (sin filtros):', status);
+      });
+    
+    console.log('✅ [Realtime] Canal creado para casa:', house);
+    return channel;
+  } catch (error) {
+    console.error('❌ [Realtime] Error al suscribirse:', error);
+    return null;
+  }
+}
 import { getSupabaseClient } from './supabaseClient';
 
 // Helper para normalizar campos snake_case -> camelCase
