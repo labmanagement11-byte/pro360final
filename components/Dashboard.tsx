@@ -3652,7 +3652,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         </div>
       )}
       
-      {/* Modal para Tareas/Inventario Sincronizado */}
+      {/* Modal para Checklist (Limpieza Regular y Mantenimiento) */}
       {selectedAssignmentForChecklist && (
         <div className="modal-overlay" onClick={() => {
           setSelectedAssignmentForChecklist(null);
@@ -3661,9 +3661,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                {currentAssignmentType?.toLowerCase().includes('profunda') 
-                  ? '📦 Inventario de la Casa' 
-                  : currentAssignmentType?.toLowerCase().includes('mantenimiento')
+                {currentAssignmentType?.toLowerCase().includes('mantenimiento')
                   ? '🔧 Tareas de Mantenimiento'
                   : '🧹 Checklist de Limpieza Regular'}
               </h2>
@@ -3673,122 +3671,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               }}>✕</button>
             </div>
             <div className="modal-body">
-              {/* Mostrar según tipo de asignación */}
-              {currentAssignmentType?.toLowerCase().includes('profunda') ? (
-                // LIMPIEZA PROFUNDA: Mostrar Inventario de la Casa
-                syncedInventories.get(selectedAssignmentForChecklist) ? (
-                  (() => {
-                    const inventoryItems = syncedInventories.get(selectedAssignmentForChecklist) || [];
-                    const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
-                    
-                    if (!assignment) return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
-                    
-                    // Agrupar por categoría
-                    const categories = new Map<string, any[]>();
-                    inventoryItems.forEach(item => {
-                      const cat = item.category || 'Sin categoría';
-                      if (!categories.has(cat)) {
-                        categories.set(cat, []);
-                      }
-                      categories.get(cat)!.push(item);
-                    });
-                    
-                    const totalItems = inventoryItems.length;
-                    const completedItems = inventoryItems.filter(i => i.is_complete).length;
-                    const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-                    
-                    return (
-                      <>
-                        <div className="modal-stats" style={{marginBottom: '2rem'}}>
-                          <div className="stat-box">
-                            <p className="stat-box-number">{assignment.employee}</p>
-                            <p className="stat-box-label">Empleado</p>
-                          </div>
-                          <div className="stat-box">
-                            <p className="stat-box-number">{progress}%</p>
-                            <p className="stat-box-label">Progreso</p>
-                          </div>
-                          <div className="stat-box">
-                            <p className="stat-box-number">{completedItems}/{totalItems}</p>
-                            <p className="stat-box-label">Verificados</p>
-                          </div>
-                        </div>
-                        
-                        <div className="progress-bar" style={{marginBottom: '2rem'}}>
-                          <div className="progress-fill" style={{width: `${progress}%`}}></div>
-                        </div>
-                        
-                        <div className="inventory-categories">
-                          {Array.from(categories.entries()).map(([category, items]) => {
-                            const catCompleted = items.filter(i => i.is_complete).length;
-                            const catTotal = items.length;
-                            
-                            return (
-                              <div key={category} className="inventory-category-card">
-                                <div className="inventory-category-header">
-                                  <h3>{category}</h3>
-                                  <span className="category-progress">{catCompleted}/{catTotal}</span>
-                                </div>
-                                <div className="inventory-items">
-                                  {items.map(item => (
-                                    <label key={item.id} className="inventory-item">
-                                      <input
-                                        type="checkbox"
-                                        checked={item.is_complete}
-                                        onChange={async (e) => {
-                                          const newCheckedState = e.target.checked;
-                                          console.log('📦 Actualizando item inventario:', item.id, 'a', newCheckedState);
-                                          
-                                          // Actualizar estado local PRIMERO para respuesta inmediata
-                                          setSyncedInventories(prev => {
-                                            const newMap = new Map(prev);
-                                            const items = newMap.get(selectedAssignmentForChecklist) || [];
-                                            const updatedItems = items.map(i => 
-                                              i.id === item.id ? {...i, is_complete: newCheckedState} : i
-                                            );
-                                            newMap.set(selectedAssignmentForChecklist, updatedItems);
-                                            console.log('🔄 Estado local inventario actualizado:', item.id);
-                                            return newMap;
-                                          });
-                                          
-                                          // Luego actualizar en Supabase
-                                          try {
-                                            const result = await realtimeService.updateAssignmentInventoryItem(
-                                              item.id,
-                                              newCheckedState,
-                                              user.username
-                                            );
-                                            if (result) {
-                                              console.log('✅ Item inventario actualizado en BD:', result);
-                                            }
-                                          } catch (err) {
-                                            console.error('❌ Error actualizando inventario:', err);
-                                          }
-                                        }}
-                                        disabled={user.role === 'manager' && user.username !== assignment.employee}
-                                      />
-                                      <span className={item.is_complete ? 'completed' : ''}>{item.item_name}</span>
-                                      {item.is_complete && item.checked_by && (
-                                        <span className="completed-by">✓ por {item.checked_by}</span>
-                                      )}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    );
-                  })()
-                ) : (
-                  <div className="modal-body-empty">
-                    <p>Cargando inventario...</p>
-                  </div>
-                )
-              ) : (
-                // LIMPIEZA REGULAR o MANTENIMIENTO: Mostrar Checklist de Tareas
-                syncedChecklists.get(selectedAssignmentForChecklist) ? (
+              {syncedChecklists.get(selectedAssignmentForChecklist) ? (
                 (() => {
                   const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
                   const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
@@ -3916,13 +3799,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </div>
                     </>
                   );
-                })()
-              ) : (
-                <div className="modal-body-empty">
-                  <p>Cargando checklist...</p>
-                </div>
-              )
-              )}
+                  })()
+                ) : (
+                  <div className="modal-body-empty">
+                    <p>Cargando checklist...</p>
+                  </div>
+                )}
             </div>
           </div>
         </div>
