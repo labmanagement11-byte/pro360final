@@ -153,6 +153,15 @@ const App = () => {
     setUser(null);
   };
 
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return <div style={{ padding: 40, textAlign: 'center' }}>Cargando...</div>;
+  }
+
   return (
     <div>
       {/* Logo eliminado, restaurado a versión previa */}

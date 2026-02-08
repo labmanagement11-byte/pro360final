@@ -629,6 +629,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   // Estado para template de inventario (manager edita el template)
   const [inventoryTemplate, setInventoryTemplate] = useState<any[]>([]);
   const [loadingInventoryTemplate, setLoadingInventoryTemplate] = useState(true);
+  const [inventoryTemplateSource, setInventoryTemplateSource] = useState<'inventory_templates' | 'inventory_template'>('inventory_templates');
   const [editingTemplateItemId, setEditingTemplateItemId] = useState<string | null>(null);
   const [newTemplateItem, setNewTemplateItem] = useState({
     item_name: '',
@@ -636,14 +637,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     category: 'Cocina',
     location: ''
   });
+  const checklistFormRef = useRef<HTMLDivElement | null>(null);
+  const inventoryFormRef = useRef<HTMLDivElement | null>(null);
 
   // Estado para template de checklist (por casa)
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
   const [loadingChecklistTemplates, setLoadingChecklistTemplates] = useState(true);
+  const [checklistTemplatesError, setChecklistTemplatesError] = useState<string | null>(null);
+  const [checklistTemplatesSource, setChecklistTemplatesSource] = useState<'checklist_templates' | 'checklist'>('checklist_templates');
   const [editingChecklistTemplateId, setEditingChecklistTemplateId] = useState<string | null>(null);
   const [newChecklistTemplate, setNewChecklistTemplate] = useState({
     zone: '',
-    task: ''
+    task: '',
+    task_type: 'Limpieza regular'
   });
 
   // Casas y selección de casa
@@ -663,8 +669,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] }
     ];
   });
-  // Si el usuario es empleado o manager (no owner), forzar la casa asignada
-  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager');
+  const isJonathanUser = String((user as any)?.username || '').toLowerCase() === 'jonathan'
+    || String((user as any)?.email || '').toLowerCase() === 'jonathan@360pro.com';
+  // Si el usuario es empleado o manager (no jonathan), forzar la casa asignada
+  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && !isJonathanUser);
   const employeeHouseIdx = (isRestrictedUser && user.house)
     ? houses.findIndex(h => h.name === user.house)
     : -1;
@@ -719,12 +727,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [newHouseName, setNewHouseName] = useState('');
 
   // Estado para checklist
-  const [checklistType, setChecklistType] = useState<'regular' | 'profunda' | 'mantenimiento'>('regular');
-  const getChecklistTaskType = (type: 'regular' | 'profunda' | 'mantenimiento') => {
-    if (type === 'profunda') return 'Limpieza profunda';
-    if (type === 'mantenimiento') return 'Mantenimiento';
-    return 'Limpieza regular';
-  };
   const [selectedTaskMaintenance, setSelectedTaskMaintenance] = useState<any>(null); // Para mostrar checklist de tarea específica
   const [taskMaintenanceData, setTaskMaintenanceData] = useState<any>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_task_maintenance') : null;
@@ -780,6 +782,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     });
     return initial;
   });
+
+  const buildChecklistSeedTemplates = (house: string) => {
+    const templates: any[] = [];
+    const addTemplates = (taskType: string, zones: Record<string, string[]>) => {
+      let order = 1;
+      Object.entries(zones).forEach(([zone, tasks]) => {
+        tasks.forEach((task) => {
+          templates.push({
+            house,
+            task_type: taskType,
+            zone,
+            task,
+            order_num: order++,
+            active: true
+          });
+        });
+      });
+    };
+
+    addTemplates('Limpieza regular', LIMPIEZA_REGULAR as Record<string, string[]>);
+    addTemplates('Limpieza profunda', LIMPIEZA_PROFUNDA as Record<string, string[]>);
+    addTemplates('Mantenimiento', MANTENIMIENTO as Record<string, string[]>);
+
+    return templates;
+  };
+
+  const dedupeChecklistTemplates = (items: any[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const type = (item.task_type || item.assigned_to || '').toString().trim().toLowerCase();
+      const zone = (item.zone || item.room || '').toString().trim().toLowerCase();
+      const task = (item.task || item.item || '').toString().trim().toLowerCase();
+      const key = `${type}||${zone}||${task}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
 
   // Cargar tareas desde Supabase con suscripción en tiempo real
   useEffect(() => {
@@ -1185,42 +1226,197 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     
     const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
     
+    let cancelled = false;
     const loadTemplate = async () => {
       try {
         setLoadingInventoryTemplate(true);
         const template = await realtimeService.getInventoryTemplates(selectedHouse);
-        setInventoryTemplate(template);
-        setLoadingInventoryTemplate(false);
+        if (cancelled) return;
+
+        if (!template || template.length === 0) {
+          const legacyTemplate = await realtimeService.getInventoryTemplateLegacy(selectedHouse);
+          if (cancelled) return;
+          if (legacyTemplate && legacyTemplate.length > 0) {
+            setInventoryTemplateSource('inventory_template');
+            setInventoryTemplate(legacyTemplate.map((item: any) => ({ ...item, _legacyTable: true })));
+            setLoadingInventoryTemplate(false);
+            return 'inventory_template' as const;
+          } else {
+            setInventoryTemplateSource('inventory_templates');
+            setInventoryTemplate([]);
+            setLoadingInventoryTemplate(false);
+            return 'inventory_templates' as const;
+          }
+        } else {
+          setInventoryTemplateSource('inventory_templates');
+          setInventoryTemplate(template);
+          setLoadingInventoryTemplate(false);
+          return 'inventory_templates' as const;
+        }
       } catch (error) {
         console.error('Error loading inventory template:', error);
         setLoadingInventoryTemplate(false);
+        return 'inventory_templates' as const;
       }
     };
-    
-    loadTemplate();
-  }, [selectedModalCard, allowedHouseIdx, houses]);
+
+    let subscription: any;
+    const subscribeToSource = (source: 'inventory_templates' | 'inventory_template') => {
+      try {
+        if (source === 'inventory_template') {
+          subscription = realtimeService.subscribeToInventoryTemplate(selectedHouse, (payload: any) => {
+            if (payload?.eventType === 'INSERT') {
+              setInventoryTemplate(prev => prev.some(item => item.id === payload.new?.id) ? prev : [...prev, { ...payload.new, _legacyTable: true }]);
+            } else if (payload?.eventType === 'UPDATE') {
+              setInventoryTemplate(prev => prev.map(item => item.id === payload.new?.id ? { ...payload.new, _legacyTable: true } : item));
+            } else if (payload?.eventType === 'DELETE') {
+              setInventoryTemplate(prev => prev.filter(item => item.id !== payload.old?.id));
+            }
+          });
+        } else {
+          subscription = realtimeService.subscribeToInventoryTemplates(selectedHouse, (payload: any) => {
+            if (payload?.eventType === 'INSERT') {
+              setInventoryTemplate(prev => prev.some(item => item.id === payload.new?.id) ? prev : [...prev, payload.new]);
+            } else if (payload?.eventType === 'UPDATE') {
+              setInventoryTemplate(prev => prev.map(item => item.id === payload.new?.id ? payload.new : item));
+            } else if (payload?.eventType === 'DELETE') {
+              setInventoryTemplate(prev => prev.filter(item => item.id !== payload.old?.id));
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error subscribing to inventory templates:', error);
+      }
+    };
+
+    loadTemplate().then((source) => {
+      if (!cancelled) subscribeToSource(source);
+    });
+
+    return () => {
+      try {
+        cancelled = true;
+        if (subscription) supabase?.removeChannel(subscription);
+      } catch (error) {
+        console.error('Error unsubscribing from inventory templates:', error);
+      }
+    };
+  }, [selectedModalCard, allowedHouseIdx, houses, user.role]);
 
   // useEffect para cargar templates de checklist por casa
   useEffect(() => {
     if (selectedModalCard !== 'checklist') return;
 
     const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
-    const taskType = getChecklistTaskType(checklistType);
 
     const loadChecklistTemplates = async () => {
       try {
         setLoadingChecklistTemplates(true);
-        const templates = await realtimeService.getChecklistTemplates(selectedHouse, taskType);
-        setChecklistTemplates(templates);
+        setChecklistTemplatesError(null);
+        const { data, error } = await realtimeService.getChecklistTemplatesWithError(selectedHouse);
+        if (error) {
+          const errorMessage = error.message || 'No se pudo cargar desde Supabase';
+          // Fallback: usar tabla checklist si checklist_templates no existe
+          if (String(errorMessage).includes('checklist_templates')) {
+            const legacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
+            setChecklistTemplatesSource('checklist');
+            if (!legacy || legacy.length === 0) {
+              const seedTemplates = buildChecklistSeedTemplates(selectedHouse);
+              if (seedTemplates.length > 0) {
+                const createdLegacy = await realtimeService.createChecklistTemplatesLegacyBulk(
+                  seedTemplates.map(t => ({
+                    house: t.house,
+                    room: t.zone,
+                    item: t.task,
+                    assigned_to: t.task_type
+                  }))
+                );
+                if (!createdLegacy || createdLegacy.length === 0) {
+                  setChecklistTemplatesError('No se pudo crear la plantilla en Supabase. Revisa permisos RLS.');
+                  setChecklistTemplates([]);
+                } else {
+                  const refreshedLegacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
+                  setChecklistTemplatesError(null);
+                  setChecklistTemplates(dedupeChecklistTemplates(refreshedLegacy || []));
+                }
+              } else {
+                setChecklistTemplatesError(null);
+                setChecklistTemplates([]);
+              }
+            } else {
+              setChecklistTemplatesError(null);
+              setChecklistTemplates(dedupeChecklistTemplates(legacy || []));
+            }
+          } else {
+            setChecklistTemplatesSource('checklist_templates');
+            setChecklistTemplatesError(errorMessage);
+            setChecklistTemplates([]);
+          }
+        } else if (!data || data.length === 0) {
+          // Auto-cargar plantilla por defecto en Supabase
+          const seedTemplates = buildChecklistSeedTemplates(selectedHouse);
+          if (seedTemplates.length > 0) {
+            const created = await realtimeService.createChecklistTemplatesBulk(seedTemplates);
+            if (!created || created.length === 0) {
+              setChecklistTemplatesError('No se pudo crear la plantilla en Supabase. Revisa permisos RLS.');
+              setChecklistTemplates([]);
+            } else {
+              const { data: refreshed } = await realtimeService.getChecklistTemplatesWithError(selectedHouse);
+              setChecklistTemplates(dedupeChecklistTemplates(refreshed || []));
+            }
+          } else {
+            setChecklistTemplates([]);
+          }
+          setChecklistTemplatesSource('checklist_templates');
+        } else {
+          setChecklistTemplatesSource('checklist_templates');
+          setChecklistTemplates(dedupeChecklistTemplates(data || []));
+        }
         setLoadingChecklistTemplates(false);
       } catch (error) {
         console.error('Error loading checklist templates:', error);
+        setChecklistTemplatesError('No se pudo cargar desde Supabase');
         setLoadingChecklistTemplates(false);
       }
     };
 
     loadChecklistTemplates();
-  }, [selectedModalCard, allowedHouseIdx, houses, checklistType]);
+
+    let subscription: any;
+    try {
+      if (checklistTemplatesSource === 'checklist') {
+        subscription = realtimeService.subscribeToChecklistLegacy(selectedHouse, (payload: any) => {
+          if (payload?.eventType === 'INSERT') {
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.some(t => t.id === payload.new?.id) ? prev : [...prev, payload.new]));
+          } else if (payload?.eventType === 'UPDATE') {
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.map(t => t.id === payload.new?.id ? payload.new : t)));
+          } else if (payload?.eventType === 'DELETE') {
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.filter(t => t.id !== payload.old?.id)));
+          }
+        });
+      } else {
+        subscription = realtimeService.subscribeToChecklistTemplates(selectedHouse, (payload: any) => {
+          if (payload?.eventType === 'INSERT') {
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.some(t => t.id === payload.new?.id) ? prev : [...prev, payload.new]));
+          } else if (payload?.eventType === 'UPDATE') {
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.map(t => t.id === payload.new?.id ? payload.new : t)));
+          } else if (payload?.eventType === 'DELETE') {
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.filter(t => t.id !== payload.old?.id)));
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error subscribing to checklist templates:', error);
+    }
+
+    return () => {
+      try {
+        if (subscription) supabase?.removeChannel(subscription);
+      } catch (error) {
+        console.error('Error unsubscribing from checklist templates:', error);
+      }
+    };
+  }, [selectedModalCard, allowedHouseIdx, houses, checklistTemplatesSource]);
 
   // Cargar checklist desde Supabase y sincronizar en tiempo real
   useEffect(() => {
@@ -1519,12 +1715,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
       show: user.role === 'owner' || user.role === 'manager',
     },
-    // Mostrar selector de casa para todos los owners
+    // Mostrar selector de casa para owners y Jonathan (manager)
     {
       key: 'house',
       title: 'Seleccionar Casa',
       desc: 'Elige y administra la casa actual.',
-      show: user.role === 'owner',
+      show: user.role === 'owner' || (user.role === 'manager' && isJonathanUser),
     },
     {
       key: 'users',
@@ -2415,7 +2611,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedModalCard === 'shopping' && (
                 <>
                   {/* Formulario para agregar productos */}
-                  <div className="modal-assignment-form">
+                  <div className="modal-assignment-form" ref={inventoryFormRef}>
                     <h3>🛒 Agregar a Lista de Compras</h3>
                     <form onSubmit={addShoppingItem}>
                       <div className="assignment-form-grid">
@@ -2565,7 +2761,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedModalCard === 'reminders' && (
                 <>
                   {/* Formulario para agregar/editar recordatorios (Manager/Owner) */}
-                  {(user.role === 'owner' || user.role === 'manager') && (
+                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
                     <div className="modal-assignment-form">
                       <h3>🔔 {editingReminderIdx >= 0 ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h3>
                       <form onSubmit={async (e) => {
@@ -2744,39 +2940,41 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               
               {selectedModalCard === 'checklist' && (
                 <>
-                  {/* Controles de tipo de checklist */}
-                  <div className="checklist-controls" style={{marginBottom: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap'}}>
-                    <button 
-                      onClick={() => setChecklistType('regular')}
-                      className={`dashboard-btn ${checklistType === 'regular' ? 'main' : ''}`}
-                      style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
-                    >
-                      🧹 Limpieza Regular
-                    </button>
-                    <button 
-                      onClick={() => setChecklistType('profunda')}
-                      className={`dashboard-btn ${checklistType === 'profunda' ? 'main' : ''}`}
-                      style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
-                    >
-                      🏠 Limpieza Profunda
-                    </button>
-                    <button 
-                      onClick={() => setChecklistType('mantenimiento')}
-                      className={`dashboard-btn ${checklistType === 'mantenimiento' ? 'main' : ''}`}
-                      style={{fontSize: '1rem', padding: '0.75rem 1.5rem'}}
-                    >
-                      🔧 Mantenimiento
-                    </button>
+                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
+                    <div className="modal-assignment-form" style={{marginBottom: '1.5rem'}}>
+                      <h3>🏠 Casa</h3>
+                      <div className="assignment-form-grid">
+                        <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                          <label>Seleccionar casa</label>
+                          <select
+                            value={selectedHouseIdx}
+                            onChange={(e) => setSelectedHouseIdx(parseInt(e.target.value, 10))}
+                            title="Seleccionar casa"
+                          >
+                            {houses.map((house, idx) => (
+                              <option key={house.id || idx} value={idx}>
+                                {house.houseName || house.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <p style={{margin: '0.75rem 0 0', color: '#6b7280', fontSize: '0.9rem'}}>
+                        Esta lista se sincroniza con las asignaciones de la casa seleccionada.
+                      </p>
+                    </div>
+                  )}
+                  <div style={{marginBottom: '2rem', textAlign: 'center', color: '#6b7280'}}>
+                    Lista completa de limpieza regular, profunda y mantenimiento.
                   </div>
 
                   {/* Formulario para agregar/editar tarea (solo manager/owner) */}
-                  {(user.role === 'owner' || user.role === 'manager') && (
-                    <div className="modal-assignment-form" style={{marginBottom: '2rem'}}>
+                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
+                    <div className="modal-assignment-form" style={{marginBottom: '2rem'}} ref={checklistFormRef}>
                       <h3>➕ {editingChecklistTemplateId ? 'Editar Tarea del Template' : 'Agregar Tarea al Template'}</h3>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
                         const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
-                        const taskType = getChecklistTaskType(checklistType);
 
                         if (!newChecklistTemplate.task.trim() || !newChecklistTemplate.zone.trim()) return;
 
@@ -2786,34 +2984,80 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         }, 0);
 
                         if (editingChecklistTemplateId) {
-                          const updated = await realtimeService.updateChecklistTemplate(editingChecklistTemplateId, {
-                            zone: newChecklistTemplate.zone.trim(),
-                            task: newChecklistTemplate.task.trim()
-                          });
-                          if (updated) {
-                            setChecklistTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+                          if (checklistTemplatesSource === 'checklist') {
+                            const updated = await realtimeService.updateChecklistTemplateLegacy(editingChecklistTemplateId, {
+                              room: newChecklistTemplate.zone.trim(),
+                              item: newChecklistTemplate.task.trim(),
+                              assigned_to: newChecklistTemplate.task_type
+                            });
+                            if (updated) {
+                              setChecklistTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+                            } else {
+                              alert('No se pudo actualizar. Revisa permisos en Supabase.');
+                            }
+                          } else {
+                            const updated = await realtimeService.updateChecklistTemplate(editingChecklistTemplateId, {
+                              zone: newChecklistTemplate.zone.trim(),
+                              task: newChecklistTemplate.task.trim(),
+                              task_type: newChecklistTemplate.task_type
+                            });
+                            if (updated) {
+                              setChecklistTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+                            } else {
+                              alert('No se pudo actualizar. Revisa permisos en Supabase.');
+                            }
                           }
                           setEditingChecklistTemplateId(null);
                         } else {
-                          const created = await realtimeService.createChecklistTemplate({
-                            house: selectedHouse,
-                            task_type: taskType,
-                            zone: newChecklistTemplate.zone.trim(),
-                            task: newChecklistTemplate.task.trim(),
-                            order_num: maxOrder + 1,
-                            active: true
-                          });
-                          if (created) {
-                            setChecklistTemplates(prev => [...prev, created]);
+                          if (checklistTemplatesSource === 'checklist') {
+                            const created = await realtimeService.createChecklistTemplateLegacy({
+                              house: selectedHouse,
+                              room: newChecklistTemplate.zone.trim(),
+                              item: newChecklistTemplate.task.trim(),
+                              assigned_to: newChecklistTemplate.task_type
+                            });
+                            if (created) {
+                              setChecklistTemplates(prev => [...prev, created]);
+                            } else {
+                              alert('No se pudo crear. Revisa permisos en Supabase.');
+                            }
+                          } else {
+                            const created = await realtimeService.createChecklistTemplate({
+                              house: selectedHouse,
+                              task_type: newChecklistTemplate.task_type,
+                              zone: newChecklistTemplate.zone.trim(),
+                              task: newChecklistTemplate.task.trim(),
+                              order_num: maxOrder + 1,
+                              active: true
+                            });
+                            if (created) {
+                              setChecklistTemplates(prev => [...prev, created]);
+                            } else {
+                              alert('No se pudo crear. Revisa permisos en Supabase.');
+                            }
                           }
                         }
 
-                        setNewChecklistTemplate({ zone: '', task: '' });
+                        setNewChecklistTemplate({ zone: '', task: '', task_type: 'Limpieza regular' });
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
+                            <label>🏷️ Tipo</label>
+                            <select
+                              value={newChecklistTemplate.task_type}
+                              onChange={(e) => setNewChecklistTemplate({ ...newChecklistTemplate, task_type: e.target.value })}
+                              required
+                              title="Tipo de checklist"
+                            >
+                              <option value="Limpieza regular">🧹 Limpieza Regular</option>
+                              <option value="Limpieza profunda">🏠 Limpieza Profunda</option>
+                              <option value="Mantenimiento">🔧 Mantenimiento</option>
+                            </select>
+                          </div>
+                          <div className="form-group">
                             <label>📍 Zona</label>
                             <input
+                              id="checklist-template-zone"
                               type="text"
                               value={newChecklistTemplate.zone}
                               onChange={(e) => setNewChecklistTemplate({ ...newChecklistTemplate, zone: e.target.value })}
@@ -2825,6 +3069,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <div className="form-group">
                             <label>📋 Tarea</label>
                             <input
+                              id="checklist-template-task"
                               type="text"
                               value={newChecklistTemplate.task}
                               onChange={(e) => setNewChecklistTemplate({ ...newChecklistTemplate, task: e.target.value })}
@@ -2844,7 +3089,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               className="dashboard-btn danger" 
                               onClick={() => {
                                 setEditingChecklistTemplateId(null);
-                                setNewChecklistTemplate({ zone: '', task: '' });
+                                setNewChecklistTemplate({ zone: '', task: '', task_type: 'Limpieza regular' });
                               }}
                             >
                               ❌ Cancelar
@@ -2870,6 +3115,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <p className="stat-box-label">Casa</p>
                     </div>
                   </div>
+                  {checklistTemplatesError && checklistTemplatesSource === 'checklist_templates' && (
+                    <div style={{textAlign: 'center', marginBottom: '1rem', color: '#dc2626'}}>
+                      {checklistTemplatesError}
+                      {String(checklistTemplatesError).includes('checklist_templates') && (
+                        <div style={{marginTop: '0.5rem', color: '#b91c1c'}}>
+                          Ejecuta el SQL en "create-checklist-templates-table.sql" para crear la tabla en Supabase.
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Zonas con tareas */}
                   <div className="subcards-grid">
@@ -2879,58 +3134,91 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </div>
                     ) : checklistTemplates.length > 0 ? (
                       (() => {
-                        const zones = new Map<string, any[]>();
+                        const byType = new Map<string, Map<string, any[]>>();
                         checklistTemplates.forEach(item => {
-                          if (!zones.has(item.zone)) zones.set(item.zone, []);
-                          zones.get(item.zone)!.push(item);
+                          const type = item.task_type || item.assigned_to || 'Limpieza regular';
+                          if (!byType.has(type)) byType.set(type, new Map());
+                          const zones = byType.get(type)!;
+                          const zoneName = item.zone || item.room || 'SIN ZONA';
+                          if (!zones.has(zoneName)) zones.set(zoneName, []);
+                          zones.get(zoneName)!.push(item);
                         });
 
                         return (
                           <div style={{gridColumn: '1 / -1'}}>
-                            {Array.from(zones.entries()).map(([zone, items]) => (
-                              <div key={zone} style={{marginBottom: '2rem'}}>
-                                <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
-                                  {zone} ({items.length} tareas)
-                                </h3>
-                                <div className="subcards-grid">
-                                  {items.map((item: any) => (
-                                    <div key={item.id} className="subcard">
-                                      <div className="subcard-header">
-                                        <div className="subcard-icon">📋</div>
-                                        <h3>{item.task}</h3>
-                                      </div>
-                                      <div className="subcard-content">
-                                        <p><strong>🏷️ Tipo:</strong> {item.task_type}</p>
-                                        <p><strong>📍 Zona:</strong> {item.zone}</p>
-                                      </div>
-                                      {(user.role === 'owner' || user.role === 'manager') && (
-                                        <div className="subcard-actions">
-                                          <button
-                                            onClick={() => {
-                                              setEditingChecklistTemplateId(item.id);
-                                              setNewChecklistTemplate({ zone: item.zone, task: item.task });
-                                            }}
-                                          >
-                                            ✏️ Editar
-                                          </button>
-                                          <button
-                                            className="danger"
-                                            onClick={async () => {
-                                              if (confirm(`¿Eliminar "${item.task}" del template?`)) {
-                                                const ok = await realtimeService.deleteChecklistTemplate(item.id);
-                                                if (ok) {
-                                                  setChecklistTemplates(prev => prev.filter(t => t.id !== item.id));
-                                                }
-                                              }
-                                            }}
-                                          >
-                                            🗑️ Eliminar
-                                          </button>
+                            {Array.from(byType.entries()).map(([type, zones]) => (
+                              <div key={type} style={{marginBottom: '2.5rem'}}>
+                                <h2 style={{marginBottom: '1rem', color: '#0f172a'}}>
+                                  {type} ({Array.from(zones.values()).reduce((acc, items) => acc + items.length, 0)} tareas)
+                                </h2>
+                                {Array.from(zones.entries()).map(([zone, items]) => (
+                                  <div key={`${type}-${zone}`} style={{marginBottom: '2rem'}}>
+                                    <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
+                                      {zone} ({items.length} tareas)
+                                    </h3>
+                                    <div className="subcards-grid">
+                                      {items.map((item: any) => (
+                                        <div key={item.id} className="subcard">
+                                          <div className="subcard-header">
+                                            <div className="subcard-icon">📋</div>
+                                            <h3>{item.task || item.item}</h3>
+                                          </div>
+                                          <div className="subcard-content">
+                                            <p><strong>🏷️ Tipo:</strong> {item.task_type || item.assigned_to || 'Limpieza regular'}</p>
+                                            <p><strong>📍 Zona:</strong> {item.zone || item.room || 'SIN ZONA'}</p>
+                                          </div>
+                                          {(user.role === 'owner' || user.role === 'manager') && (
+                                            <div className="subcard-actions">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setEditingChecklistTemplateId(item.id);
+                                                  setNewChecklistTemplate({
+                                                    zone: item.zone || item.room || '',
+                                                    task: item.task || item.item || '',
+                                                    task_type: item.task_type || item.assigned_to || 'Limpieza regular'
+                                                  });
+                                                  requestAnimationFrame(() => {
+                                                    checklistFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                    const input = document.getElementById('checklist-template-task') as HTMLInputElement | null;
+                                                    input?.focus();
+                                                  });
+                                                }}
+                                              >
+                                                ✏️ Editar
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="danger"
+                                                onClick={async () => {
+                                                  if (confirm(`¿Eliminar "${item.task}" del template?`)) {
+                                                    if (checklistTemplatesSource === 'checklist') {
+                                                      const ok = await realtimeService.deleteChecklistTemplateLegacy(item.id);
+                                                      if (ok) {
+                                                        setChecklistTemplates(prev => prev.filter(t => t.id !== item.id));
+                                                      } else {
+                                                        alert('No se pudo eliminar. Revisa permisos en Supabase.');
+                                                      }
+                                                    } else {
+                                                      const ok = await realtimeService.deleteChecklistTemplate(item.id);
+                                                      if (ok) {
+                                                        setChecklistTemplates(prev => prev.filter(t => t.id !== item.id));
+                                                      } else {
+                                                        alert('No se pudo eliminar. Revisa permisos en Supabase.');
+                                                      }
+                                                    }
+                                                  }
+                                                }}
+                                              >
+                                                🗑️ Eliminar
+                                              </button>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
+                                      ))}
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
+                                ))}
                               </div>
                             ))}
                           </div>
@@ -3073,6 +3361,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
               {selectedModalCard === 'inventory' && (
                 <>
+                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
+                    <div className="modal-assignment-form" style={{marginBottom: '1.5rem'}}>
+                      <h3>🏠 Casa</h3>
+                      <div className="assignment-form-grid">
+                        <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                          <label>Seleccionar casa</label>
+                          <select
+                            value={selectedHouseIdx}
+                            onChange={(e) => setSelectedHouseIdx(parseInt(e.target.value, 10))}
+                            title="Seleccionar casa"
+                          >
+                            {houses.map((house, idx) => (
+                              <option key={house.id || idx} value={idx}>
+                                {house.houseName || house.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <p style={{margin: '0.75rem 0 0', color: '#6b7280', fontSize: '0.9rem'}}>
+                        Este inventario se sincroniza con las asignaciones de la casa seleccionada.
+                      </p>
+                    </div>
+                  )}
                   {/* Formulario para agregar/editar items del template */}
                   <div className="modal-assignment-form">
                     <h3>📦 {editingTemplateItemId ? 'Editar Item del Template' : 'Agregar Item al Template'}</h3>
@@ -3082,27 +3394,52 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       
                       if (editingTemplateItemId) {
                         // Actualizar item existente
-                        const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
-                          item_name: newTemplateItem.item_name,
-                          quantity: parseInt(newTemplateItem.quantity),
-                          category: newTemplateItem.category,
-                          location: newTemplateItem.location || undefined
-                        });
-                        if (updated) {
-                          setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
+                        const editingItem = inventoryTemplate.find(i => i.id === editingTemplateItemId);
+                        if (editingItem?._legacyTable) {
+                          const updated = await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
+                            item_name: newTemplateItem.item_name,
+                            quantity: parseInt(newTemplateItem.quantity),
+                            category: newTemplateItem.category,
+                            location: newTemplateItem.location || undefined
+                          });
+                          if (updated) {
+                            setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? { ...updated, _legacyTable: true } : item));
+                          }
+                        } else {
+                          const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
+                            item_name: newTemplateItem.item_name,
+                            quantity: parseInt(newTemplateItem.quantity),
+                            category: newTemplateItem.category,
+                            location: newTemplateItem.location || undefined
+                          });
+                          if (updated) {
+                            setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
+                          }
                         }
                         setEditingTemplateItemId(null);
                       } else {
                         // Crear nuevo item
-                        const created = await realtimeService.createInventoryTemplate({
-                          house: selectedHouse,
-                          item_name: newTemplateItem.item_name,
-                          quantity: parseInt(newTemplateItem.quantity),
-                          category: newTemplateItem.category,
-                          location: newTemplateItem.location || undefined
-                        });
-                        if (created) {
-                          setInventoryTemplate(prev => [...prev, created]);
+                        if (inventoryTemplateSource === 'inventory_template') {
+                          const created = await realtimeService.createInventoryTemplateItem({
+                            item_name: newTemplateItem.item_name,
+                            quantity: parseInt(newTemplateItem.quantity),
+                            category: newTemplateItem.category,
+                            location: newTemplateItem.location || undefined
+                          }, selectedHouse);
+                          if (created) {
+                            setInventoryTemplate(prev => [...prev, { ...created, _legacyTable: true }]);
+                          }
+                        } else {
+                          const created = await realtimeService.createInventoryTemplate({
+                            house: selectedHouse,
+                            item_name: newTemplateItem.item_name,
+                            quantity: parseInt(newTemplateItem.quantity),
+                            category: newTemplateItem.category,
+                            location: newTemplateItem.location || undefined
+                          });
+                          if (created) {
+                            setInventoryTemplate(prev => [...prev, created]);
+                          }
                         }
                       }
                       
@@ -3112,6 +3449,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div className="form-group">
                           <label>📝 Nombre del artículo</label>
                           <input
+                            id="inventory-template-item-name"
                             type="text"
                             value={newTemplateItem.item_name}
                             onChange={(e) => setNewTemplateItem({...newTemplateItem, item_name: e.target.value})}
@@ -3124,6 +3462,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div className="form-group">
                           <label>🔢 Cantidad</label>
                           <input
+                            id="inventory-template-quantity"
                             type="number"
                             value={newTemplateItem.quantity}
                             onChange={(e) => setNewTemplateItem({...newTemplateItem, quantity: e.target.value})}
@@ -3137,6 +3476,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div className="form-group">
                           <label>🏷️ Categoría</label>
                           <select
+                            id="inventory-template-category"
                             value={newTemplateItem.category}
                             onChange={(e) => setNewTemplateItem({...newTemplateItem, category: e.target.value})}
                             required
@@ -3154,6 +3494,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div className="form-group">
                           <label>📍 Ubicación (opcional)</label>
                           <input
+                            id="inventory-template-location"
                             type="text"
                             value={newTemplateItem.location}
                             onChange={(e) => setNewTemplateItem({...newTemplateItem, location: e.target.value})}
@@ -3239,6 +3580,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                       </div>
                                       <div className="subcard-actions">
                                         <button 
+                                          type="button"
                                           onClick={() => {
                                             setNewTemplateItem({
                                               item_name: item.item_name,
@@ -3247,15 +3589,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                               location: item.location || ''
                                             });
                                             setEditingTemplateItemId(item.id);
+                                            requestAnimationFrame(() => {
+                                              inventoryFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                              const input = document.getElementById('inventory-template-item-name') as HTMLInputElement | null;
+                                              input?.focus();
+                                            });
                                           }}
                                         >
                                           ✏️ Editar
                                         </button>
                                         <button 
+                                          type="button"
                                           className="danger"
                                           onClick={async () => {
                                             if (confirm(`¿Eliminar "${item.item_name}" del template?`)) {
-                                              const ok = await realtimeService.deleteInventoryTemplate(item.id);
+                                              const ok = item._legacyTable
+                                                ? await realtimeService.deleteInventoryTemplateItem(item.id)
+                                                : await realtimeService.deleteInventoryTemplate(item.id);
                                               if (ok) {
                                                 setInventoryTemplate(prev => prev.filter(i => i.id !== item.id));
                                               }

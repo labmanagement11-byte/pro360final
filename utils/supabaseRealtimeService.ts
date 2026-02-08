@@ -1121,7 +1121,10 @@ export async function createInventoryTemplateItem(item: any, house: string = 'HY
       house: house,
       item_name: item.item_name,
       quantity: item.quantity,
-      category: item.category
+      category: item.category,
+      location: item.location || null,
+      order_num: item.order_num || null,
+      active: item.active !== undefined ? item.active : true
     }])
     .select();
 
@@ -1787,6 +1790,59 @@ export async function getChecklistTemplates(house: string, taskType?: string) {
   }
 }
 
+export async function getChecklistTemplatesWithError(house: string, taskType?: string) {
+  try {
+    const supabase = getSupabaseClient();
+    let query = supabase.from('checklist_templates').select('*').eq('house', house);
+
+    if (taskType) {
+      query = query.eq('task_type', taskType);
+    }
+
+    const { data, error } = await query.order('order_num', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error obteniendo templates de checklist:', error);
+      return { data: [], error };
+    }
+
+    return { data: data || [], error: null };
+  } catch (error: any) {
+    console.error('❌ Exception en getChecklistTemplatesWithError:', error);
+    return { data: [], error };
+  }
+}
+
+export function subscribeToChecklistTemplates(house: string, callback: (data: any) => void) {
+  try {
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel(`checklist-templates-changes-${house}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'checklist_templates',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to checklist templates:', error);
+    return null;
+  }
+}
+
 export async function createChecklistTemplate(template: {
   house: string;
   task_type: string;
@@ -1813,6 +1869,180 @@ export async function createChecklistTemplate(template: {
     return null;
   }
 }
+
+export async function createChecklistTemplatesBulk(templates: Array<{
+  house: string;
+  task_type: string;
+  zone: string;
+  task: string;
+  order_num?: number;
+  active?: boolean;
+}>) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist_templates') as any)
+      .insert(templates)
+      .select();
+
+    if (error) {
+      console.error('❌ Error creando templates de checklist (bulk):', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en createChecklistTemplatesBulk:', error);
+    return [];
+  }
+}
+
+// Legacy checklist templates (tabla checklist)
+export async function getChecklistTemplatesLegacy(house: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist') as any)
+      .select('*')
+      .eq('house', house)
+      .order('room', { ascending: true })
+      .order('item', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error obteniendo checklist legacy:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en getChecklistTemplatesLegacy:', error);
+    return [];
+  }
+}
+
+export async function createChecklistTemplateLegacy(item: { house: string; room?: string; item: string; assigned_to?: string | null }) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist') as any)
+      .insert([{
+        house: item.house,
+        room: item.room || null,
+        item: item.item,
+        complete: false,
+        assigned_to: item.assigned_to || null
+      }])
+      .select();
+
+    if (error) {
+      console.error('❌ Error creando checklist legacy:', error);
+      return null;
+    }
+
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ Exception en createChecklistTemplateLegacy:', error);
+    return null;
+  }
+}
+
+export async function createChecklistTemplatesLegacyBulk(items: Array<{ house: string; room?: string | null; item: string; assigned_to?: string | null }>) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist') as any)
+      .insert(items.map(i => ({
+        house: i.house,
+        room: i.room || null,
+        item: i.item,
+        complete: false,
+        assigned_to: i.assigned_to || null
+      })))
+      .select();
+
+    if (error) {
+      console.error('❌ Error creando checklist legacy (bulk):', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en createChecklistTemplatesLegacyBulk:', error);
+    return [];
+  }
+}
+
+export async function updateChecklistTemplateLegacy(id: string, updates: any) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('checklist') as any)
+      .update(updates)
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('❌ Error actualizando checklist legacy:', error);
+      return null;
+    }
+
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('❌ Exception en updateChecklistTemplateLegacy:', error);
+    return null;
+  }
+}
+
+export async function deleteChecklistTemplateLegacy(id: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await (supabase
+      .from('checklist') as any)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Error eliminando checklist legacy:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('❌ Exception en deleteChecklistTemplateLegacy:', error);
+    return false;
+  }
+}
+
+export function subscribeToChecklistLegacy(house: string, callback: (data: any) => void) {
+  try {
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel(`checklist-legacy-changes-${house}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'checklist',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to checklist legacy:', error);
+    return null;
+  }
+}
+
 
 export async function updateChecklistTemplate(id: string, updates: any) {
   try {
@@ -1874,6 +2104,58 @@ export async function getInventoryTemplates(house: string) {
   } catch (error) {
     console.error('❌ Exception en getInventoryTemplates:', error);
     return [];
+  }
+}
+
+export async function getInventoryTemplateLegacy(house: string) {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory_template') as any)
+      .select('*')
+      .eq('house', house)
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error obteniendo templates legacy de inventario:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en getInventoryTemplateLegacy:', error);
+    return [];
+  }
+}
+
+export function subscribeToInventoryTemplates(house: string, callback: (data: any) => void) {
+  try {
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel(`inventory-templates-changes-${house}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_templates',
+          filter: `house=eq.${house}`
+        },
+        (payload: any) => {
+          const mappedPayload = {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          };
+          callback(mappedPayload);
+        }
+      )
+      .subscribe();
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to inventory templates:', error);
+    return null;
   }
 }
 
