@@ -1290,7 +1290,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
 
     loadTemplate().then((source) => {
-      if (!cancelled) subscribeToSource(source);
+      if (!cancelled) subscribeToSource(source ?? 'inventory_templates');
     });
 
     return () => {
