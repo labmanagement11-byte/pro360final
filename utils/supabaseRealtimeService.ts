@@ -1237,25 +1237,33 @@ export async function getShoppingList(house: string = 'HYNTIBA2 APTO 406', inclu
 
 // Agregar item a la lista de compras
 export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 APTO 406') {
-  const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('shopping_list') as any)
-    .insert([{
-      house: house,
-      item_name: item.item_name,
-      quantity: item.quantity || '',
-      category: item.category || 'General',
-      size: item.size || 'Mediano',
-      added_by: item.added_by,
-      notes: item.notes || ''
-    }])
-    .select();
+  try {
+    const supabase = getSupabaseClient();
+    console.log('📝 Adding shopping item:', { item, house });
+    
+    const { data, error } = await (supabase
+      .from('shopping_list') as any)
+      .insert([{
+        house: house,
+        item_name: item.item_name,
+        quantity: item.quantity || '',
+        category: item.category || 'General',
+        size: item.size || 'Mediano',
+        added_by: item.added_by,
+        notes: item.notes || ''
+      }])
+      .select();
 
-  if (error) {
-    console.error('Error adding shopping list item:', error);
+    if (error) {
+      console.error('❌ Error adding shopping list item:', error);
+      return null;
+    }
+    console.log('✅ Shopping item added:', data?.[0]);
+    return data?.[0] || null;
+  } catch (err) {
+    console.error('❌ Exception adding shopping item:', err);
     return null;
   }
-  return data?.[0] || null;
 }
 
 // Actualizar item de la lista de compras
