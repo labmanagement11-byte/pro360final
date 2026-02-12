@@ -396,7 +396,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                       {!isManager && subtasksMap && (
                         <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
                           <div style={{fontWeight: '600', color: '#0f172a', marginBottom: '0.75rem', fontSize: '0.95rem'}}>📋 Zonas de Limpieza</div>
-                          <div style={{display: 'grid', gap: '0.5rem'}}>
+                          <div style={{display: 'grid', gap: '1rem'}}>
                             {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => {
                               const zoneItemsCount = (subtasks as string[]).length;
                               const zoneCompletedCount = (subtasks as string[]).filter((_, idx) => {
@@ -404,10 +404,29 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                 return progressArr[globalIdx];
                               }).length;
                               return (
-                                <div key={zona} style={{background: '#f8fafc', padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid #e2e8f0'}}>
-                                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem'}}>
-                                    <span style={{fontWeight: '600', color: '#1f2937', fontSize: '0.9rem'}}>{zona}</span>
-                                    <span style={{background: '#0284c7', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', fontSize: '0.75rem', fontWeight: '600'}}>{zoneCompletedCount}/{zoneItemsCount}</span>
+                                <div key={zona} style={{background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0'}}>
+                                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0'}}>
+                                    <span style={{fontWeight: '700', color: '#1f2937', fontSize: '0.95rem'}}>{zona}</span>
+                                    <span style={{background: '#0284c7', color: 'white', padding: '0.35rem 0.65rem', borderRadius: '0.375rem', fontSize: '0.8rem', fontWeight: '600'}}>{zoneCompletedCount}/{zoneItemsCount}</span>
+                                  </div>
+                                  <div style={{display: 'grid', gap: '0.65rem'}}>
+                                    {(subtasks as string[]).map((subtask, idx) => {
+                                      const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
+                                      const isChecked = progressArr[globalIdx];
+                                      return (
+                                        <div key={`${zona}-${idx}`} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.65rem', background: 'white', borderRadius: '0.5rem', border: isChecked ? '1px solid #10b981' : '1px solid #e5e7eb', cursor: 'pointer'}} onClick={() => handleSubtaskToggle(task.id, globalIdx, !isChecked, allSubtasks.length)}>
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => handleSubtaskToggle(task.id, globalIdx, !isChecked, allSubtasks.length)}
+                                            style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
+                                          />
+                                          <span style={{flex: 1, fontSize: '0.9rem', color: isChecked ? '#94a3b8' : '#1f2937', textDecoration: isChecked ? 'line-through' : 'none', lineHeight: '1.5'}}>
+                                            {subtask}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               );
