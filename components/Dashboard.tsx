@@ -325,7 +325,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   return (
     <div className="dashboard-assigned-tasks-modal">
-      <h2 style={{ color: '#111827' }}>{isManager ? 'Progreso de Tareas de Empleados' : 'Tareas Asignadas'}</h2>
+      <h2 className="assigned-tasks-title">{isManager ? 'Progreso de Tareas de Empleados' : 'Tareas Asignadas'}</h2>
       {loading ? (
         <p>Cargando tareas...</p>
       ) : Object.keys(groupedTasks).length === 0 ? (
@@ -335,9 +335,9 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       ) : (
         <div className="assigned-tasks-list-modern">
           {Object.entries(groupedTasks).map(([employee, tasks]: any) => (
-            <div key={employee} style={{marginBottom: '2rem'}}>
+            <div key={employee} className="assigned-tasks-employee-group">
               {isManager && (
-                <div style={{fontWeight: 700, color: '#0284c7', fontSize: '1.1rem', marginBottom: '0.5rem'}}>
+                <div className="assigned-tasks-employee-name">
                   {employee}
                 </div>
               )}
@@ -352,66 +352,59 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                 const isCompleted = !!task.completed || allComplete;
                 const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
                 return (
-                  <div key={task.id} className={`assigned-task-card ${isCompleted ? 'completed' : 'incomplete'}`} style={{
-                    background: isCompleted ? '#e0f7e9' : '#fff8e1',
-                    border: isCompleted ? '2px solid #22c55e' : '2px solid #fbbf24',
-                    borderRadius: '12px',
-                    marginBottom: '1.2rem',
-                    padding: '1.2rem',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1.5rem',
-                    transition: 'background 0.2s, border 0.2s'
-                  }}>
-                    <div style={{flex: 1}}>
-                      <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
-                      <div style={{fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem'}}>
-                        ID: {task.id}
+                  <div key={task.id} className={`assigned-task-card ${isCompleted ? 'completed' : 'incomplete'}`}>
+                    <div className="assigned-task-card__content">
+                      <div className="assigned-task-card__title">{task.type}</div>
+                      <div className="assigned-task-card__meta">
+                        <span className="assigned-task-card__id">ID: {task.id}</span>
+                        <span>Fecha: {task.date} {task.time ? `- ${task.time}` : ''}</span>
                       </div>
-                      <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
+                      <div className="assigned-task-card__desc">
                         {task.title || task.description || ''}
                       </div>
-                      <div style={{fontSize: '0.95rem', color: '#64748b'}}>
-                        Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
-                      </div>
-                      <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
-                        Estado: {isCompleted ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Incompleta</span>}
+                      <div className="assigned-task-card__status">
+                        Estado: {isCompleted ? <span className="assigned-task-card__status-complete">Completada</span> : <span className="assigned-task-card__status-incomplete">Incompleta</span>}
                       </div>
                       {/* Barra de progreso para manager */}
                       {isManager && allSubtasks.length > 0 && (
-                        <div style={{margin: '0.7rem 0 0.2rem 0'}}>
-                          <div style={{height: '10px', background: '#e5e7eb', borderRadius: '6px', overflow: 'hidden', marginBottom: '0.2rem'}}>
-                            <div style={{width: `${percent}%`, height: '100%', background: allComplete ? '#22c55e' : '#fbbf24', transition: 'width 0.3s'}}></div>
+                        <div className="assigned-task-card__progress">
+                          <div className="assigned-task-card__progress-bar">
+                            <div className={`assigned-task-card__progress-fill ${allComplete ? 'is-complete' : ''}`} style={{width: `${percent}%`}}></div>
                           </div>
-                          <span style={{fontSize: '0.95rem', color: allComplete ? '#22c55e' : '#64748b', fontWeight: 500}}>
+                          <span className={`assigned-task-card__progress-text ${allComplete ? 'is-complete' : ''}`}>
                             {percent}% completado
                           </span>
                         </div>
                       )}
                       {/* Subtareas con checkboxes (solo para empleados, agrupadas por secciones completas) */}
                       {!isManager && subtasksMap && (
-                        <div style={{marginTop: '1rem'}}>
-                          <div style={{fontWeight: 500, color: '#0284c7', marginBottom: '0.3rem'}}>Lista de subtareas:</div>
+                        <div className="assigned-subtasks">
+                          <div className="assigned-subtasks__title">Lista de subtareas:</div>
                           {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => (
-                            <div key={zona} style={{marginBottom: '0.7rem'}}>
-                              <div style={{fontWeight: 600, color: '#374151', fontSize: '1.02rem', marginBottom: '0.2rem'}}>{zona}</div>
-                              <ul style={{margin: 0, paddingLeft: '1.2rem'}}>
+                            <div key={zona} className="assigned-subtasks__section">
+                              <div className="assigned-subtasks__section-title">{zona}</div>
+                              <ul className="assigned-subtasks__list">
                                 {(subtasks as string[]).map((st, idx) => {
                                   // Calcular el índice global de la subtarea para el array de progreso
                                   const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                   return (
-                                    <li key={zona + '-' + idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem'}}>
-                                      <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked, allSubtasks.length)} />
-                                      <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
+                                    <li key={zona + '-' + idx} className="assigned-subtasks__item">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSubtaskToggle(task.id, globalIdx, !progressArr[globalIdx], allSubtasks.length)}
+                                        className={`subtask-toggle-button ${progressArr[globalIdx] ? 'is-complete' : ''}`}
+                                        aria-pressed={!!progressArr[globalIdx]}
+                                      >
+                                        {progressArr[globalIdx] ? 'Completado' : 'Marcar como completado'}
+                                      </button>
+                                      <span className={`assigned-subtasks__text ${progressArr[globalIdx] ? 'is-complete' : ''}`}>{st}</span>
                                     </li>
                                   );
                                 })}
                               </ul>
                             </div>
                           ))}
-                          <div style={{marginTop: '0.7rem', fontWeight: 500, color: allComplete ? '#22c55e' : '#64748b'}}>
+                          <div className={`assigned-subtasks__summary ${allComplete ? 'is-complete' : ''}`}>
                             Progreso: {completedCount} / {allSubtasks.length} subtareas completadas
                           </div>
                         </div>
@@ -511,29 +504,9 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                     <div>
                       {!isManager && (
                         isCompleted ? (
-                          <button style={{
-                            background: '#22c55e',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '0.7rem 1.2rem',
-                            fontWeight: 600,
-                            fontSize: '1rem',
-                            cursor: 'pointer',
-                            opacity: 1
-                          }} onClick={() => markTaskComplete(task.id, false)}>Marcar como incompleta</button>
+                          <button className="assigned-task-action-button complete" onClick={() => markTaskComplete(task.id, false)}>Marcar como incompleta</button>
                         ) : (
-                          <button style={{
-                            background: '#fbbf24',
-                            color: '#222',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '0.7rem 1.2rem',
-                            fontWeight: 600,
-                            fontSize: '1rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
-                          }} onClick={() => markTaskComplete(task.id, true)}>Marcar como completada</button>
+                          <button className="assigned-task-action-button pending" onClick={() => markTaskComplete(task.id, true)}>Marcar como completada</button>
                         )
                       )}
                     </div>
