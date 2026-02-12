@@ -12,6 +12,8 @@ import Tasks from './Tasks';
 const AssignedTasksCard = ({ user }: { user: any }) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inventoryByAssignment, setInventoryByAssignment] = useState<Record<string, any[]>>({});
+  const [inventoryLoading, setInventoryLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -20,6 +22,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   // Mantener referencia a las suscripciones para limpiar (pueden ser varias)
   const subscriptionRef = useRef<any[]>([]);
+  const inventorySubsRef = useRef<Map<string, any>>(new Map());
 
   // Cargar tareas y suscribirse en tiempo real
   useEffect(() => {
@@ -27,6 +30,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     let refreshInterval: NodeJS.Timeout | null = null;
     
     const fetchAssignedTasks = async () => {
+      const isManagerUser = user?.role && user.role.toLowerCase().includes('manager');
       console.log(`📅 [Dashboard] Cargando asignaciones para usuario:`, {
         username: user.username,
         house: user.house,
@@ -46,8 +50,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
       }
       
       if (isMounted) {
-        // Filter by employee on client side
-        const filtered = (data || []).filter((a: any) => a.employee === user.username);
+        // Filter by employee on client side (solo empleados)
+        const filtered = isManagerUser ? (data || []) : (data || []).filter((a: any) => a.employee === user.username);
         console.log(`✅ [Dashboard] Total asignaciones en casa:`, data?.length, `| Para usuario:`, filtered.length);
         (data || []).forEach((a: any) => {
           console.log(`  - ID:${a.id} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
@@ -103,10 +107,84 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     };
   }, [user]);
 
-  const markTaskComplete = async (assignmentId: string) => {
+  // Cargar inventario por asignación para empleados
+  useEffect(() => {
+    if (!user || user.role?.toLowerCase().includes('manager')) return;
+    if (!assignedTasks || assignedTasks.length === 0) return;
+
+    const loadAll = async () => {
+      for (const task of assignedTasks) {
+        let assignmentId = String(task.id);
+        if (!assignmentId) continue;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
+        if (!isUuid) {
+          const resolved = await realtimeService.resolveAssignmentIdFromTask(task);
+          if (resolved) assignmentId = String(resolved);
+        }
+
+        setInventoryLoading(prev => ({ ...prev, [assignmentId]: true }));
+        realtimeService.getAssignmentInventory(assignmentId)
+          .then(async (items: any[]) => {
+            if ((!items || items.length === 0) && !String(task.type || '').toLowerCase().includes('mantenimiento')) {
+              const created = await realtimeService.createAssignmentInventory(
+                assignmentId,
+                task.employee || user.username,
+                task.house || user.house
+              );
+              setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: created || [] }));
+            } else {
+              setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: items || [] }));
+            }
+          })
+          .catch((err: any) => {
+            console.error('❌ Error loading assignment inventory:', err);
+            setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: [] }));
+          })
+          .finally(() => {
+            setInventoryLoading(prev => ({ ...prev, [assignmentId]: false }));
+          });
+
+        if (!inventorySubsRef.current.has(assignmentId)) {
+          const sub = realtimeService.subscribeToAssignmentInventory(assignmentId, (payload: any) => {
+            if (payload?.eventType === 'INSERT') {
+              setInventoryByAssignment(prev => {
+                const items = prev[assignmentId] || [];
+                return { ...prev, [assignmentId]: items.some((i: any) => i.id === payload.new?.id) ? items : [...items, payload.new] };
+              });
+            } else if (payload?.eventType === 'UPDATE') {
+              setInventoryByAssignment(prev => {
+                const items = prev[assignmentId] || [];
+                return { ...prev, [assignmentId]: items.map((i: any) => i.id === payload.new?.id ? payload.new : i) };
+              });
+            } else if (payload?.eventType === 'DELETE') {
+              setInventoryByAssignment(prev => {
+                const items = prev[assignmentId] || [];
+                return { ...prev, [assignmentId]: items.filter((i: any) => i.id !== payload.old?.id) };
+              });
+            }
+          });
+          if (sub) inventorySubsRef.current.set(assignmentId, sub);
+        }
+      }
+    };
+    loadAll();
+
+    return () => {
+      inventorySubsRef.current.forEach((sub) => {
+        try {
+          if (supabase && sub) supabase.removeChannel(sub);
+        } catch (err) {
+          console.error('Error removing inventory subscription:', err);
+        }
+      });
+      inventorySubsRef.current.clear();
+    };
+  }, [assignedTasks, user]);
+
+  const markTaskComplete = async (assignmentId: string, completed: boolean) => {
     // @ts-ignore
-    await supabase.from('calendar_assignments').update({ completed: true }).eq('id', assignmentId);
-    setAssignedTasks(tasks => tasks.map(t => t.id === assignmentId ? { ...t, completed: true } : t));
+    await supabase.from('calendar_assignments').update({ completed }).eq('id', assignmentId);
+    setAssignedTasks(tasks => tasks.map(t => t.id === assignmentId ? { ...t, completed } : t));
   };
 
   // Mapas de subtareas por tipo
@@ -192,7 +270,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   }
 
   // Guardar progreso de subtareas en Supabase (puedes mejorar esto usando una tabla aparte si lo deseas)
-  async function handleSubtaskToggle(taskId: string, idx: number, checked: boolean) {
+  async function handleSubtaskToggle(taskId: string, idx: number, checked: boolean, totalSubtasks: number) {
     setSubtaskProgress(prev => {
       const arr = prev[taskId] ? [...prev[taskId]] : [];
       arr[idx] = checked;
@@ -225,6 +303,14 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
           updated_at: new Date().toISOString(),
         });
     }
+
+    const completedCount = current.filter(Boolean).length;
+    const isCompleted = totalSubtasks > 0 && completedCount === totalSubtasks;
+    await (supabase as any)
+      .from('calendar_assignments')
+      .update({ completed: isCompleted })
+      .eq('id', taskId);
+    setAssignedTasks(tasks => tasks.map(t => t.id === taskId ? { ...t, completed: isCompleted } : t));
   }
 
   // Si el usuario es manager, mostrar todas las tareas de todos los empleados
@@ -263,11 +349,12 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                 const progressArr = subtaskProgress[progressKey] || Array(allSubtasks.length).fill(false);
                 const completedCount = progressArr.filter(Boolean).length;
                 const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
+                const isCompleted = !!task.completed || allComplete;
                 const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
                 return (
-                  <div key={task.id} className={`assigned-task-card ${allComplete ? 'completed' : 'incomplete'}`} style={{
-                    background: allComplete ? '#e0f7e9' : '#fff8e1',
-                    border: allComplete ? '2px solid #22c55e' : '2px solid #fbbf24',
+                  <div key={task.id} className={`assigned-task-card ${isCompleted ? 'completed' : 'incomplete'}`} style={{
+                    background: isCompleted ? '#e0f7e9' : '#fff8e1',
+                    border: isCompleted ? '2px solid #22c55e' : '2px solid #fbbf24',
                     borderRadius: '12px',
                     marginBottom: '1.2rem',
                     padding: '1.2rem',
@@ -280,6 +367,9 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                   }}>
                     <div style={{flex: 1}}>
                       <div style={{fontWeight: 600, fontSize: '1.1rem', color: '#0284c7'}}>{task.type}</div>
+                      <div style={{fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem'}}>
+                        ID: {task.id}
+                      </div>
                       <div style={{fontSize: '1rem', color: '#374151', margin: '0.2rem 0'}}>
                         {task.title || task.description || ''}
                       </div>
@@ -287,7 +377,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                         Fecha: {task.date} {task.time ? `- ${task.time}` : ''}
                       </div>
                       <div style={{fontSize: '0.95rem', color: '#64748b', marginTop: '0.2rem'}}>
-                        Estado: {allComplete ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Pendiente</span>}
+                        Estado: {isCompleted ? <span style={{color:'#22c55e', fontWeight:600}}>Completada</span> : <span style={{color:'#f59e42', fontWeight:600}}>Incompleta</span>}
                       </div>
                       {/* Barra de progreso para manager */}
                       {isManager && allSubtasks.length > 0 && (
@@ -313,7 +403,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                   const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                   return (
                                     <li key={zona + '-' + idx} style={{color: '#64748b', fontSize: '0.97rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem'}}>
-                                      <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked)} />
+                                      <input type="checkbox" checked={!!progressArr[globalIdx]} onChange={e => handleSubtaskToggle(task.id, globalIdx, e.target.checked, allSubtasks.length)} />
                                       <span style={{textDecoration: progressArr[globalIdx] ? 'line-through' : 'none'}}>{st}</span>
                                     </li>
                                   );
@@ -326,33 +416,126 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                           </div>
                         </div>
                       )}
+
+                      {/* Inventario por asignación (solo empleados) */}
+                      {!isManager && (
+                        <div style={{marginTop: '1.2rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb'}}>
+                          <div style={{fontWeight: 600, color: '#0284c7', marginBottom: '0.5rem'}}>Inventario</div>
+                          {inventoryLoading[String(task.id)] ? (
+                            <div style={{color: '#6b7280'}}>Cargando inventario...</div>
+                          ) : (inventoryByAssignment[String(task.id)] && inventoryByAssignment[String(task.id)].length > 0) ? (
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                              {inventoryByAssignment[String(task.id)].map((inv: any) => {
+                                const status = inv.is_complete
+                                  ? 'completo'
+                                  : (inv.notes || '').toString().toLowerCase().includes('faltante')
+                                    ? 'faltante'
+                                    : 'incompleto';
+
+                                return (
+                                  <div key={inv.id} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: '#f8fafc', borderRadius: '0.5rem'}}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!inv.is_complete}
+                                      onChange={async (e) => {
+                                        const checked = e.target.checked;
+                                        setInventoryByAssignment(prev => {
+                                          const items = prev[String(task.id)] || [];
+                                          return {
+                                            ...prev,
+                                            [String(task.id)]: items.map((i: any) => i.id === inv.id ? { ...i, is_complete: checked } : i)
+                                          };
+                                        });
+                                        await realtimeService.updateAssignmentInventoryItem(inv.id, checked, checked ? '' : inv.notes, user.username);
+                                      }}
+                                    />
+                                    <span style={{flex: 1, fontSize: '0.95rem', color: '#1f2937'}}>
+                                      {inv.item_name} ({inv.quantity})
+                                    </span>
+                                    <select
+                                      value={status}
+                                      onChange={async (e) => {
+                                        const value = e.target.value;
+                                        const isComplete = value === 'completo';
+                                        const notes = value === 'faltante' ? 'FALTANTE' : '';
+                                        setInventoryByAssignment(prev => {
+                                          const items = prev[String(task.id)] || [];
+                                          return {
+                                            ...prev,
+                                            [String(task.id)]: items.map((i: any) => i.id === inv.id ? { ...i, is_complete: isComplete, notes } : i)
+                                          };
+                                        });
+                                        await realtimeService.updateAssignmentInventoryItem(inv.id, isComplete, notes, user.username);
+                                      }}
+                                      style={{padding: '0.35rem 0.5rem', borderRadius: '0.4rem', border: '1px solid #e5e7eb'}}
+                                    >
+                                      <option value="completo">✅ Completo</option>
+                                      <option value="incompleto">⏳ Incompleto</option>
+                                      <option value="faltante">❌ Faltante</option>
+                                    </select>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                              <span style={{color: '#6b7280'}}>No hay inventario para esta asignación.</span>
+                              <button
+                                type="button"
+                                className="dashboard-btn main"
+                                style={{padding: '0.35rem 0.75rem', fontSize: '0.85rem'}}
+                                onClick={async () => {
+                                  const assignmentId = String(task.id);
+                                  setInventoryLoading(prev => ({ ...prev, [assignmentId]: true }));
+                                  try {
+                                    const created = await realtimeService.createAssignmentInventory(
+                                      assignmentId,
+                                      task.employee || user.username,
+                                      task.house || user.house
+                                    );
+                                    setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: created || [] }));
+                                  } catch (err) {
+                                    console.error('❌ Error creating assignment inventory:', err);
+                                  } finally {
+                                    setInventoryLoading(prev => ({ ...prev, [assignmentId]: false }));
+                                  }
+                                }}
+                              >
+                                🔄 Crear inventario
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div>
-                      {allComplete ? (
-                        <button style={{
-                          background: '#22c55e',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '0.7rem 1.2rem',
-                          fontWeight: 600,
-                          fontSize: '1rem',
-                          cursor: 'not-allowed',
-                          opacity: 0.7
-                        }} disabled>Completada</button>
-                      ) : (!isManager && (
-                        <button style={{
-                          background: '#fbbf24',
-                          color: '#222',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '0.7rem 1.2rem',
-                          fontWeight: 600,
-                          fontSize: '1rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
-                        }} onClick={() => markTaskComplete(task.id)}>Marcar como completada</button>
-                      ))}
+                      {!isManager && (
+                        isCompleted ? (
+                          <button style={{
+                            background: '#22c55e',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '0.7rem 1.2rem',
+                            fontWeight: 600,
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            opacity: 1
+                          }} onClick={() => markTaskComplete(task.id, false)}>Marcar como incompleta</button>
+                        ) : (
+                          <button style={{
+                            background: '#fbbf24',
+                            color: '#222',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '0.7rem 1.2rem',
+                            fontWeight: 600,
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                          }} onClick={() => markTaskComplete(task.id, true)}>Marcar como completada</button>
+                        )
+                      )}
                     </div>
                   </div>
                 );

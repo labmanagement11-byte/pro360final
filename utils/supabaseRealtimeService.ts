@@ -902,15 +902,40 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
 // Crear inventario para una asignación (copia del template)
 export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
+
+  const resolveAssignmentInventoryKey = async (): Promise<number | null> => {
+    if (!isUuid) {
+      const asNumber = Number(assignmentId);
+      return Number.isFinite(asNumber) ? asNumber : null;
+    }
+    try {
+      const { data: assignment, error } = await (supabase
+        .from('calendar_assignments') as any)
+        .select('created_at')
+        .eq('id', assignmentId)
+        .single();
+      if (error || !assignment?.created_at) return null;
+      return Math.floor(new Date(assignment.created_at).getTime());
+    } catch (err) {
+      console.error('❌ [Assignment Inventory] Error resolving bigint key:', err);
+      return null;
+    }
+  };
 
   console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId, 'Empleado:', employee, 'Casa:', house);
 
   // Eliminar inventario previo de la asignación (si existe)
   try {
-    await (supabase
+    const deleteQuery = (supabase
       .from('assignment_inventory') as any)
-      .delete()
-      .eq('calendar_assignment_id', assignmentId);
+      .delete();
+    const assignmentInventoryId = await resolveAssignmentInventoryKey();
+    if (assignmentInventoryId !== null) {
+      await deleteQuery.eq('calendar_assignment_id', assignmentInventoryId);
+    } else if (isUuid) {
+      await deleteQuery.eq('calendar_assignment_id', assignmentId as any);
+    }
   } catch (err) {
     console.error('❌ [Assignment Inventory] Error eliminando inventario previo:', err);
   }
@@ -925,9 +950,10 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
 
   // Crear items basados en el template, nunca incluir 'id'
   const now = new Date().toISOString();
+  const assignmentInventoryId = await resolveAssignmentInventoryKey();
   const itemsToInsert = template.map((item: any) => {
     const obj = {
-      calendar_assignment_id: assignmentId,
+      calendar_assignment_id: assignmentInventoryId ?? assignmentId,
       employee: employee,
       house: house,
       item_name: item.item_name,
@@ -946,10 +972,26 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
 
   console.log('📝 [Assignment Inventory] Insertando', itemsToInsert.length, 'items');
 
-  const { data, error } = await (supabase
+  let { data, error } = await (supabase
     .from('assignment_inventory') as any)
     .insert(itemsToInsert)
     .select();
+
+  if (error && assignmentInventoryId === null && isUuid) {
+    const fallbackId = await resolveAssignmentInventoryKey();
+    if (fallbackId !== null) {
+      const retryItems = itemsToInsert.map((item: any) => ({
+        ...item,
+        calendar_assignment_id: fallbackId
+      }));
+      const retry = await (supabase
+        .from('assignment_inventory') as any)
+        .insert(retryItems)
+        .select();
+      data = retry.data;
+      error = retry.error;
+    }
+  }
 
   if (error) {
     try {
@@ -971,55 +1013,53 @@ export async function getAssignmentInventory(assignmentId: string) {
   try {
     console.log('📦 [Assignment Inventory] Obteniendo para asignación:', assignmentId);
     const supabase = getSupabaseClient();
-    
-    // Primero obtener la casa de la asignación
-    const { data: assignment, error: assignmentError } = await (supabase
-      .from('calendar_assignments') as any)
-      .select('house, employee')
-      .eq('id', assignmentId)
-      .single();
-    
-    if (assignmentError || !assignment) {
-      console.error('❌ [Assignment Inventory] Error obteniendo asignación:', assignmentError);
-      return [];
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
+
+    let assignmentInventoryId: number | null = null;
+    if (!isUuid) {
+      const asNumber = Number(assignmentId);
+      assignmentInventoryId = Number.isFinite(asNumber) ? asNumber : null;
+    } else {
+      const { data: assignment, error: assignmentError } = await (supabase
+        .from('calendar_assignments') as any)
+        .select('created_at')
+        .eq('id', assignmentId)
+        .single();
+      if (!assignmentError && assignment?.created_at) {
+        assignmentInventoryId = Math.floor(new Date(assignment.created_at).getTime());
+      }
     }
-    
-    console.log('🏠 [Assignment Inventory] Casa:', assignment.house, 'Empleado:', assignment.employee);
-    
-    // Obtener inventario de la casa desde la tabla inventory
-    const { data, error } = await (supabase
-      .from('inventory') as any)
-      .select('*')
-      .eq('house', assignment.house)
-      .order('location', { ascending: true });
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    if (assignmentInventoryId !== null) {
+      const result = await (supabase
+        .from('assignment_inventory') as any)
+        .select('*')
+        .eq('calendar_assignment_id', assignmentInventoryId)
+        .order('category', { ascending: true })
+        .order('item_name', { ascending: true });
+      data = result.data;
+      error = result.error;
+    } else {
+      const result = await (supabase
+        .from('assignment_inventory') as any)
+        .select('*')
+        .eq('calendar_assignment_id', assignmentId as any)
+        .order('category', { ascending: true })
+        .order('item_name', { ascending: true });
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('❌ [Assignment Inventory] Error fetching:', error.message);
       return [];
     }
     
-    console.log('📊 [Assignment Inventory] Datos crudos de BD:', data?.length || 0, 'items');
-    if (data && data.length > 0) {
-      data.slice(0, 3).forEach((item: any) => {
-        console.log('  - ID:', item.id, '| Name:', item.name || item.item_name, '| Category:', item.category || item.location, '| Complete:', item.complete);
-      });
-    }
-    
-    // Mapear campos de inventory a los campos que espera el Dashboard
-    const mappedData = (data || []).map((item: any) => ({
-      id: item.id,
-      item_name: item.name, // La columna es 'name', no 'item_name'
-      category: item.location || 'Sin categoría', // Usamos 'location' como categoría
-      is_complete: item.complete || false,
-      notes: item.notes || null,
-      checked_by: null,
-      checked_at: null,
-      house: item.house,
-      calendar_assignment_id: assignmentId
-    }));
-    
-    console.log('✅ [Assignment Inventory] Items mapeados:', mappedData.length);
-    return mappedData;
+    console.log('✅ [Assignment Inventory] Items obtenidos:', data?.length || 0);
+    return data || [];
   } catch (error) {
     console.error('❌ [Assignment Inventory] Exception:', error);
     return [];
@@ -1038,9 +1078,9 @@ export async function updateAssignmentInventoryItem(itemId: string, isComplete: 
     
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
-      .from('inventory') as any)
+      .from('assignment_inventory') as any)
       .update({
-        complete: isComplete,
+        is_complete: isComplete,
         notes: notes || null,
         checked_by: isComplete ? checkedBy || null : null,
         checked_at: isComplete ? new Date().toISOString() : null,
@@ -1077,6 +1117,10 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
   try {
     console.log('📦 [Assignment Inventory] Iniciando suscripción:', assignmentId);
     const supabase = getSupabaseClient();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
+    const assignmentInventoryId = !isUuid && Number.isFinite(Number(assignmentId))
+      ? Number(assignmentId)
+      : null;
 
     const channel = supabase
       .channel(`inventory-${assignmentId}`)
@@ -1086,7 +1130,9 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
           event: '*',
           schema: 'public',
           table: 'assignment_inventory',
-          filter: `calendar_assignment_id=eq.${assignmentId}`
+          filter: assignmentInventoryId !== null
+            ? `calendar_assignment_id=eq.${assignmentInventoryId}`
+            : `calendar_assignment_id=eq.${assignmentId}`
         },
         (payload: any) => {
           console.log('⚡ [Assignment Inventory] Evento recibido:', payload);
@@ -1108,6 +1154,28 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
     return channel;
   } catch (error) {
     console.error('❌ [Assignment Inventory] Error subscribing:', error);
+    return null;
+  }
+}
+
+export async function resolveAssignmentIdFromTask(task: any) {
+  try {
+    const supabase = getSupabaseClient();
+    const query = (supabase
+      .from('calendar_assignments') as any)
+      .select('id')
+      .eq('employee', task.employee)
+      .eq('house', task.house)
+      .eq('date', task.date)
+      .eq('time', task.time)
+      .eq('type', task.type)
+      .limit(1)
+      .maybeSingle();
+    const { data, error } = await query;
+    if (error) return null;
+    return data?.id || null;
+  } catch (error) {
+    console.error('❌ Error resolving assignment id:', error);
     return null;
   }
 }
