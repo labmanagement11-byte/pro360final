@@ -412,16 +412,29 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                   <div style={{display: 'grid', gap: '0.65rem'}}>
                                     {(subtasks as string[]).map((subtask, idx) => {
                                       const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
-                                      const isChecked = progressArr[globalIdx];
+                                      const isCompleted = progressArr[globalIdx];
                                       return (
-                                        <div key={`${zona}-${idx}`} style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.65rem', background: 'white', borderRadius: '0.5rem', border: isChecked ? '1px solid #10b981' : '1px solid #e5e7eb', cursor: 'pointer'}} onClick={() => handleSubtaskToggle(task.id, globalIdx, !isChecked, allSubtasks.length)}>
-                                          <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            onChange={() => handleSubtaskToggle(task.id, globalIdx, !isChecked, allSubtasks.length)}
-                                            style={{marginTop: '0.25rem', width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#10b981'}}
-                                          />
-                                          <span style={{flex: 1, fontSize: '0.9rem', color: isChecked ? '#94a3b8' : '#1f2937', textDecoration: isChecked ? 'line-through' : 'none', lineHeight: '1.5'}}>
+                                        <div key={`${zona}-${idx}`} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'white', borderRadius: '0.5rem', border: isCompleted ? '1px solid #10b981' : '1px solid #e5e7eb', transition: 'all 0.3s ease'}}>
+                                          <button
+                                            onClick={() => handleSubtaskToggle(task.id, globalIdx, !isCompleted, allSubtasks.length)}
+                                            style={{
+                                              padding: '0.5rem 1rem',
+                                              borderRadius: '0.375rem',
+                                              border: 'none',
+                                              fontWeight: '600',
+                                              fontSize: '0.85rem',
+                                              cursor: 'pointer',
+                                              whiteSpace: 'nowrap',
+                                              flexShrink: 0,
+                                              background: isCompleted ? '#10b981' : '#f59e0b',
+                                              color: 'white',
+                                              transition: 'all 0.3s ease',
+                                              boxShadow: isCompleted ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 2px 8px rgba(245, 158, 11, 0.2)',
+                                            }}
+                                          >
+                                            {isCompleted ? '✅ Completada' : '⏳ Completar'}
+                                          </button>
+                                          <span style={{flex: 1, fontSize: '0.9rem', color: isCompleted ? '#94a3b8' : '#1f2937', textDecoration: isCompleted ? 'line-through' : 'none', lineHeight: '1.5'}}>
                                             {subtask}
                                           </span>
                                         </div>
