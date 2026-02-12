@@ -2978,7 +2978,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               {h.size && <p><strong>📏 Tamaño:</strong> {h.size}</p>}
                               <p><strong>👤 Agregado por:</strong> {h.added_by}</p>
                               <p><strong>✅ Comprado por:</strong> {h.purchased_by}</p>
-                              <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'N/A'}</p>
+                              <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at.replace('Z', '+00:00')).toLocaleString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A'}</p>
                               <span className="subcard-badge">✅ Comprado</span>
                             </div>
                             <div className="subcard-actions">
