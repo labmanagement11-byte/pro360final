@@ -4279,47 +4279,90 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   
                   return (
                     <>
-                      <div className="modal-stats" style={{marginBottom: '2rem'}}>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{assignment.employee}</p>
-                          <p className="stat-box-label">Empleado</p>
+                      {/* Header Mejorado */}
+                      <div className="assignment-header-modern">
+                        <div className="assignment-header-left">
+                          <div className="assignment-type-badge-modern">
+                            {assignment.type === 'Limpieza profunda' ? '🧹 Profunda' : 
+                             assignment.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
+                          </div>
+                          <div className="assignment-info">
+                            <h3 className="assignment-employee-name">{assignment.employee}</h3>
+                            <p className="assignment-date-time">
+                              📅 {(() => {
+                                const dateStr = assignment.date;
+                                const dateParts = dateStr.split('T')[0].split('-');
+                                const date = new Date(dateParts[0], parseInt(dateParts[1]) - 1, dateParts[2]);
+                                return date.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
+                              })()} • 🕐 {assignment.time}
+                            </p>
+                          </div>
                         </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{progress}%</p>
-                          <p className="stat-box-label">Progreso</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{completedItems}/{totalItems}</p>
-                          <p className="stat-box-label">Completadas</p>
+                        <div className="assignment-progress-circular">
+                          <svg className="progress-ring" style={{transform: 'rotate(-90deg)'}}>
+                            <circle className="progress-ring-circle-bg" cx="50" cy="50" r="45" />
+                            <circle 
+                              className="progress-ring-circle" 
+                              cx="50" 
+                              cy="50" 
+                              r="45"
+                              style={{
+                                strokeDashoffset: 282 - (282 * progress / 100)
+                              }}
+                            />
+                          </svg>
+                          <div className="progress-text">
+                            <span className="progress-number">{progress}%</span>
+                            <span className="progress-label">Progreso</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Mostrar aviso si la lista es una plantilla local (no hay filas en BD) */}
-                      {checklistItems && checklistItems.length > 0 && checklistItems[0].isTemplate && (
-                        <div style={{textAlign: 'center', marginBottom: '1rem', color: '#6b7280'}}>
-                          <strong>Plantilla local</strong> — No se encontraron items en la base de datos; mostrando la plantilla por defecto.
+                      {/* Stats Mejoradas */}
+                      <div className="assignment-stats-modern">
+                        <div className="stat-card-modern completed">
+                          <div className="stat-icon">✅</div>
+                          <div className="stat-content">
+                            <span className="stat-number">{completedItems}</span>
+                            <span className="stat-text">Completadas</span>
+                          </div>
                         </div>
-                      )}
-                      
-                      <div className="progress-bar" style={{marginBottom: '2rem'}}>
-                        <div className="progress-fill" style={{width: `${progress}%`}}></div>
+                        <div className="stat-card-modern pending">
+                          <div className="stat-icon">⏳</div>
+                          <div className="stat-content">
+                            <span className="stat-number">{totalItems - completedItems}</span>
+                            <span className="stat-text">Pendientes</span>
+                          </div>
+                        </div>
+                        <div className="stat-card-modern total">
+                          <div className="stat-icon">📋</div>
+                          <div className="stat-content">
+                            <span className="stat-number">{totalItems}</span>
+                            <span className="stat-text">Total</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barra de progreso mejorada */}
+                      <div className="progress-bar-modern">
+                        <div className="progress-fill-modern" style={{width: `${progress}%`}}></div>
                       </div>
                       
-                      {/* Botón para eliminar asignación cuando esté completa (solo manager/owner) */}
-                      {(user.role === 'manager' || user.role === 'owner') && progress === 100 && (
-                        <div style={{marginBottom: '2rem', textAlign: 'center'}}>
+                      {/* Botón para marcar como completado */}
+                      {progress === 100 && (
+                        <div className="completion-section">
                           <button 
-                            className="dashboard-btn danger"
-                            style={{fontSize: '1rem', padding: '0.75rem 2rem'}}
+                            className="btn-mark-completed"
                             onClick={async () => {
-                              if (confirm(`¿Eliminar esta asignación completada de ${assignment.employee}? Esto también eliminará el checklist.`)) {
-                                console.log('🗑️ Eliminando asignación:', selectedAssignmentForChecklist);
-                                await realtimeService.deleteCalendarAssignment(selectedAssignmentForChecklist);
+                              if (confirm(`¿Marcar esta asignación como completada?`)) {
+                                console.log('✅ Asignación completada:', selectedAssignmentForChecklist);
+                                // Aquí podrías agregar lógica adicional si es necesario
                                 setSelectedAssignmentForChecklist(null);
                               }
                             }}
                           >
-                            ✅ Trabajo Completado - Eliminar Asignación
+                            <span className="btn-icon">✨</span>
+                            <span className="btn-text">Trabajo Completado</span>
                           </button>
                         </div>
                       )}
