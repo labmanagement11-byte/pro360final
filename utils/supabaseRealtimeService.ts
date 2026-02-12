@@ -1248,7 +1248,6 @@ export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 A
         item_name: item.item_name,
         quantity: item.quantity || '',
         category: item.category || 'General',
-        size: item.size || 'Mediano',
         added_by: item.added_by,
         notes: item.notes || ''
       }])
