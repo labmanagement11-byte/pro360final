@@ -3211,23 +3211,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     Lista completa de limpieza regular, profunda y mantenimiento.
                   </div>
 
-                  {/* Sección: Tareas Asignadas por Tipo */}
+                  {/* Sección: Tareas Asignadas por Tipo - MEJORADO */}
                   {calendarAssignments && calendarAssignments.length > 0 && (
-                    <div className="assigned-tasks-section">
-                      <div className="assigned-tasks-header">
-                        <h3 className="assigned-tasks-title">
-                          📅 Tareas Asignadas
-                        </h3>
-                        <span className="assigned-tasks-badge">{calendarAssignments.length}</span>
+                    <div className="assigned-tasks-section-v2">
+                      <div className="assigned-tasks-header-v2">
+                        <div className="assigned-tasks-title-group">
+                          <h3 className="assigned-tasks-title-v2">📋 Tareas Asignadas</h3>
+                          <p className="assigned-tasks-subtitle">Resumen de actividades por tipo</p>
+                        </div>
+                        <span className="assigned-tasks-badge-v2">{calendarAssignments.length}</span>
                       </div>
                       
                       {(() => {
-                        // Agrupar asignaciones por tipo
                         const byType = new Map<string, any[]>();
-                        const typeConfig: {[key: string]: {icon: string, color: string, bgColor: string}} = {
-                          'Limpieza regular': {icon: '✨', color: '#7c3aed', bgColor: '#ede9fe'},
-                          'Limpieza profunda': {icon: '🧹', color: '#dc2626', bgColor: '#fee2e2'},
-                          'Mantenimiento': {icon: '🔧', color: '#0891b2', bgColor: '#cffafe'}
+                        const typeConfig: {[key: string]: {icon: string, color: string, borderColor: string}} = {
+                          'Limpieza regular': {icon: '✨', color: '#7c3aed', borderColor: '#c4b5fd'},
+                          'Limpieza profunda': {icon: '🧹', color: '#dc2626', borderColor: '#fecaca'},
+                          'Mantenimiento': {icon: '🔧', color: '#0891b2', borderColor: '#67e8f9'}
                         };
                         
                         calendarAssignments.forEach(assignment => {
@@ -3237,44 +3237,40 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         });
 
                         return (
-                          <div className="assigned-tasks-grid">
+                          <div className="assigned-tasks-container-v2">
                             {Array.from(byType.entries()).map(([type, assignments]) => {
-                              const config = typeConfig[type] || {icon: '📋', color: '#6366f1', bgColor: '#e0e7ff'};
+                              const config = typeConfig[type] || {icon: '📋', color: '#6366f1', borderColor: '#c7d2fe'};
                               return (
-                                <div key={type} className="assigned-tasks-type-card">
-                                  <div className="assigned-tasks-type-header" style={{backgroundColor: config.bgColor, borderLeftColor: config.color}}>
-                                    <span className="assigned-tasks-type-icon">{config.icon}</span>
-                                    <div className="assigned-tasks-type-info">
-                                      <h4 className="assigned-tasks-type-title" style={{color: config.color}}>{type}</h4>
-                                      <span className="assigned-tasks-type-count">{assignments.length} {assignments.length === 1 ? 'tarea' : 'tareas'}</span>
+                                <div key={type} className="assigned-tasks-card-v2" style={{borderTopColor: config.color}}>
+                                  <div className="assigned-tasks-card-header-v2">
+                                    <div className="assigned-tasks-card-title-group">
+                                      <span className="assigned-tasks-card-icon" style={{color: config.color}}>{config.icon}</span>
+                                      <div>
+                                        <h4 className="assigned-tasks-card-title" style={{color: config.color}}>{type}</h4>
+                                        <span className="assigned-tasks-card-count">{assignments.length} {assignments.length === 1 ? 'tarea' : 'tareas'}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="assigned-tasks-list">
+                                  <div className="assigned-tasks-items-v2">
                                     {assignments.map((assignment, idx) => (
-                                      <div key={assignment.id || idx} className="assigned-tasks-item">
-                                        <div className="assigned-tasks-item-content">
-                                          <div className="assigned-tasks-item-employee">
-                                            <span className="assigned-tasks-item-avatar">👤</span>
-                                            <span className="assigned-tasks-item-name">{assignment.employee}</span>
-                                          </div>
-                                          <div className="assigned-tasks-item-details">
-                                            <div className="assigned-tasks-item-detail">
-                                              <span className="assigned-tasks-detail-icon">📅</span>
-                                              <span className="assigned-tasks-detail-text">
-                                                {new Date(assignment.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: '2-digit' })}
-                                              </span>
-                                            </div>
-                                            {assignment.time && (
-                                              <div className="assigned-tasks-item-detail">
-                                                <span className="assigned-tasks-detail-icon">🕐</span>
-                                                <span className="assigned-tasks-detail-text">{assignment.time}</span>
+                                      <div key={assignment.id || idx} className="assigned-tasks-item-v2">
+                                        <div className="assigned-tasks-item-header-v2">
+                                          <div className="assigned-tasks-employee-info">
+                                            <div className="assigned-tasks-employee-avatar">👤</div>
+                                            <div className="assigned-tasks-employee-details">
+                                              <div className="assigned-tasks-employee-name">{assignment.employee}</div>
+                                              <div className="assigned-tasks-employee-date">
+                                                📅 {new Date(assignment.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' })}
                                               </div>
-                                            )}
+                                            </div>
                                           </div>
+                                          <span className={`assigned-tasks-status-badge ${assignment.completed ? 'status-done' : 'status-pending'}`}>
+                                            {assignment.completed ? '✅ Hecho' : '⏳ Pendiente'}
+                                          </span>
                                         </div>
-                                        <span className={`assigned-tasks-item-status ${assignment.completed ? 'status-completed' : 'status-pending'}`}>
-                                          {assignment.completed ? '✅ Completada' : '⏳ Pendiente'}
-                                        </span>
+                                        {assignment.time && (
+                                          <div className="assigned-tasks-time-info">🕐 {assignment.time}</div>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
