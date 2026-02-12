@@ -2773,68 +2773,78 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         {calendarAssignments
                           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                           .map((assignment, idx) => (
-                          <div key={assignment.id || idx} className="subcard">
-                            <div className="subcard-header">
-                              <div className="subcard-icon">
-                                {assignment.type === 'Limpieza profunda' ? '🧹' : 
-                                 assignment.type === 'Limpieza regular' ? '✨' : '🔧'}
-                              </div>
-                              <h3>{assignment.employee}</h3>
-                            </div>
-                            <div className="subcard-content">
-                              <p><strong>📅 Fecha:</strong> {new Date(assignment.date).toLocaleDateString('es-ES', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                              })}</p>
-                              <p><strong>🕐 Hora:</strong> {assignment.time}</p>
-                              <p><strong>🏠 Servicio:</strong> {assignment.type}</p>
-                              <span className={`subcard-badge ${
-                                assignment.type === 'Limpieza profunda' ? 'warning' : 
-                                assignment.type === 'Limpieza regular' ? 'success' : ''
-                              }`}>
+                          <div key={assignment.id || idx} className="assignment-card-v3">
+                            <div className="assignment-card-v3-header">
+                              <div className="assignment-card-v3-type-badge">
                                 {assignment.type === 'Limpieza profunda' ? '🧹 Profunda' : 
                                  assignment.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
-                              </span>
+                              </div>
+                              <div className="assignment-card-v3-id">ID: {assignment.id}</div>
                             </div>
-                            <div className="subcard-actions">
+                            
+                            <div className="assignment-card-v3-title">
+                              <span className="assignment-card-v3-emoji">
+                                {assignment.type === 'Limpieza profunda' ? '🧹' : 
+                                 assignment.type === 'Limpieza regular' ? '✨' : '🔧'}
+                              </span>
+                              <h3>{assignment.employee}</h3>
+                            </div>
+                            
+                            <div className="assignment-card-v3-meta">
+                              <div className="assignment-meta-item">
+                                <span className="assignment-meta-icon">📅</span>
+                                <span className="assignment-meta-label">Fecha:</span>
+                                <span className="assignment-meta-value">{new Date(assignment.date).toLocaleDateString('es-CO', { 
+                                  weekday: 'short', 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                })}</span>
+                              </div>
+                              <div className="assignment-meta-item">
+                                <span className="assignment-meta-icon">🕐</span>
+                                <span className="assignment-meta-label">Hora:</span>
+                                <span className="assignment-meta-value">{assignment.time}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="assignment-card-v3-actions">
                               <button 
-                                className="dashboard-btn main"
+                                className="assignment-btn primary"
                                 onClick={() => {
                                   console.log('🧹 Abriendo modal para asignación:', assignment.id, 'Tipo:', assignment.type);
-                                  // Todos abren el checklist modal ahora
-                                  console.log('🧹 Abriendo checklist');
                                   setSelectedAssignmentForChecklist(assignment.id);
                                   setCurrentAssignmentType(assignment.type);
                                 }}
                               >
-                                ✅ Ver Checklist
+                                <span className="assignment-btn-icon">✅</span>
+                                <span className="assignment-btn-text">Ver Checklist</span>
                               </button>
                               {(assignment.type === 'Limpieza profunda' || assignment.type === 'Limpieza regular') && (
                                 <button 
-                                  className="dashboard-btn success"
+                                  className="assignment-btn secondary"
                                   onClick={() => {
                                     console.log('📦 Abriendo inventario para asignación:', assignment.id);
                                     setSelectedAssignmentForInventory(assignment.id);
                                   }}
                                 >
-                                  📦 Ver Inventario
+                                  <span className="assignment-btn-icon">📦</span>
+                                  <span className="assignment-btn-text">Inventario</span>
                                 </button>
                               )}
                               {(user.role === 'owner' || user.role === 'manager') && (
                                 <button 
-                                  className="dashboard-btn danger"
+                                  className="assignment-btn danger"
                                   onClick={async () => {
                                     if (confirm(`¿Eliminar la asignación de ${assignment.employee} para ${assignment.type}?`)) {
                                       console.log('🗑️ Eliminando asignación del calendario:', assignment.id);
                                       await realtimeService.deleteCalendarAssignment(assignment.id);
-                                      // Actualizar estado local
                                       setCalendarAssignments(calendarAssignments.filter(a => a.id !== assignment.id));
                                     }
                                   }}
                                 >
-                                  🗑️ Eliminar
+                                  <span className="assignment-btn-icon">🗑️</span>
+                                  <span className="assignment-btn-text">Eliminar</span>
                                 </button>
                               )}
                             </div>
