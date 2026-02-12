@@ -2299,10 +2299,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <span className="dashboard-inventory-name">{h.item_name}</span>
                         {h.quantity && <span className="dashboard-inventory-qty">{h.quantity}</span>}
                         <div className="dashboard-inventory-meta">
-                          <small>🏷️ {h.category}</small>
+                          {h.size && <small>📏 {h.size}</small>}
                           <small>👤 Agregado por {h.added_by}</small>
                           <small>✅ Comprado por {h.purchased_by || 'N/A'}</small>
-                          <small>� {item.purchased_at ? new Date(item.purchased_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : ''}</small>
+                          <small>� {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : ''}</small>
                         </div>
                         <div className="dashboard-inventory-actions">
                           <button className="dashboard-btn danger" onClick={async () => {
@@ -4541,4 +4541,5 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 };
 
 export default Dashboard;
+
 
