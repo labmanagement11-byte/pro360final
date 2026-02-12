@@ -2255,6 +2255,35 @@ export async function createInventoryTemplate(template: {
   }
 }
 
+export async function createInventoryTemplatesBulk(templates: Array<{
+  house: string;
+  item_name: string;
+  quantity: number;
+  category: string;
+  location?: string;
+  order_num?: number;
+  active?: boolean;
+}>) {
+  try {
+    if (!templates || templates.length === 0) return [];
+    const supabase = getSupabaseClient();
+    const { data, error } = await (supabase
+      .from('inventory_templates') as any)
+      .insert(templates)
+      .select();
+
+    if (error) {
+      console.error('❌ Error creando templates de inventario (bulk):', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception en createInventoryTemplatesBulk:', error);
+    return [];
+  }
+}
+
 export async function updateInventoryTemplate(id: string, updates: any) {
   try {
     const supabase = getSupabaseClient();

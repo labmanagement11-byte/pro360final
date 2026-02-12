@@ -964,6 +964,96 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     return templates;
   };
 
+  const buildInventorySeedTemplates = (house: string) => {
+    const items: Array<{ category: string; item_name: string; quantity: number; location?: string }> = [
+      { category: 'Cocina', item_name: 'Platos llanos', quantity: 12 },
+      { category: 'Cocina', item_name: 'Platos hondos', quantity: 12 },
+      { category: 'Cocina', item_name: 'Vasos altos (agua/jugo)', quantity: 15 },
+      { category: 'Cocina', item_name: 'Vasos para cerveza', quantity: 10 },
+      { category: 'Cocina', item_name: 'Copas para vino', quantity: 10 },
+      { category: 'Cocina', item_name: 'Tazas para café/té', quantity: 12 },
+      { category: 'Cocina', item_name: 'Cubiertos (tenedores)', quantity: 12 },
+      { category: 'Cocina', item_name: 'Cubiertos (cucharas soperas)', quantity: 12 },
+      { category: 'Cocina', item_name: 'Cubiertos (cucharas de postre)', quantity: 12 },
+      { category: 'Cocina', item_name: 'Cubiertos (cuchillos de mesa)', quantity: 12 },
+      { category: 'Cocina', item_name: 'Cuchillos de cocina (set)', quantity: 5 },
+      { category: 'Cocina', item_name: 'Tablas de picar', quantity: 3 },
+      { category: 'Cocina', item_name: 'Ollas medianas/grandes', quantity: 5 },
+      { category: 'Cocina', item_name: 'Sartenes (incluyendo antiadherente grande)', quantity: 4 },
+      { category: 'Cocina', item_name: 'Licuadora', quantity: 1 },
+      { category: 'Cocina', item_name: 'Cafetera eléctrica', quantity: 1 },
+      { category: 'Cocina', item_name: 'Hervidor eléctrico', quantity: 1 },
+      { category: 'Cocina', item_name: 'Microondas', quantity: 1 },
+      { category: 'Cocina', item_name: 'Toallas de cocina', quantity: 10 },
+      { category: 'Cocina', item_name: 'Trapos de cocina', quantity: 8 },
+      { category: 'Cocina', item_name: 'Detergente para platos', quantity: 2 },
+      { category: 'Cocina', item_name: 'Esponjas', quantity: 6 },
+      { category: 'Cocina', item_name: 'Bolsas de basura', quantity: 50 },
+      { category: 'Cocina', item_name: 'Papel aluminio', quantity: 2 },
+      { category: 'Cocina', item_name: 'Film plástico', quantity: 2 },
+      { category: 'Cocina', item_name: 'Servilletas de papel', quantity: 2 },
+      { category: 'Cocina', item_name: 'Sal, azúcar, aceite (paquete inicial)', quantity: 1 },
+
+      { category: 'Sala-Comedor', item_name: 'Controles remoto (TV + A/C o ventilador)', quantity: 2 },
+      { category: 'Sala-Comedor', item_name: 'Cojines para sofá', quantity: 10 },
+      { category: 'Sala-Comedor', item_name: 'Mantas ligeras', quantity: 4 },
+      { category: 'Sala-Comedor', item_name: 'Sillas comedor + extras', quantity: 12 },
+      { category: 'Sala-Comedor', item_name: 'Posavasos', quantity: 12 },
+
+      { category: 'Dormitorios', item_name: 'Sets de sábanas completos', quantity: 12 },
+      { category: 'Dormitorios', item_name: 'Almohadas', quantity: 20 },
+      { category: 'Dormitorios', item_name: 'Fundas de almohada', quantity: 24 },
+      { category: 'Dormitorios', item_name: 'Cobijas o edredones', quantity: 10 },
+      { category: 'Dormitorios', item_name: 'Perchas', quantity: 60 },
+      { category: 'Dormitorios', item_name: 'Lámparas de mesa de noche', quantity: 4 },
+
+      { category: 'Baños', item_name: 'Toallas grandes (baño)', quantity: 16 },
+      { category: 'Baños', item_name: 'Toallas medianas (mano)', quantity: 12 },
+      { category: 'Baños', item_name: 'Toallas pequeñas (cara)', quantity: 10 },
+      { category: 'Baños', item_name: 'Tapetes de baño', quantity: 4 },
+      { category: 'Baños', item_name: 'Jabón líquido manos/baño', quantity: 4 },
+      { category: 'Baños', item_name: 'Papel higiénico', quantity: 24 },
+      { category: 'Baños', item_name: 'Secador de pelo', quantity: 3 },
+      { category: 'Baños', item_name: 'Basureros con tapa', quantity: 4 },
+
+      { category: 'Zona de lavado', item_name: 'Detergente para ropa', quantity: 2 },
+      { category: 'Zona de lavado', item_name: 'Suavizante', quantity: 1 },
+      { category: 'Zona de lavado', item_name: 'Cesto ropa sucia', quantity: 2 },
+      { category: 'Zona de lavado', item_name: 'Plancha', quantity: 1 },
+      { category: 'Zona de lavado', item_name: 'Tabla de planchar', quantity: 1 },
+
+      { category: 'Piscina y Jacuzzi', item_name: 'Toallas para piscina/exterior', quantity: 15 },
+      { category: 'Piscina y Jacuzzi', item_name: 'Flotadores/inflables', quantity: 6 },
+      { category: 'Piscina y Jacuzzi', item_name: 'Sillas o tumbonas exteriores', quantity: 10 },
+      { category: 'Piscina y Jacuzzi', item_name: 'Sombrillas o toldos', quantity: 3 },
+      { category: 'Piscina y Jacuzzi', item_name: 'Red recogehojas piscina', quantity: 1 },
+      { category: 'Piscina y Jacuzzi', item_name: 'Cepillo/barredor piscina', quantity: 1 },
+
+      { category: 'Zona BBQ y Terraza', item_name: 'Parrilla/gas o carbón', quantity: 1 },
+      { category: 'Zona BBQ y Terraza', item_name: 'Pinzas/utensilios BBQ (set)', quantity: 4 },
+      { category: 'Zona BBQ y Terraza', item_name: 'Mesa exterior + sillas', quantity: 10 },
+      { category: 'Zona BBQ y Terraza', item_name: 'Basurero exterior con tapa', quantity: 2 },
+      { category: 'Zona BBQ y Terraza', item_name: 'Cenicero (exterior)', quantity: 2 },
+
+      { category: 'Seguridad y General', item_name: 'Botiquín primeros auxilios', quantity: 1 },
+      { category: 'Seguridad y General', item_name: 'Extintor', quantity: 1 },
+      { category: 'Seguridad y General', item_name: 'Linterna', quantity: 2 },
+      { category: 'Seguridad y General', item_name: 'Manual casa + wifi contraseña', quantity: 1 },
+      { category: 'Seguridad y General', item_name: 'Repelente mosquitos', quantity: 2 },
+      { category: 'Seguridad y General', item_name: 'Cargadores USB', quantity: 4 }
+    ];
+
+    return items.map((item, index) => ({
+      house,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      category: item.category,
+      location: item.location || item.category,
+      order_num: index + 1,
+      active: true
+    }));
+  };
+
   const dedupeChecklistTemplates = (items: any[]) => {
     const seen = new Set<string>();
     return items.filter((item) => {
@@ -1398,6 +1488,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             setLoadingInventoryTemplate(false);
             return 'inventory_template' as const;
           } else {
+            const normalizedHouse = String(selectedHouse || '').trim().toUpperCase();
+            if (normalizedHouse === 'EPIC D1') {
+              const seed = buildInventorySeedTemplates(selectedHouse);
+              const created = await realtimeService.createInventoryTemplatesBulk(seed);
+              if (!cancelled && created && created.length > 0) {
+                setInventoryTemplateSource('inventory_templates');
+                setInventoryTemplate(created);
+                setLoadingInventoryTemplate(false);
+                return 'inventory_templates' as const;
+              }
+            }
             setInventoryTemplateSource('inventory_templates');
             setInventoryTemplate([]);
             setLoadingInventoryTemplate(false);
