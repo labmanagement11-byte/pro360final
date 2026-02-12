@@ -726,7 +726,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     title: '',
     description: '',
     assignedTo: '',
-    type: 'Limpieza general',
+    type: 'Tarea extra',
   });
   const [editingTaskIdx, setEditingTaskIdx] = useState(-1);
 
@@ -3926,7 +3926,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           });
                           console.log('✅ Tarea creada con resultado:', result);
                         }
-                        setNewTask({ title: '', description: '', assignedTo: '', type: 'Limpieza general' });
+                        setNewTask({ title: '', description: '', assignedTo: '', type: 'Tarea extra' });
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
@@ -3968,9 +3968,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               required
                               title="Tipo de tarea"
                             >
-                              <option value="Limpieza general">✨ Limpieza general</option>
-                              <option value="Limpieza profunda">🧹 Limpieza profunda</option>
-                              <option value="Mantenimiento">🔧 Mantenimiento</option>
                               <option value="Tarea extra">🟦 Tarea extra</option>
                             </select>
                           </div>
@@ -3997,7 +3994,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               className="dashboard-btn danger" 
                               onClick={() => {
                                 setEditingTaskIdx(-1);
-                                setNewTask({ title: '', description: '', assignedTo: '', type: 'Limpieza general' });
+                                setNewTask({ title: '', description: '', assignedTo: '', type: 'Tarea extra' });
                               }}
                             >
                               ❌ Cancelar
@@ -4088,7 +4085,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                         title: task.title || '',
                                         description: task.description || '',
                                         assignedTo: task.assignedTo || '',
-                                        type: task.type || 'Limpieza general'
+                                        type: 'Tarea extra'
                                       });
                                       setEditingTaskIdx(idx);
                                     }}
