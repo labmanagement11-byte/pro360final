@@ -1248,7 +1248,6 @@ export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 A
         item_name: item.item_name,
         quantity: item.quantity || '',
         category: item.category || 'General',
-        size: item.size || 'Mediano',
         added_by: item.added_by,
         notes: item.notes || ''
       }])
@@ -1259,6 +1258,15 @@ export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 A
       return null;
     }
     console.log('✅ Shopping item added:', data?.[0]);
+    
+    // Actualizar el item con el size después de insertarlo
+    if (data?.[0]?.id && item.size) {
+      await (supabase
+        .from('shopping_list') as any)
+        .update({ size: item.size })
+        .eq('id', data[0].id);
+    }
+    
     return data?.[0] || null;
   } catch (err) {
     console.error('❌ Exception adding shopping item:', err);
