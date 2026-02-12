@@ -1981,7 +1981,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [newShoppingItem, setNewShoppingItem] = useState({
     item_name: '',
     quantity: '',
-    category: 'General'
+    category: 'General',
+    size: 'Mediano'
   });
 
   // Cargar lista de compras desde Supabase
@@ -2038,9 +2039,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       item_name: newShoppingItem.item_name,
       quantity: newShoppingItem.quantity,
       category: newShoppingItem.category,
+      size: newShoppingItem.size,
       added_by: user.username
     }, selectedHouse);
-    setNewShoppingItem({ item_name: '', quantity: '', category: 'General' });
+    setNewShoppingItem({ item_name: '', quantity: '', category: 'General', size: 'Mediano' });
   };
 
   // --- END Shopping List State ---
@@ -2880,16 +2882,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         </div>
                         
                         <div className="form-group">
-                          <label>🏷️ Categoría</label>
+                          <label>📏 Tamaño</label>
                           <select
-                            value={newShoppingItem.category}
-                            onChange={(e) => setNewShoppingItem({ ...newShoppingItem, category: e.target.value })}
+                            value={newShoppingItem.size}
+                            onChange={(e) => setNewShoppingItem({ ...newShoppingItem, size: e.target.value })}
                           >
-                            <option value="General">General</option>
-                            <option value="Alimentos">Alimentos</option>
-                            <option value="Limpieza">Limpieza</option>
-                            <option value="Baño">Baño</option>
-                            <option value="Cocina">Cocina</option>
+                            <option value="Pequeño">Pequeño</option>
+                            <option value="Mediano">Mediano</option>
+                            <option value="Grande">Grande</option>
                           </select>
                         </div>
                       </div>
@@ -2925,7 +2925,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           </div>
                           <div className="subcard-content">
                             {item.quantity && <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>}
-                            <p><strong>🏷️ Categoría:</strong> {item.category}</p>
+                            {item.size && <p><strong>📏 Tamaño:</strong> {item.size}</p>}
                             <p><strong>👤 Agregado por:</strong> {item.added_by}</p>
                             <span className="subcard-badge success">🛒 Por comprar</span>
                           </div>
@@ -2975,7 +2975,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             </div>
                             <div className="subcard-content">
                               {h.quantity && <p><strong>🔢 Cantidad:</strong> {h.quantity}</p>}
-                              <p><strong>🏷️ Categoría:</strong> {h.category}</p>
+                              {h.size && <p><strong>📏 Tamaño:</strong> {h.size}</p>}
                               <p><strong>👤 Agregado por:</strong> {h.added_by}</p>
                               <p><strong>✅ Comprado por:</strong> {h.purchased_by}</p>
                               <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-ES') : 'N/A'}</p>
