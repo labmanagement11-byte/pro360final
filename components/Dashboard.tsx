@@ -2235,7 +2235,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     <span className="dashboard-inventory-name">{item.item_name}</span>
                     {item.quantity && <span className="dashboard-inventory-qty">{item.quantity}</span>}
                     <div className="dashboard-inventory-meta">
-                      <small>🏷️ {item.category}</small>
+                      {item.size && <small>📏 {item.size}</small>}
                       <small>👤 {item.added_by}</small>
                     </div>
                     <div className="dashboard-inventory-actions">
@@ -2302,7 +2302,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <small>🏷️ {h.category}</small>
                           <small>👤 Agregado por {h.added_by}</small>
                           <small>✅ Comprado por {h.purchased_by || 'N/A'}</small>
-                          <small>📅 {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-ES') : ''}</small>
+                          <small>� {item.purchased_at ? new Date(item.purchased_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : ''}</small>
                         </div>
                         <div className="dashboard-inventory-actions">
                           <button className="dashboard-btn danger" onClick={async () => {
@@ -2978,7 +2978,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               {h.size && <p><strong>📏 Tamaño:</strong> {h.size}</p>}
                               <p><strong>👤 Agregado por:</strong> {h.added_by}</p>
                               <p><strong>✅ Comprado por:</strong> {h.purchased_by}</p>
-                              <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-ES') : 'N/A'}</p>
+                              <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'N/A'}</p>
                               <span className="subcard-badge">✅ Comprado</span>
                             </div>
                             <div className="subcard-actions">
