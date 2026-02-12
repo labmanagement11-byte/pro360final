@@ -14,6 +14,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const [loading, setLoading] = useState(true);
   const [inventoryByAssignment, setInventoryByAssignment] = useState<Record<string, any[]>>({});
   const [inventoryLoading, setInventoryLoading] = useState<Record<string, boolean>>({});
+  const [inventoryProgress, setInventoryProgress] = useState<{ [key: string]: boolean[] }>({});
+  const [expandedInventory, setExpandedInventory] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -313,6 +315,99 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     setAssignedTasks(tasks => tasks.map(t => t.id === taskId ? { ...t, completed: isCompleted } : t));
   }
 
+  // Manejar completar items de inventario
+  async function handleInventoryItemToggle(assignmentId: string, itemId: string, checked: boolean, totalItems: number) {
+    const progressKey = `${assignmentId}_${itemId}`;
+    setInventoryProgress(prev => {
+      return { ...prev, [progressKey]: checked };
+    });
+
+    if (!supabase) return;
+
+    // Obtener o crear registro de progreso de inventario
+    const { data: existing, error } = await (supabase as any)
+      .from('inventory_progress')
+      .select('id')
+      .eq('assignment_id', assignmentId)
+      .eq('item_id', itemId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existing && existing.id) {
+      await (supabase as any)
+        .from('inventory_progress')
+        .update({ completed: checked, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    } else {
+      await (supabase as any)
+        .from('inventory_progress')
+        .insert({
+          assignment_id: assignmentId,
+          item_id: itemId,
+          user_id: user.id,
+          house_id: user.house_id || user.house,
+          completed: checked,
+          updated_at: new Date().toISOString(),
+        });
+    }
+  }
+
+  // Cargar progreso de inventario desde Supabase
+  useEffect(() => {
+    if (!user || !user.id || !user.house) return;
+    const isManager = user.role && user.role.toLowerCase().includes('manager');
+    
+    const fetchInventoryProgress = async () => {
+      if (!supabase) return;
+      let query = (supabase as any)
+        .from('inventory_progress')
+        .select('assignment_id, item_id, user_id, completed');
+      
+      if (!isManager) {
+        query = query.eq('user_id', user.id);
+      } else {
+        query = query.eq('house_id', user.house_id || user.house);
+      }
+      
+      const { data, error } = await query;
+      if (!error && data) {
+        const progressMap: { [key: string]: boolean } = {};
+        data.forEach((row: any) => {
+          progressMap[`${row.assignment_id}_${row.item_id}`] = row.completed;
+        });
+        setInventoryProgress(progressMap);
+      }
+    };
+    fetchInventoryProgress();
+
+    // Suscripción realtime a cambios en inventory_progress
+    if (!supabase) return;
+    const channel = (supabase as any).channel('inventory_progress_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_progress' }, (payload: any) => {
+        if (!payload.new) return;
+        if (!isManager) {
+          if (payload.new.user_id === user.id) {
+            setInventoryProgress(prev => ({ 
+              ...prev, 
+              [`${payload.new.assignment_id}_${payload.new.item_id}`]: payload.new.completed 
+            }));
+          }
+        } else {
+          if (payload.new.house_id === (user.house_id || user.house)) {
+            setInventoryProgress(prev => ({ 
+              ...prev, 
+              [`${payload.new.assignment_id}_${payload.new.item_id}`]: payload.new.completed 
+            }));
+          }
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      if (supabase) supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Si el usuario es manager, mostrar todas las tareas de todos los empleados
   const isManager = user.role && user.role.toLowerCase().includes('manager');
   const groupedTasks = isManager
@@ -441,6 +536,85 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                       );
                                     })}
                                   </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Botón de inventario */}
+                      {!isManager && inventoryByAssignment[task.id] && inventoryByAssignment[task.id].length > 0 && (
+                        <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
+                          <button
+                            onClick={() => {
+                              const newSet = new Set(expandedInventory);
+                              if (newSet.has(task.id)) {
+                                newSet.delete(task.id);
+                              } else {
+                                newSet.add(task.id);
+                              }
+                              setExpandedInventory(newSet);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              borderRadius: '0.625rem',
+                              border: 'none',
+                              fontWeight: '600',
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)',
+                              color: 'white',
+                              transition: 'all 0.3s ease',
+                              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.2)',
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.target as HTMLButtonElement).style.boxShadow = '0 6px 16px rgba(2, 132, 199, 0.3)';
+                              (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.target as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.2)';
+                              (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+                            }}
+                          >
+                            📦 {expandedInventory.has(task.id) ? 'Ocultar' : 'Ver'} Inventario ({inventoryByAssignment[task.id].length})
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Sección de Inventario Expandible */}
+                      {!isManager && expandedInventory.has(task.id) && inventoryByAssignment[task.id] && (
+                        <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
+                          <div style={{fontWeight: '600', color: '#0f172a', marginBottom: '0.75rem', fontSize: '0.95rem'}}>📋 Inventario a Completar</div>
+                          <div style={{display: 'grid', gap: '0.65rem'}}>
+                            {(inventoryByAssignment[task.id] as any[]).map((item, idx) => {
+                              const progressKey = `${task.id}_${item.id}`;
+                              const itemCompleted = inventoryProgress[progressKey] || false;
+                              return (
+                                <div key={`${task.id}-inv-${item.id}`} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'white', borderRadius: '0.5rem', border: itemCompleted ? '1px solid #10b981' : '1px solid #e5e7eb', transition: 'all 0.3s ease'}}>
+                                  <button
+                                    onClick={() => handleInventoryItemToggle(task.id, item.id, !itemCompleted, inventoryByAssignment[task.id].length)}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      borderRadius: '0.375rem',
+                                      border: 'none',
+                                      fontWeight: '600',
+                                      fontSize: '0.85rem',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0,
+                                      background: itemCompleted ? '#10b981' : '#f59e0b',
+                                      color: 'white',
+                                      transition: 'all 0.3s ease',
+                                      boxShadow: itemCompleted ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 2px 8px rgba(245, 158, 11, 0.2)',
+                                    }}
+                                  >
+                                    {itemCompleted ? '✅ Completado' : '⏳ Completar'}
+                                  </button>
+                                  <span style={{flex: 1, fontSize: '0.9rem', color: itemCompleted ? '#94a3b8' : '#1f2937', textDecoration: itemCompleted ? 'line-through' : 'none', lineHeight: '1.5'}}>
+                                    {item.name}
+                                  </span>
                                 </div>
                               );
                             })}
