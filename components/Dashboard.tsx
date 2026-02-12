@@ -14,7 +14,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const [loading, setLoading] = useState(true);
   const [inventoryByAssignment, setInventoryByAssignment] = useState<Record<string, any[]>>({});
   const [inventoryLoading, setInventoryLoading] = useState<Record<string, boolean>>({});
-  const [inventoryProgress, setInventoryProgress] = useState<{ [key: string]: boolean[] }>({});
+  const [inventoryProgress, setInventoryProgress] = useState<{ [key: string]: boolean }>({});
   const [expandedInventory, setExpandedInventory] = useState<Set<string>>(new Set());
 
   useEffect(() => {
