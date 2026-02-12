@@ -3213,18 +3213,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
                   {/* Sección: Tareas Asignadas por Tipo */}
                   {calendarAssignments && calendarAssignments.length > 0 && (
-                    <div style={{marginBottom: '2.5rem', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0'}}>
-                      <h3 style={{marginBottom: '1.5rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                        📅 Tareas Asignadas ({calendarAssignments.length})
-                      </h3>
+                    <div className="assigned-tasks-section">
+                      <div className="assigned-tasks-header">
+                        <h3 className="assigned-tasks-title">
+                          📅 Tareas Asignadas
+                        </h3>
+                        <span className="assigned-tasks-badge">{calendarAssignments.length}</span>
+                      </div>
                       
                       {(() => {
                         // Agrupar asignaciones por tipo
                         const byType = new Map<string, any[]>();
-                        const typeIcons: {[key: string]: string} = {
-                          'Limpieza regular': '✨',
-                          'Limpieza profunda': '🧹',
-                          'Mantenimiento': '🔧'
+                        const typeConfig: {[key: string]: {icon: string, color: string, bgColor: string}} = {
+                          'Limpieza regular': {icon: '✨', color: '#7c3aed', bgColor: '#ede9fe'},
+                          'Limpieza profunda': {icon: '🧹', color: '#dc2626', bgColor: '#fee2e2'},
+                          'Mantenimiento': {icon: '🔧', color: '#0891b2', bgColor: '#cffafe'}
                         };
                         
                         calendarAssignments.forEach(assignment => {
@@ -3234,51 +3237,50 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         });
 
                         return (
-                          <div style={{display: 'grid', gap: '1.5rem'}}>
-                            {Array.from(byType.entries()).map(([type, assignments]) => (
-                              <div key={type} style={{backgroundColor: 'white', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1'}}>
-                                <h4 style={{marginBottom: '1rem', color: '#0f172a', fontSize: '1rem', fontWeight: '600'}}>
-                                  {typeIcons[type] || '📋'} {type} ({assignments.length})
-                                </h4>
-                                <div style={{display: 'grid', gap: '0.75rem'}}>
-                                  {assignments.map((assignment, idx) => (
-                                    <div key={assignment.id || idx} style={{
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
-                                      padding: '0.75rem',
-                                      backgroundColor: '#f1f5f9',
-                                      borderRadius: '0.375rem',
-                                      fontSize: '0.95rem'
-                                    }}>
-                                      <div style={{display: 'flex', gap: '1rem', alignItems: 'center', flex: 1}}>
-                                        <span style={{fontWeight: '500', color: '#1e293b', minWidth: '100px'}}>
-                                          👤 {assignment.employee}
-                                        </span>
-                                        <span style={{color: '#64748b', fontSize: '0.9rem'}}>
-                                          📅 {new Date(assignment.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
-                                        </span>
-                                        {assignment.time && (
-                                          <span style={{color: '#64748b', fontSize: '0.9rem'}}>
-                                            🕐 {assignment.time}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span style={{
-                                        padding: '0.25rem 0.75rem',
-                                        borderRadius: '9999px',
-                                        fontSize: '0.85rem',
-                                        fontWeight: '500',
-                                        backgroundColor: assignment.completed ? '#dcfce7' : '#fef3c7',
-                                        color: assignment.completed ? '#166534' : '#92400e'
-                                      }}>
-                                        {assignment.completed ? '✅ Completada' : '⏳ Pendiente'}
-                                      </span>
+                          <div className="assigned-tasks-grid">
+                            {Array.from(byType.entries()).map(([type, assignments]) => {
+                              const config = typeConfig[type] || {icon: '📋', color: '#6366f1', bgColor: '#e0e7ff'};
+                              return (
+                                <div key={type} className="assigned-tasks-type-card">
+                                  <div className="assigned-tasks-type-header" style={{backgroundColor: config.bgColor, borderLeftColor: config.color}}>
+                                    <span className="assigned-tasks-type-icon">{config.icon}</span>
+                                    <div className="assigned-tasks-type-info">
+                                      <h4 className="assigned-tasks-type-title" style={{color: config.color}}>{type}</h4>
+                                      <span className="assigned-tasks-type-count">{assignments.length} {assignments.length === 1 ? 'tarea' : 'tareas'}</span>
                                     </div>
-                                  ))}
+                                  </div>
+                                  <div className="assigned-tasks-list">
+                                    {assignments.map((assignment, idx) => (
+                                      <div key={assignment.id || idx} className="assigned-tasks-item">
+                                        <div className="assigned-tasks-item-content">
+                                          <div className="assigned-tasks-item-employee">
+                                            <span className="assigned-tasks-item-avatar">👤</span>
+                                            <span className="assigned-tasks-item-name">{assignment.employee}</span>
+                                          </div>
+                                          <div className="assigned-tasks-item-details">
+                                            <div className="assigned-tasks-item-detail">
+                                              <span className="assigned-tasks-detail-icon">📅</span>
+                                              <span className="assigned-tasks-detail-text">
+                                                {new Date(assignment.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                              </span>
+                                            </div>
+                                            {assignment.time && (
+                                              <div className="assigned-tasks-item-detail">
+                                                <span className="assigned-tasks-detail-icon">🕐</span>
+                                                <span className="assigned-tasks-detail-text">{assignment.time}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <span className={`assigned-tasks-item-status ${assignment.completed ? 'status-completed' : 'status-pending'}`}>
+                                          {assignment.completed ? '✅ Completada' : '⏳ Pendiente'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         );
                       })()}
