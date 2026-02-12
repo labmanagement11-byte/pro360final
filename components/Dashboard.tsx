@@ -4345,7 +4345,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
                       {/* Barra de progreso mejorada */}
                       <div className="progress-bar-modern">
-                        <div className="progress-fill-modern" style={{width: `${progress}%`}}></div>
+                        <div className="progress-bar-modern-label">
+                          <span className="progress-bar-modern-text">Progreso General</span>
+                          <span className="progress-bar-modern-percentage">{progress}%</span>
+                        </div>
+                        <div className="progress-bar-modern-container">
+                          <div 
+                            className={`progress-bar-modern-fill ${progress === 100 ? 'complete' : ''}`} 
+                            style={{width: `${progress}%`}}
+                          ></div>
+                        </div>
                       </div>
                       
                       {/* Botón para marcar como completado */}

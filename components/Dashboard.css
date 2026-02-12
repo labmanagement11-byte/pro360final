@@ -3045,6 +3045,10 @@ body,
   justify-content: center;
 }
 
+.completion-section {
+  margin-bottom: 1.5rem;
+}
+
 /* ============================================
    RESPONSIVE - MODERN ASSIGNMENT (TABLET)
    ============================================ */
