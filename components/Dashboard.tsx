@@ -325,180 +325,112 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   return (
     <div className="dashboard-assigned-tasks-modal">
-      <h2 className="assigned-tasks-title">{isManager ? 'Progreso de Tareas de Empleados' : 'Tareas Asignadas'}</h2>
+      <div className="assigned-tasks-header-v2">
+        <div className="assigned-tasks-title-group">
+          <h3 className="assigned-tasks-title-v2">{isManager ? '👥 Progreso de Empleados' : '✨ Tareas Asignadas'}</h3>
+          <p className="assigned-tasks-subtitle">{isManager ? 'Supervisar el progreso de todos los empleados' : 'Tu lista de tareas asignadas por el manager'}</p>
+        </div>
+        <span className="assigned-tasks-badge-v2">{Object.values(groupedTasks).flat().length}</span>
+      </div>
+
       {loading ? (
-        <p>Cargando tareas...</p>
+        <div style={{textAlign: 'center', padding: '2rem', color: '#64748b'}}>
+          <p>Cargando tareas...</p>
+        </div>
       ) : Object.keys(groupedTasks).length === 0 ? (
-        <div>
-          <p>No hay tareas asignadas.</p>
+        <div style={{textAlign: 'center', padding: '2rem', background: '#f0f9ff', borderRadius: '1rem', border: '2px dashed #0284c7', color: '#0284c7', fontSize: '1.1rem', fontWeight: '600'}}>
+          🎉 No hay tareas asignadas
         </div>
       ) : (
-        <div className="assigned-tasks-list-modern">
+        <div className="assigned-tasks-container-v2">
           {Object.entries(groupedTasks).map(([employee, tasks]: any) => (
-            <div key={employee} className="assigned-tasks-employee-group">
-              {isManager && (
-                <div className="assigned-tasks-employee-name">
-                  {employee}
-                </div>
-              )}
-              {tasks.map((task: any) => {
-                const subtasksMap = getSubtasks(task.type || '');
-                const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
-                // Para managers: clave es assignment_id + user_id
-                const progressKey = isManager ? `${task.id}_${task.user_id || task.employee_id || task.employee}` : task.id;
-                const progressArr = subtaskProgress[progressKey] || Array(allSubtasks.length).fill(false);
-                const completedCount = progressArr.filter(Boolean).length;
-                const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
-                const isCompleted = !!task.completed || allComplete;
-                const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
-                return (
-                  <div key={task.id} className={`assigned-task-card ${isCompleted ? 'completed' : 'incomplete'}`}>
-                    <div className="assigned-task-card__content">
-                      <div className="assigned-task-card__title">{task.type}</div>
-                      <div className="assigned-task-card__meta">
-                        <span className="assigned-task-card__id">ID: {task.id}</span>
-                        <span>Fecha: {task.date} {task.time ? `- ${task.time}` : ''}</span>
-                      </div>
-                      <div className="assigned-task-card__desc">
-                        {task.title || task.description || ''}
-                      </div>
-                      <div className="assigned-task-card__status">
-                        Estado: {isCompleted ? <span className="assigned-task-card__status-complete">Completada</span> : <span className="assigned-task-card__status-incomplete">Incompleta</span>}
-                      </div>
-                      {/* Barra de progreso para manager */}
-                      {isManager && allSubtasks.length > 0 && (
-                        <div className="assigned-task-card__progress">
-                          <div className="assigned-task-card__progress-bar">
-                            <div className={`assigned-task-card__progress-fill ${allComplete ? 'is-complete' : ''}`} style={{width: `${percent}%`}}></div>
-                          </div>
-                          <span className={`assigned-task-card__progress-text ${allComplete ? 'is-complete' : ''}`}>
-                            {percent}% completado
-                          </span>
-                        </div>
-                      )}
-                      {/* Subtareas con checkboxes (solo para empleados, agrupadas por secciones completas) */}
-                      {!isManager && subtasksMap && (
-                        <div className="assigned-subtasks">
-                          <div className="assigned-subtasks__title">Lista de subtareas:</div>
-                          {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => (
-                            <div key={zona} className="assigned-subtasks__section">
-                              <div className="assigned-subtasks__section-title">{zona}</div>
-                              <ul className="assigned-subtasks__list">
-                                {(subtasks as string[]).map((st, idx) => {
-                                  // Calcular el índice global de la subtarea para el array de progreso
-                                  const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
-                                  return (
-                                    <li key={zona + '-' + idx} className="assigned-subtasks__item">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSubtaskToggle(task.id, globalIdx, !progressArr[globalIdx], allSubtasks.length)}
-                                        className={`subtask-toggle-button ${progressArr[globalIdx] ? 'is-complete' : ''}`}
-                                        aria-pressed={!!progressArr[globalIdx]}
-                                      >
-                                        {progressArr[globalIdx] ? 'Completado' : 'Marcar como completado'}
-                                      </button>
-                                      <span className={`assigned-subtasks__text ${progressArr[globalIdx] ? 'is-complete' : ''}`}>{st}</span>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          ))}
-                          <div className={`assigned-subtasks__summary ${allComplete ? 'is-complete' : ''}`}>
-                            Progreso: {completedCount} / {allSubtasks.length} subtareas completadas
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Inventario por asignación (solo empleados) */}
-                      {!isManager && (
-                        <div className="assigned-inventory-section">
-                          <div className="assigned-inventory-title">📦 Inventario</div>
-                          {inventoryLoading[String(task.id)] ? (
-                            <div style={{color: '#6b7280', fontSize: '0.9rem'}}>Cargando inventario...</div>
-                          ) : (inventoryByAssignment[String(task.id)] && inventoryByAssignment[String(task.id)].length > 0) ? (
-                            <div className="assigned-inventory-list">
-                              {inventoryByAssignment[String(task.id)].map((inv: any) => {
-                                const status = inv.is_complete
-                                  ? 'completo'
-                                  : (inv.notes || '').toString().toLowerCase().includes('faltante')
-                                    ? 'faltante'
-                                    : 'incompleto';
-
-                                return (
-                                  <div key={inv.id} className="assigned-inventory-item">
-                                    <div className="assigned-inventory-item-info">
-                                      <span className="assigned-inventory-item-name">
-                                        {inv.item_name} ({inv.quantity})
-                                      </span>
-                                      <span className="assigned-inventory-item-category">{inv.category}</span>
-                                    </div>
-                                    <select
-                                      value={status}
-                                      className="assigned-inventory-status-select"
-                                      onChange={async (e) => {
-                                        const value = e.target.value;
-                                        const isComplete = value === 'completo';
-                                        const notes = value === 'faltante' ? 'FALTANTE' : '';
-                                        setInventoryByAssignment(prev => {
-                                          const items = prev[String(task.id)] || [];
-                                          return {
-                                            ...prev,
-                                            [String(task.id)]: items.map((i: any) => i.id === inv.id ? { ...i, is_complete: isComplete, notes } : i)
-                                          };
-                                        });
-                                        await realtimeService.updateAssignmentInventoryItem(inv.id, isComplete, notes, user.username);
-                                      }}
-                                    >
-                                      <option value="completo">✅ Completo</option>
-                                      <option value="incompleto">⏳ Incompleto</option>
-                                      <option value="faltante">❌ Faltante</option>
-                                    </select>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="assigned-inventory-empty">
-                              <button
-                                type="button"
-                                className="assigned-inventory-button"
-                                onClick={async () => {
-                                  const assignmentId = String(task.id);
-                                  setInventoryLoading(prev => ({ ...prev, [assignmentId]: true }));
-                                  try {
-                                    const created = await realtimeService.createAssignmentInventory(
-                                      assignmentId,
-                                      task.employee || user.username,
-                                      task.house || user.house
-                                    );
-                                    setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: created || [] }));
-                                  } catch (err) {
-                                    console.error('❌ Error creating assignment inventory:', err);
-                                  } finally {
-                                    setInventoryLoading(prev => ({ ...prev, [assignmentId]: false }));
-                                  }
-                                }}
-                              >
-                                👁️ Ver inventario
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      {!isManager && (
-                        isCompleted ? (
-                          <button className="assigned-task-action-button complete" onClick={() => markTaskComplete(task.id, false)}>Marcar como incompleta</button>
-                        ) : (
-                          <button className="assigned-task-action-button pending" onClick={() => markTaskComplete(task.id, true)}>Marcar como completada</button>
-                        )
-                      )}
-                    </div>
+            <div key={employee} className="assigned-tasks-card-v2" style={{borderTopColor: isManager ? '#0284c7' : '#0ea5e9'}}>
+              <div className="assigned-tasks-card-header-v2">
+                <div className="assigned-tasks-card-title-group">
+                  <span className="assigned-tasks-card-icon">👤</span>
+                  <div>
+                    <h4 className="assigned-tasks-card-title">{employee}</h4>
+                    <span className="assigned-tasks-card-count">{tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}</span>
                   </div>
-                );
-              })}
+                </div>
+              </div>
+              <div className="assigned-tasks-items-v2">
+                {tasks.map((task: any) => {
+                  const subtasksMap = getSubtasks(task.type || '');
+                  const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
+                  const progressKey = isManager ? `${task.id}_${task.user_id || task.employee_id || task.employee}` : task.id;
+                  const progressArr = subtaskProgress[progressKey] || Array(allSubtasks.length).fill(false);
+                  const completedCount = progressArr.filter(Boolean).length;
+                  const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
+                  const isCompleted = !!task.completed || allComplete;
+                  const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
+                  
+                  return (
+                    <div key={task.id} className="assigned-tasks-item-v2">
+                      <div className="assigned-tasks-item-header-v2">
+                        <div style={{flex: 1}}>
+                          <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#0284c7', marginBottom: '0.25rem'}}>
+                            {task.type === 'Limpieza profunda' ? '🧹 Profunda' : task.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
+                          </div>
+                          <div style={{fontSize: '0.9rem', color: '#64748b'}}>
+                            📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
+                          </div>
+                        </div>
+                        <span className={`assigned-tasks-status-badge ${isCompleted ? 'status-done' : 'status-pending'}`}>
+                          {isCompleted ? '✅ Hecho' : '⏳ Pendiente'}
+                        </span>
+                      </div>
+
+                      {/* Barra de progreso */}
+                      <div style={{marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '600'}}>
+                          <span style={{color: '#0f172a'}}>Progreso</span>
+                          <span style={{color: '#0284c7'}}>{percent}%</span>
+                        </div>
+                        <div className="progress-bar-modern-container">
+                          <div className={`progress-bar-modern-fill ${isCompleted ? 'complete' : ''}`} style={{width: `${percent}%`}}></div>
+                        </div>
+                      </div>
+
+                      {/* Zonas/Subtareas para empleados */}
+                      {!isManager && subtasksMap && (
+                        <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
+                          <div style={{fontWeight: '600', color: '#0f172a', marginBottom: '0.75rem', fontSize: '0.95rem'}}>📋 Zonas de Limpieza</div>
+                          <div style={{display: 'grid', gap: '0.5rem'}}>
+                            {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => {
+                              const zoneItemsCount = (subtasks as string[]).length;
+                              const zoneCompletedCount = (subtasks as string[]).filter((_, idx) => {
+                                const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
+                                return progressArr[globalIdx];
+                              }).length;
+                              return (
+                                <div key={zona} style={{background: '#f8fafc', padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid #e2e8f0'}}>
+                                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem'}}>
+                                    <span style={{fontWeight: '600', color: '#1f2937', fontSize: '0.9rem'}}>{zona}</span>
+                                    <span style={{background: '#0284c7', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', fontSize: '0.75rem', fontWeight: '600'}}>{zoneCompletedCount}/{zoneItemsCount}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Botón de acción */}
+                      {!isManager && (
+                        <button
+                          className={`btn-mark-completed ${isCompleted ? 'completed' : ''}`}
+                          style={{marginTop: '0.75rem', width: '100%', padding: '0.75rem', borderRadius: '0.625rem', border: 'none', fontWeight: '600', cursor: isCompleted ? 'default' : 'pointer', fontSize: '0.9rem'}}
+                          onClick={() => markTaskComplete(task.id, !isCompleted)}
+                          disabled={isCompleted}
+                        >
+                          {isCompleted ? '✅ Completada' : '⏳ Marcar como completada'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
