@@ -412,12 +412,12 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
                       {/* Inventario por asignación (solo empleados) */}
                       {!isManager && (
-                        <div style={{marginTop: '1.2rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb'}}>
-                          <div style={{fontWeight: 600, color: '#0284c7', marginBottom: '0.5rem'}}>Inventario</div>
+                        <div className="assigned-inventory-section">
+                          <div className="assigned-inventory-title">📦 Inventario</div>
                           {inventoryLoading[String(task.id)] ? (
-                            <div style={{color: '#6b7280'}}>Cargando inventario...</div>
+                            <div style={{color: '#6b7280', fontSize: '0.9rem'}}>Cargando inventario...</div>
                           ) : (inventoryByAssignment[String(task.id)] && inventoryByAssignment[String(task.id)].length > 0) ? (
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                            <div className="assigned-inventory-list">
                               {inventoryByAssignment[String(task.id)].map((inv: any) => {
                                 const status = inv.is_complete
                                   ? 'completo'
@@ -426,27 +426,16 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                     : 'incompleto';
 
                                 return (
-                                  <div key={inv.id} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: '#f8fafc', borderRadius: '0.5rem'}}>
-                                    <input
-                                      type="checkbox"
-                                      checked={!!inv.is_complete}
-                                      onChange={async (e) => {
-                                        const checked = e.target.checked;
-                                        setInventoryByAssignment(prev => {
-                                          const items = prev[String(task.id)] || [];
-                                          return {
-                                            ...prev,
-                                            [String(task.id)]: items.map((i: any) => i.id === inv.id ? { ...i, is_complete: checked } : i)
-                                          };
-                                        });
-                                        await realtimeService.updateAssignmentInventoryItem(inv.id, checked, checked ? '' : inv.notes, user.username);
-                                      }}
-                                    />
-                                    <span style={{flex: 1, fontSize: '0.95rem', color: '#1f2937'}}>
-                                      {inv.item_name} ({inv.quantity})
-                                    </span>
+                                  <div key={inv.id} className="assigned-inventory-item">
+                                    <div className="assigned-inventory-item-info">
+                                      <span className="assigned-inventory-item-name">
+                                        {inv.item_name} ({inv.quantity})
+                                      </span>
+                                      <span className="assigned-inventory-item-category">{inv.category}</span>
+                                    </div>
                                     <select
                                       value={status}
+                                      className="assigned-inventory-status-select"
                                       onChange={async (e) => {
                                         const value = e.target.value;
                                         const isComplete = value === 'completo';
@@ -460,7 +449,6 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                         });
                                         await realtimeService.updateAssignmentInventoryItem(inv.id, isComplete, notes, user.username);
                                       }}
-                                      style={{padding: '0.35rem 0.5rem', borderRadius: '0.4rem', border: '1px solid #e5e7eb'}}
                                     >
                                       <option value="completo">✅ Completo</option>
                                       <option value="incompleto">⏳ Incompleto</option>
@@ -471,12 +459,10 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                               })}
                             </div>
                           ) : (
-                            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                              <span style={{color: '#6b7280'}}>No hay inventario para esta asignación.</span>
+                            <div className="assigned-inventory-empty">
                               <button
                                 type="button"
-                                className="dashboard-btn main"
-                                style={{padding: '0.35rem 0.75rem', fontSize: '0.85rem'}}
+                                className="assigned-inventory-button"
                                 onClick={async () => {
                                   const assignmentId = String(task.id);
                                   setInventoryLoading(prev => ({ ...prev, [assignmentId]: true }));
@@ -494,7 +480,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                                   }
                                 }}
                               >
-                                🔄 Crear inventario
+                                👁️ Ver inventario
                               </button>
                             </div>
                           )}
