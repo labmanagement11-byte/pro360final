@@ -3211,6 +3211,80 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     Lista completa de limpieza regular, profunda y mantenimiento.
                   </div>
 
+                  {/* Sección: Tareas Asignadas por Tipo */}
+                  {calendarAssignments && calendarAssignments.length > 0 && (
+                    <div style={{marginBottom: '2.5rem', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0'}}>
+                      <h3 style={{marginBottom: '1.5rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                        📅 Tareas Asignadas ({calendarAssignments.length})
+                      </h3>
+                      
+                      {(() => {
+                        // Agrupar asignaciones por tipo
+                        const byType = new Map<string, any[]>();
+                        const typeIcons: {[key: string]: string} = {
+                          'Limpieza regular': '✨',
+                          'Limpieza profunda': '🧹',
+                          'Mantenimiento': '🔧'
+                        };
+                        
+                        calendarAssignments.forEach(assignment => {
+                          const type = assignment.type || 'Limpieza regular';
+                          if (!byType.has(type)) byType.set(type, []);
+                          byType.get(type)!.push(assignment);
+                        });
+
+                        return (
+                          <div style={{display: 'grid', gap: '1.5rem'}}>
+                            {Array.from(byType.entries()).map(([type, assignments]) => (
+                              <div key={type} style={{backgroundColor: 'white', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1'}}>
+                                <h4 style={{marginBottom: '1rem', color: '#0f172a', fontSize: '1rem', fontWeight: '600'}}>
+                                  {typeIcons[type] || '📋'} {type} ({assignments.length})
+                                </h4>
+                                <div style={{display: 'grid', gap: '0.75rem'}}>
+                                  {assignments.map((assignment, idx) => (
+                                    <div key={assignment.id || idx} style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      padding: '0.75rem',
+                                      backgroundColor: '#f1f5f9',
+                                      borderRadius: '0.375rem',
+                                      fontSize: '0.95rem'
+                                    }}>
+                                      <div style={{display: 'flex', gap: '1rem', alignItems: 'center', flex: 1}}>
+                                        <span style={{fontWeight: '500', color: '#1e293b', minWidth: '100px'}}>
+                                          👤 {assignment.employee}
+                                        </span>
+                                        <span style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                          📅 {new Date(assignment.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                        {assignment.time && (
+                                          <span style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                            🕐 {assignment.time}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span style={{
+                                        padding: '0.25rem 0.75rem',
+                                        borderRadius: '9999px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '500',
+                                        backgroundColor: assignment.completed ? '#dcfce7' : '#fef3c7',
+                                        color: assignment.completed ? '#166534' : '#92400e'
+                                      }}>
+                                        {assignment.completed ? '✅ Completada' : '⏳ Pendiente'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {/* Formulario para agregar/editar tarea (solo manager/owner) */}
                   {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
                     <div className="modal-assignment-form" style={{marginBottom: '2rem'}} ref={checklistFormRef}>
