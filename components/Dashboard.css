@@ -449,6 +449,64 @@ body,
   transform: translateY(-1px);
 }
 
+@media (max-width: 768px) {
+  .dashboard-assigned-tasks-modal {
+    padding: 1rem;
+    border-radius: 0.9rem;
+  }
+
+  .assigned-tasks-title {
+    font-size: 1.25rem;
+  }
+
+  .assigned-task-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .assigned-task-card__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .assigned-subtasks {
+    padding: 0.8rem;
+  }
+
+  .assigned-subtasks__item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .subtask-toggle-button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .assigned-task-action-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .assigned-task-card__title {
+    font-size: 1.02rem;
+  }
+
+  .assigned-task-card__desc {
+    font-size: 0.93rem;
+  }
+
+  .assigned-task-card__status {
+    font-size: 0.9rem;
+  }
+}
+
 /* Mejoras para mobile: lista de tareas */
 @media (max-width: 768px) {
   .tasks-list-item {
