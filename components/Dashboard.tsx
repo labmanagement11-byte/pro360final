@@ -1950,7 +1950,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'calendar',
       title: 'Calendario',
       desc: 'Gestiona eventos y tareas programadas.',
-      show: true,
+      show: user.role === 'owner' || user.role === 'manager',
     },
     {
       key: 'reminders',
