@@ -905,10 +905,10 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
 
   console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId, 'Empleado:', employee, 'Casa:', house);
 
-  // Ensure numeric ID for assignment_inventory operations
-  const numericAssignmentId = Number(assignmentId);
-  if (!Number.isFinite(numericAssignmentId)) {
-    console.error('❌ [Assignment Inventory] Invalid assignment ID:', assignmentId);
+  // Validate that assignmentId is a valid UUID
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidPattern.test(assignmentId)) {
+    console.error('❌ [Assignment Inventory] Invalid UUID format for assignment ID:', assignmentId);
     return [];
   }
 
@@ -917,7 +917,7 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
     await (supabase
       .from('assignment_inventory') as any)
       .delete()
-      .eq('calendar_assignment_id', numericAssignmentId);
+      .eq('calendar_assignment_id', assignmentId);
   } catch (err) {
     console.error('❌ [Assignment Inventory] Error eliminando inventario previo:', err);
   }
@@ -934,7 +934,7 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
   const now = new Date().toISOString();
   const itemsToInsert = template.map((item: any) => {
     const obj = {
-      calendar_assignment_id: numericAssignmentId,
+      calendar_assignment_id: assignmentId,
       employee: employee,
       house: house,
       item_name: item.item_name,
@@ -960,14 +960,14 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
 
   if (error) {
     try {
-      console.error('❌ [Assignment Inventory] Error creating:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId, '\nnumericAssignmentId:', numericAssignmentId);
+      console.error('❌ [Assignment Inventory] Error creating:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId);
     } catch (e) {
-      console.error('❌ [Assignment Inventory] Error creating (raw):', error, '\nassignmentId:', assignmentId, '\nnumericAssignmentId:', numericAssignmentId);
+      console.error('❌ [Assignment Inventory] Error creating (raw):', error, '\nassignmentId:', assignmentId);
     }
     return [];
   }
   if (!data || data.length === 0) {
-    console.warn('⚠️ [Assignment Inventory] No se insertaron items en assignment_inventory. assignmentId:', assignmentId, 'numericAssignmentId:', numericAssignmentId);
+    console.warn('⚠️ [Assignment Inventory] No se insertaron items en assignment_inventory. assignmentId:', assignmentId);
   }
   console.log('✅ [Assignment Inventory] Items creados:', data?.length, 'para assignmentId:', assignmentId);
   return data || [];
@@ -979,17 +979,17 @@ export async function getAssignmentInventory(assignmentId: string) {
     console.log('📦 [Assignment Inventory] Obteniendo para asignación:', assignmentId);
     const supabase = getSupabaseClient();
     
-    // Ensure we always use the numeric ID for calendar_assignment_id
-    const numericId = Number(assignmentId);
-    if (!Number.isFinite(numericId)) {
-      console.warn('⚠️ [Assignment Inventory] Invalid assignment ID:', assignmentId);
+    // Validate UUID format
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(assignmentId)) {
+      console.warn('⚠️ [Assignment Inventory] Invalid UUID format:', assignmentId);
       return [];
     }
 
     const { data, error } = await (supabase
       .from('assignment_inventory') as any)
       .select('*')
-      .eq('calendar_assignment_id', numericId)
+      .eq('calendar_assignment_id', assignmentId)
       .order('category', { ascending: true })
       .order('item_name', { ascending: true });
 
@@ -1057,10 +1057,13 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
   try {
     console.log('📦 [Assignment Inventory] Iniciando suscripción:', assignmentId);
     const supabase = getSupabaseClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
-    const assignmentInventoryId = !isUuid && Number.isFinite(Number(assignmentId))
-      ? Number(assignmentId)
-      : null;
+    
+    // Validate UUID format
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(assignmentId)) {
+      console.error('❌ [Assignment Inventory] Invalid UUID format:', assignmentId);
+      return null;
+    }
 
     const channel = supabase
       .channel(`inventory-${assignmentId}`)
@@ -1070,9 +1073,7 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
           event: '*',
           schema: 'public',
           table: 'assignment_inventory',
-          filter: assignmentInventoryId !== null
-            ? `calendar_assignment_id=eq.${assignmentInventoryId}`
-            : `calendar_assignment_id=eq.${assignmentId}`
+          filter: `calendar_assignment_id=eq.${assignmentId}`
         },
         (payload: any) => {
           console.log('⚡ [Assignment Inventory] Evento recibido:', payload);
