@@ -410,6 +410,11 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   // Si el usuario es manager, mostrar todas las tareas de todos los empleados
   const isManager = user.role && user.role.toLowerCase().includes('manager');
+  const canManageAssignments = user.role && (
+    user.role.toLowerCase().includes('manager') ||
+    user.role.toLowerCase().includes('owner') ||
+    user.role.toLowerCase().includes('dueno')
+  );
   const groupedTasks = isManager
     ? assignedTasks.reduce((acc: any, t: any) => {
         if (!acc[t.employee]) acc[t.employee] = [];
@@ -417,6 +422,23 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
         return acc;
       }, {})
     : { [user.username]: assignedTasks };
+
+  const handleDeleteAssignment = async (task: any) => {
+    if (!task?.id) return;
+    const typeLabel = task.type || 'tarea';
+    const employeeLabel = task.employee ? ` de ${task.employee}` : '';
+    if (!confirm(`¿Eliminar esta asignación ${typeLabel}${employeeLabel}?`)) return;
+
+    try {
+      setLoading(true);
+      const deleted = await realtimeService.deleteCalendarAssignmentCascade(String(task.id));
+      if (deleted) {
+        setAssignedTasks(prev => prev.filter(t => t.id !== task.id));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="dashboard-assigned-tasks-modal">
@@ -471,9 +493,28 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                             📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
                           </div>
                         </div>
-                        <span className={`assigned-tasks-status-badge ${isCompleted ? 'status-done' : 'status-pending'}`}>
-                          {isCompleted ? '✅ Hecho' : '⏳ Pendiente'}
-                        </span>
+                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem'}}>
+                          <span className={`assigned-tasks-status-badge ${isCompleted ? 'status-done' : 'status-pending'}`}>
+                            {isCompleted ? '✅ Hecho' : '⏳ Pendiente'}
+                          </span>
+                          {canManageAssignments && (
+                            <button
+                              onClick={() => handleDeleteAssignment(task)}
+                              style={{
+                                background: '#fee2e2',
+                                color: '#b91c1c',
+                                border: '1px solid #fecaca',
+                                borderRadius: '0.5rem',
+                                padding: '0.35rem 0.6rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              🗑️ Eliminar
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Barra de progreso */}
@@ -3419,9 +3460,39 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                               </div>
                                             </div>
                                           </div>
-                                          <span className={`assigned-tasks-status-badge ${assignment.completed ? 'status-done' : 'status-pending'}`}>
-                                            {assignment.completed ? '✅ Hecho' : '⏳ Pendiente'}
-                                          </span>
+                                          <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem'}}>
+                                            <span className={`assigned-tasks-status-badge ${assignment.completed ? 'status-done' : 'status-pending'}`}>
+                                              {assignment.completed ? '✅ Hecho' : '⏳ Pendiente'}
+                                            </span>
+                                            {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
+                                              <button
+                                                onClick={async () => {
+                                                  if (!confirm(`¿Eliminar la asignación de ${assignment.employee}?`)) return;
+                                                  const deleted = await realtimeService.deleteCalendarAssignmentCascade(String(assignment.id));
+                                                  if (deleted) {
+                                                    setCalendarAssignments(prev => prev.filter(a => a.id !== assignment.id));
+                                                    setSyncedChecklists(prev => {
+                                                      const next = new Map(prev);
+                                                      next.delete(String(assignment.id));
+                                                      return next;
+                                                    });
+                                                  }
+                                                }}
+                                                style={{
+                                                  background: '#fee2e2',
+                                                  color: '#b91c1c',
+                                                  border: '1px solid #fecaca',
+                                                  borderRadius: '0.5rem',
+                                                  padding: '0.35rem 0.6rem',
+                                                  fontSize: '0.8rem',
+                                                  fontWeight: 600,
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                🗑️ Eliminar
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                         {assignment.time && (
                                           <div className="assigned-tasks-time-info">🕐 {assignment.time}</div>

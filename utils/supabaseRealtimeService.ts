@@ -598,6 +598,57 @@ export async function deleteCalendarAssignment(assignmentId: string) {
   return true;
 }
 
+export async function deleteCalendarAssignmentCascade(assignmentId: string) {
+  const supabase = getSupabaseClient();
+  const assignmentIdStr = String(assignmentId);
+  const isNumericId = /^\d+$/.test(assignmentIdStr);
+
+  // Eliminar checklist asociado
+  try {
+    const checklistFilter = isNumericId
+      ? `calendar_assignment_id.eq.${assignmentIdStr},calendar_assignment_id_bigint.eq.${assignmentIdStr}`
+      : `calendar_assignment_id.eq.${assignmentIdStr}`;
+
+    const { error: checklistError } = await (supabase
+      .from('cleaning_checklist') as any)
+      .delete()
+      .or(checklistFilter);
+
+    if (checklistError) {
+      console.error('Error deleting cleaning checklist items:', checklistError);
+    }
+  } catch (error) {
+    console.error('Error deleting cleaning checklist items:', error);
+  }
+
+  // Eliminar inventario asociado
+  try {
+    const { error: inventoryError } = await (supabase
+      .from('assignment_inventory') as any)
+      .delete()
+      .eq('calendar_assignment_id', assignmentIdStr);
+
+    if (inventoryError) {
+      console.error('Error deleting assignment inventory items:', inventoryError);
+    }
+  } catch (error) {
+    console.error('Error deleting assignment inventory items:', error);
+  }
+
+  // Eliminar la asignación del calendario
+  const { error: assignmentError } = await (supabase
+    .from('calendar_assignments') as any)
+    .delete()
+    .eq('id', assignmentIdStr);
+
+  if (assignmentError) {
+    console.error('Error deleting calendar assignment:', assignmentError);
+    return false;
+  }
+
+  return true;
+}
+
 
 // ==================== CLEANING CHECKLIST ====================
 // ==================== CLEANING CHECKLIST ====================
