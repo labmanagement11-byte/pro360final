@@ -881,7 +881,7 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
     console.log('📦 [Inventory Template] Obteniendo template para:', house);
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
-      .from('inventory_templates') as any)
+      .from('inventory_template') as any)
       .select('*')
       .eq('house', house)
       .order('category', { ascending: true })
@@ -902,40 +902,22 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
 // Crear inventario para una asignación (copia del template)
 export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
-
-  const resolveAssignmentInventoryKey = async (): Promise<number | null> => {
-    if (!isUuid) {
-      const asNumber = Number(assignmentId);
-      return Number.isFinite(asNumber) ? asNumber : null;
-    }
-    try {
-      const { data: assignment, error } = await (supabase
-        .from('calendar_assignments') as any)
-        .select('created_at')
-        .eq('id', assignmentId)
-        .single();
-      if (error || !assignment?.created_at) return null;
-      return Math.floor(new Date(assignment.created_at).getTime());
-    } catch (err) {
-      console.error('❌ [Assignment Inventory] Error resolving bigint key:', err);
-      return null;
-    }
-  };
 
   console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId, 'Empleado:', employee, 'Casa:', house);
 
+  // Ensure numeric ID for assignment_inventory operations
+  const numericAssignmentId = Number(assignmentId);
+  if (!Number.isFinite(numericAssignmentId)) {
+    console.error('❌ [Assignment Inventory] Invalid assignment ID:', assignmentId);
+    return [];
+  }
+
   // Eliminar inventario previo de la asignación (si existe)
   try {
-    const deleteQuery = (supabase
+    await (supabase
       .from('assignment_inventory') as any)
-      .delete();
-    const assignmentInventoryId = await resolveAssignmentInventoryKey();
-    if (assignmentInventoryId !== null) {
-      await deleteQuery.eq('calendar_assignment_id', assignmentInventoryId);
-    } else if (isUuid) {
-      await deleteQuery.eq('calendar_assignment_id', assignmentId as any);
-    }
+      .delete()
+      .eq('calendar_assignment_id', numericAssignmentId);
   } catch (err) {
     console.error('❌ [Assignment Inventory] Error eliminando inventario previo:', err);
   }
@@ -950,10 +932,9 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
 
   // Crear items basados en el template, nunca incluir 'id'
   const now = new Date().toISOString();
-  const assignmentInventoryId = await resolveAssignmentInventoryKey();
   const itemsToInsert = template.map((item: any) => {
     const obj = {
-      calendar_assignment_id: assignmentInventoryId ?? assignmentId,
+      calendar_assignment_id: numericAssignmentId,
       employee: employee,
       house: house,
       item_name: item.item_name,
@@ -977,32 +958,16 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
     .insert(itemsToInsert)
     .select();
 
-  if (error && assignmentInventoryId === null && isUuid) {
-    const fallbackId = await resolveAssignmentInventoryKey();
-    if (fallbackId !== null) {
-      const retryItems = itemsToInsert.map((item: any) => ({
-        ...item,
-        calendar_assignment_id: fallbackId
-      }));
-      const retry = await (supabase
-        .from('assignment_inventory') as any)
-        .insert(retryItems)
-        .select();
-      data = retry.data;
-      error = retry.error;
-    }
-  }
-
   if (error) {
     try {
-      console.error('❌ [Assignment Inventory] Error creating:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
+      console.error('❌ [Assignment Inventory] Error creating:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId, '\nnumericAssignmentId:', numericAssignmentId);
     } catch (e) {
-      console.error('❌ [Assignment Inventory] Error creating (raw):', error, '\nassignmentId:', assignmentId, '\nitemsToInsert:', itemsToInsert);
+      console.error('❌ [Assignment Inventory] Error creating (raw):', error, '\nassignmentId:', assignmentId, '\nnumericAssignmentId:', numericAssignmentId);
     }
     return [];
   }
   if (!data || data.length === 0) {
-    console.warn('⚠️ [Assignment Inventory] No se insertaron items en assignment_inventory. assignmentId:', assignmentId, 'itemsToInsert:', itemsToInsert);
+    console.warn('⚠️ [Assignment Inventory] No se insertaron items en assignment_inventory. assignmentId:', assignmentId, 'numericAssignmentId:', numericAssignmentId);
   }
   console.log('✅ [Assignment Inventory] Items creados:', data?.length, 'para assignmentId:', assignmentId);
   return data || [];
@@ -1013,45 +978,20 @@ export async function getAssignmentInventory(assignmentId: string) {
   try {
     console.log('📦 [Assignment Inventory] Obteniendo para asignación:', assignmentId);
     const supabase = getSupabaseClient();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
-
-    let assignmentInventoryId: number | null = null;
-    if (!isUuid) {
-      const asNumber = Number(assignmentId);
-      assignmentInventoryId = Number.isFinite(asNumber) ? asNumber : null;
-    } else {
-      const { data: assignment, error: assignmentError } = await (supabase
-        .from('calendar_assignments') as any)
-        .select('created_at')
-        .eq('id', assignmentId)
-        .single();
-      if (!assignmentError && assignment?.created_at) {
-        assignmentInventoryId = Math.floor(new Date(assignment.created_at).getTime());
-      }
+    
+    // Ensure we always use the numeric ID for calendar_assignment_id
+    const numericId = Number(assignmentId);
+    if (!Number.isFinite(numericId)) {
+      console.warn('⚠️ [Assignment Inventory] Invalid assignment ID:', assignmentId);
+      return [];
     }
 
-    let data: any[] | null = null;
-    let error: any = null;
-
-    if (assignmentInventoryId !== null) {
-      const result = await (supabase
-        .from('assignment_inventory') as any)
-        .select('*')
-        .eq('calendar_assignment_id', assignmentInventoryId)
-        .order('category', { ascending: true })
-        .order('item_name', { ascending: true });
-      data = result.data;
-      error = result.error;
-    } else {
-      const result = await (supabase
-        .from('assignment_inventory') as any)
-        .select('*')
-        .eq('calendar_assignment_id', assignmentId as any)
-        .order('category', { ascending: true })
-        .order('item_name', { ascending: true });
-      data = result.data;
-      error = result.error;
-    }
+    const { data, error } = await (supabase
+      .from('assignment_inventory') as any)
+      .select('*')
+      .eq('calendar_assignment_id', numericId)
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
 
     if (error) {
       console.error('❌ [Assignment Inventory] Error fetching:', error.message);
@@ -2158,7 +2098,7 @@ export async function getInventoryTemplates(house: string) {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
-      .from('inventory_templates') as any)
+      .from('inventory_template') as any)
       .select('*')
       .eq('house', house)
       .order('order_num', { ascending: true });
@@ -2207,7 +2147,7 @@ export function subscribeToInventoryTemplates(house: string, callback: (data: an
         {
           event: '*',
           schema: 'public',
-          table: 'inventory_templates',
+          table: 'inventory_template',
           filter: `house=eq.${house}`
         },
         (payload: any) => {
@@ -2268,7 +2208,7 @@ export async function createInventoryTemplatesBulk(templates: Array<{
     if (!templates || templates.length === 0) return [];
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
-      .from('inventory_templates') as any)
+      .from('inventory_template') as any)
       .insert(templates)
       .select();
 
