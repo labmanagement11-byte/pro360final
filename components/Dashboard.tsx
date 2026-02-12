@@ -2794,12 +2794,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <div className="assignment-meta-item">
                                 <span className="assignment-meta-icon">📅</span>
                                 <span className="assignment-meta-label">Fecha:</span>
-                                <span className="assignment-meta-value">{new Date(assignment.date).toLocaleDateString('es-CO', { 
-                                  weekday: 'short', 
-                                  year: 'numeric', 
-                                  month: 'short', 
-                                  day: 'numeric' 
-                                })}</span>
+                                <span className="assignment-meta-value">{
+                                  (() => {
+                                    const dateStr = assignment.date;
+                                    const dateParts = dateStr.split('T')[0].split('-');
+                                    const date = new Date(dateParts[0], parseInt(dateParts[1]) - 1, dateParts[2]);
+                                    return date.toLocaleDateString('es-CO', { 
+                                      weekday: 'short', 
+                                      year: 'numeric', 
+                                      month: 'short', 
+                                      day: 'numeric' 
+                                    });
+                                  })()
+                                }</span>
                               </div>
                               <div className="assignment-meta-item">
                                 <span className="assignment-meta-icon">🕐</span>
