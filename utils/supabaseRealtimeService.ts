@@ -926,6 +926,15 @@ export function subscribeToCleaningChecklistByHouse(house: string, callback: (da
 
 // ==================== ASSIGNMENT INVENTORY (Inventario por Asignación) ====================
 
+function normalizeAssignmentId(assignmentId: string | number) {
+  const rawId = String(assignmentId ?? '').trim();
+  if (!rawId) return null;
+  if (/^\d+$/.test(rawId)) {
+    return Number(rawId);
+  }
+  return rawId;
+}
+
 // Obtener template de inventario
 const DEFAULT_INVENTORY_TEMPLATE = [
   // 1. Cocina
@@ -1049,12 +1058,13 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
 // Crear inventario para una asignación (copia del template)
 export async function createAssignmentInventory(assignmentId: string | number, employee: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
-  const id = String(assignmentId);
+  const id = String(assignmentId ?? '').trim();
+  const normalizedId = normalizeAssignmentId(assignmentId);
 
   console.log('📦 [Assignment Inventory] Creando inventario para asignación:', id, 'Empleado:', employee, 'Casa:', house);
 
   // Validación básica
-  if (!id || id.trim() === '') {
+  if (!normalizedId) {
     console.error('❌ [Assignment Inventory] Assignment ID vacío');
     return [];
   }
@@ -1064,7 +1074,7 @@ export async function createAssignmentInventory(assignmentId: string | number, e
     await (supabase
       .from('assignment_inventory') as any)
       .delete()
-      .eq('calendar_assignment_id', id);
+      .eq('calendar_assignment_id', normalizedId);
   } catch (err) {
     console.error('❌ [Assignment Inventory] Error eliminando inventario previo:', err);
   }
@@ -1082,7 +1092,7 @@ export async function createAssignmentInventory(assignmentId: string | number, e
   // Crear items basados en el template, nunca incluir 'id'
   const now = new Date().toISOString();
   const itemsToInsert = template.map((item: any) => ({
-    calendar_assignment_id: id,
+    calendar_assignment_id: normalizedId,
     employee: employee,
     house: house,
     item_name: item.item_name,
@@ -1120,10 +1130,11 @@ export async function createAssignmentInventory(assignmentId: string | number, e
 // Obtener inventario de una asignación
 export async function getAssignmentInventory(assignmentId: string | number) {
   try {
-    const id = String(assignmentId);
+    const id = String(assignmentId ?? '').trim();
+    const normalizedId = normalizeAssignmentId(assignmentId);
     console.log('📦 [Assignment Inventory] Obteniendo para asignación:', id);
     
-    if (!id || id.trim() === '') {
+    if (!normalizedId) {
       console.warn('⚠️ [Assignment Inventory] Assignment ID vacío');
       return [];
     }
@@ -1133,7 +1144,7 @@ export async function getAssignmentInventory(assignmentId: string | number) {
     const { data, error } = await (supabase
       .from('assignment_inventory') as any)
       .select('*')
-      .eq('calendar_assignment_id', id)
+      .eq('calendar_assignment_id', normalizedId)
       .order('category', { ascending: true })
       .order('item_name', { ascending: true });
 
@@ -1203,27 +1214,27 @@ export async function updateAssignmentInventoryItem(itemId: string, isComplete: 
 }
 
 // Suscribirse a cambios en inventario de asignación
-export function subscribeToAssignmentInventory(assignmentId: string, callback: (data: any) => void) {
+export function subscribeToAssignmentInventory(assignmentId: string | number, callback: (data: any) => void) {
   try {
-    console.log('📦 [Assignment Inventory] Iniciando suscripción:', assignmentId);
+    const normalizedId = normalizeAssignmentId(assignmentId);
+    const rawId = String(assignmentId ?? '').trim();
+    console.log('📦 [Assignment Inventory] Iniciando suscripción:', rawId);
     const supabase = getSupabaseClient();
-    
-    // Validate UUID format
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(assignmentId)) {
-      console.error('❌ [Assignment Inventory] Invalid UUID format:', assignmentId);
+
+    if (!normalizedId) {
+      console.error('❌ [Assignment Inventory] Assignment ID vacío:', rawId);
       return null;
     }
 
     const channel = supabase
-      .channel(`inventory-${assignmentId}`)
+      .channel(`inventory-${String(normalizedId)}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'assignment_inventory',
-          filter: `calendar_assignment_id=eq.${assignmentId}`
+          filter: `calendar_assignment_id=eq.${normalizedId}`
         },
         (payload: any) => {
           console.log('⚡ [Assignment Inventory] Evento recibido:', payload);
