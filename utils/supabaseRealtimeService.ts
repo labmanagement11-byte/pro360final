@@ -558,7 +558,7 @@ export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406'
     console.log('✅ [getCalendarAssignments] Resultados:', data?.length || 0, 'items');
     if (data && data.length > 0) {
       data.forEach((a: any) => {
-        console.log(`   - ID:${a.id} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
+        console.log(`   - ID:${a.id} | UUID:${a.calendar_assignment_uuid || 'N/A'} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
       });
     }
     
@@ -1273,7 +1273,7 @@ export async function resolveAssignmentIdFromTask(task: any) {
     const supabase = getSupabaseClient();
     const query = (supabase
       .from('calendar_assignments') as any)
-      .select('id')
+      .select('id, calendar_assignment_uuid')
       .eq('employee', task.employee)
       .eq('house', task.house)
       .eq('date', task.date)
@@ -1289,8 +1289,14 @@ export async function resolveAssignmentIdFromTask(task: any) {
       return null;
     }
     
-    console.log('✅ [resolveAssignmentIdFromTask] Encontrado:', data?.id || 'null');
-    return data?.id || null;
+    // Preferir calendar_assignment_uuid si existe, si no usar id
+    const resolvedId = data?.calendar_assignment_uuid || data?.id || null;
+    console.log('✅ [resolveAssignmentIdFromTask] Encontrado:', {
+      id: data?.id,
+      uuid: data?.calendar_assignment_uuid,
+      usando: resolvedId
+    });
+    return resolvedId;
   } catch (error) {
     console.error('❌ [resolveAssignmentIdFromTask] Exception:', error);
     return null;

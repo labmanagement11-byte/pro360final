@@ -28,6 +28,11 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const inventorySubsRef = useRef<Map<string, any>>(new Map());
 
   const resolveAssignmentIdForTask = async (task: any) => {
+    // Si ya tiene calendar_assignment_uuid, usar ese directamente
+    if (task?.calendar_assignment_uuid) {
+      return task.calendar_assignment_uuid;
+    }
+
     const rawId = String(task?.id ?? '').trim();
     if (!rawId) return null;
 
