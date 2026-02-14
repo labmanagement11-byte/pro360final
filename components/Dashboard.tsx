@@ -27,6 +27,25 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const subscriptionRef = useRef<any[]>([]);
   const inventorySubsRef = useRef<Map<string, any>>(new Map());
 
+  const resolveAssignmentIdForTask = async (task: any) => {
+    const rawId = String(task?.id ?? '').trim();
+    if (!rawId) return null;
+
+    if (assignmentIdMap[rawId]) return assignmentIdMap[rawId];
+
+    if (/^\d+$/.test(rawId)) {
+      const resolved = await realtimeService.resolveAssignmentIdFromTask(task);
+      if (resolved) {
+        const resolvedId = String(resolved);
+        setAssignmentIdMap(prev => ({ ...prev, [rawId]: resolvedId }));
+        return resolvedId;
+      }
+    }
+
+    setAssignmentIdMap(prev => ({ ...prev, [rawId]: rawId }));
+    return rawId;
+  };
+
   // Cargar tareas y suscribirse en tiempo real
   useEffect(() => {
     let isMounted = true;
@@ -112,14 +131,13 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
   const loadAssignmentInventory = async (task: any) => {
     if (!task?.id) return null;
-    let assignmentId = String(task.id);
-    console.log('📦 [loadAssignmentInventory] Task ID:', assignmentId, 'Type:', typeof task.id);
-    
-    // Usar el ID tal como viene (puede ser número o UUID)
+    const assignmentId = await resolveAssignmentIdForTask(task);
+    if (!assignmentId) return null;
+    console.log('📦 [loadAssignmentInventory] Task ID:', task.id, 'Resolved ID:', assignmentId, 'Type:', typeof task.id);
+
     const keyForStorage = assignmentId;
     console.log('📦 [loadAssignmentInventory] Using key:', keyForStorage);
-    
-    setAssignmentIdMap(prev => ({ ...prev, [String(task.id)]: keyForStorage }));
+
     setInventoryLoading(prev => ({ ...prev, [keyForStorage]: true }));
     try {
       const items = await realtimeService.getAssignmentInventory(assignmentId);
@@ -193,10 +211,12 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     };
   }, [assignedTasks, user]);
 
-  const markTaskComplete = async (assignmentId: string, completed: boolean) => {
+  const markTaskComplete = async (task: any, completed: boolean) => {
+    const assignmentId = await resolveAssignmentIdForTask(task);
+    if (!assignmentId) return;
     // @ts-ignore
     await supabase.from('calendar_assignments').update({ completed }).eq('id', assignmentId);
-    setAssignedTasks(tasks => tasks.map(t => t.id === assignmentId ? { ...t, completed } : t));
+    setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed } : t));
   };
 
   // Mapas de subtareas por tipo
@@ -441,7 +461,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
     try {
       setLoading(true);
-      const deleted = await realtimeService.deleteCalendarAssignmentCascade(String(task.id));
+      const resolvedId = await resolveAssignmentIdForTask(task);
+      const deleted = await realtimeService.deleteCalendarAssignmentCascade(String(resolvedId || task.id));
       if (deleted) {
         setAssignedTasks(prev => prev.filter(t => t.id !== task.id));
       }
@@ -601,7 +622,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                           <button
                             className={`btn-mark-completed ${isCompleted ? 'completed' : ''}`}
                             style={{marginTop: '0.75rem', width: '100%', padding: '0.75rem', borderRadius: '0.625rem', border: 'none', fontWeight: '600', cursor: isCompleted ? 'default' : 'pointer', fontSize: '0.9rem'}}
-                            onClick={() => markTaskComplete(task.id, !isCompleted)}
+                            onClick={() => markTaskComplete(task, !isCompleted)}
                             disabled={isCompleted}
                           >
                             {isCompleted ? '✅ Completada' : '⏳ Marcar como completada'}
