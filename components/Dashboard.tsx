@@ -16,6 +16,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
   const [inventoryLoading, setInventoryLoading] = useState<Record<string, boolean>>({});
   const [inventoryProgress, setInventoryProgress] = useState<{ [key: string]: boolean }>({});
   const [expandedInventory, setExpandedInventory] = useState<Set<string>>(new Set());
+  const [assignmentIdMap, setAssignmentIdMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -109,6 +110,42 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
     };
   }, [user]);
 
+  const loadAssignmentInventory = async (task: any) => {
+    if (!task?.id) return null;
+    let assignmentId = String(task.id);
+    console.log('📦 [loadAssignmentInventory] Task ID:', assignmentId, 'Type:', typeof task.id);
+    
+    // Usar el ID tal como viene (puede ser número o UUID)
+    const keyForStorage = assignmentId;
+    console.log('📦 [loadAssignmentInventory] Using key:', keyForStorage);
+    
+    setAssignmentIdMap(prev => ({ ...prev, [String(task.id)]: keyForStorage }));
+    setInventoryLoading(prev => ({ ...prev, [keyForStorage]: true }));
+    try {
+      const items = await realtimeService.getAssignmentInventory(assignmentId);
+      console.log('📦 [loadAssignmentInventory] Items fetched:', items?.length, 'Items:', items);
+      if ((!items || items.length === 0) && !String(task.type || '').toLowerCase().includes('mantenimiento')) {
+        console.log('📦 [loadAssignmentInventory] Creating new inventory...');
+        const created = await realtimeService.createAssignmentInventory(
+          assignmentId,
+          task.employee || user.username,
+          task.house || user.house
+        );
+        console.log('📦 [loadAssignmentInventory] Inventory created:', created?.length, 'items');
+        setInventoryByAssignment(prev => ({ ...prev, [keyForStorage]: created || [] }));
+      } else {
+        console.log('📦 [loadAssignmentInventory] Using existing items:', items?.length);
+        setInventoryByAssignment(prev => ({ ...prev, [keyForStorage]: items || [] }));
+      }
+    } catch (error) {
+      console.error('❌ Error loading assignment inventory:', error);
+    } finally {
+      setInventoryLoading(prev => ({ ...prev, [keyForStorage]: false }));
+    }
+
+    return keyForStorage;
+  };
+
   // Cargar inventario por asignación para empleados
   useEffect(() => {
     if (!user || user.role?.toLowerCase().includes('manager')) return;
@@ -116,35 +153,8 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
 
     const loadAll = async () => {
       for (const task of assignedTasks) {
-        let assignmentId = String(task.id);
+        const assignmentId = await loadAssignmentInventory(task);
         if (!assignmentId) continue;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId);
-        if (!isUuid) {
-          const resolved = await realtimeService.resolveAssignmentIdFromTask(task);
-          if (resolved) assignmentId = String(resolved);
-        }
-
-        setInventoryLoading(prev => ({ ...prev, [assignmentId]: true }));
-        realtimeService.getAssignmentInventory(assignmentId)
-          .then(async (items: any[]) => {
-            if ((!items || items.length === 0) && !String(task.type || '').toLowerCase().includes('mantenimiento')) {
-              const created = await realtimeService.createAssignmentInventory(
-                assignmentId,
-                task.employee || user.username,
-                task.house || user.house
-              );
-              setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: created || [] }));
-            } else {
-              setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: items || [] }));
-            }
-          })
-          .catch((err: any) => {
-            console.error('❌ Error loading assignment inventory:', err);
-            setInventoryByAssignment(prev => ({ ...prev, [assignmentId]: [] }));
-          })
-          .finally(() => {
-            setInventoryLoading(prev => ({ ...prev, [assignmentId]: false }));
-          });
 
         if (!inventorySubsRef.current.has(assignmentId)) {
           const sub = realtimeService.subscribeToAssignmentInventory(assignmentId, (payload: any) => {
@@ -480,6 +490,7 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                   const completedCount = progressArr.filter(Boolean).length;
                   const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
                   const isCompleted = !!task.completed || allComplete;
+                  const assignmentKey = assignmentIdMap[String(task.id)] || String(task.id);
                   const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
                   
                   return (
@@ -584,95 +595,122 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
                         </div>
                       )}
 
-                      {/* Botón de inventario */}
-                      {!isManager && inventoryByAssignment[task.id] && inventoryByAssignment[task.id].length > 0 && (
-                        <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
+                      {/* Botón de acción */}
+                      {!isManager && (
+                        <>
                           <button
-                            onClick={() => {
-                              const newSet = new Set(expandedInventory);
-                              if (newSet.has(task.id)) {
-                                newSet.delete(task.id);
-                              } else {
-                                newSet.add(task.id);
-                              }
-                              setExpandedInventory(newSet);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '0.75rem',
-                              borderRadius: '0.625rem',
-                              border: 'none',
-                              fontWeight: '600',
-                              fontSize: '0.9rem',
-                              cursor: 'pointer',
-                              background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)',
-                              color: 'white',
-                              transition: 'all 0.3s ease',
-                              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.2)',
-                            }}
-                            onMouseEnter={(e) => {
-                              (e.target as HTMLButtonElement).style.boxShadow = '0 6px 16px rgba(2, 132, 199, 0.3)';
-                              (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.target as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.2)';
-                              (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
-                            }}
+                            className={`btn-mark-completed ${isCompleted ? 'completed' : ''}`}
+                            style={{marginTop: '0.75rem', width: '100%', padding: '0.75rem', borderRadius: '0.625rem', border: 'none', fontWeight: '600', cursor: isCompleted ? 'default' : 'pointer', fontSize: '0.9rem'}}
+                            onClick={() => markTaskComplete(task.id, !isCompleted)}
+                            disabled={isCompleted}
                           >
-                            📦 {expandedInventory.has(task.id) ? 'Ocultar' : 'Ver'} Inventario ({inventoryByAssignment[task.id].length})
+                            {isCompleted ? '✅ Completada' : '⏳ Marcar como completada'}
                           </button>
-                        </div>
+                          <div style={{marginTop: '0.65rem'}}>
+                            <button
+                              onClick={async () => {
+                                console.log('🔘 Button clicked. assignmentKey:', assignmentKey, 'Current inventory:', inventoryByAssignment[assignmentKey]);
+                                const newSet = new Set(expandedInventory);
+                                if (newSet.has(assignmentKey)) {
+                                  console.log('🔘 Collapsing inventory');
+                                  newSet.delete(assignmentKey);
+                                  setExpandedInventory(newSet);
+                                } else {
+                                  console.log('🔘 Expanding inventory, checking if data loaded...');
+                                  if (!inventoryByAssignment[assignmentKey] || inventoryByAssignment[assignmentKey].length === 0) {
+                                    console.log('🔘 No inventory found, loading...');
+                                    await loadAssignmentInventory(task);
+                                    console.log('🔘 Inventory loaded, now setting expanded');
+                                  }
+                                  newSet.add(assignmentKey);
+                                  setExpandedInventory(newSet);
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                borderRadius: '0.625rem',
+                                border: 'none',
+                                fontWeight: '600',
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)',
+                                color: 'white',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.2)',
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.target as HTMLButtonElement).style.boxShadow = '0 6px 16px rgba(2, 132, 199, 0.3)';
+                                (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.target as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.2)';
+                                (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+                              }}
+                            >
+                              📦 {expandedInventory.has(assignmentKey) ? 'Ocultar' : 'Ver'} Inventario ({inventoryByAssignment[assignmentKey]?.length ?? 0})
+                            </button>
+                          </div>
+                        </>
                       )}
 
                       {/* Sección de Inventario Expandible */}
-                      {!isManager && expandedInventory.has(task.id) && inventoryByAssignment[task.id] && (
+                      {!isManager && expandedInventory.has(assignmentKey) && inventoryByAssignment[assignmentKey] && (
                         <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
                           <div style={{fontWeight: '600', color: '#0f172a', marginBottom: '0.75rem', fontSize: '0.95rem'}}>📋 Inventario a Completar</div>
-                          <div style={{display: 'grid', gap: '0.65rem'}}>
-                            {(inventoryByAssignment[task.id] as any[]).map((item, idx) => {
-                              const progressKey = `${task.id}_${item.id}`;
+                          <div style={{display: 'grid', gap: '0.85rem'}}>
+                            {(inventoryByAssignment[assignmentKey] as any[]).map((item) => {
+                              const progressKey = `${assignmentKey}_${item.id}`;
                               const itemCompleted = inventoryProgress[progressKey] || false;
                               return (
-                                <div key={`${task.id}-inv-${item.id}`} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'white', borderRadius: '0.5rem', border: itemCompleted ? '1px solid #10b981' : '1px solid #e5e7eb', transition: 'all 0.3s ease'}}>
-                                  <button
-                                    onClick={() => handleInventoryItemToggle(task.id, item.id, !itemCompleted, inventoryByAssignment[task.id].length)}
-                                    style={{
-                                      padding: '0.5rem 1rem',
-                                      borderRadius: '0.375rem',
-                                      border: 'none',
-                                      fontWeight: '600',
-                                      fontSize: '0.85rem',
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                      flexShrink: 0,
-                                      background: itemCompleted ? '#10b981' : '#f59e0b',
-                                      color: 'white',
-                                      transition: 'all 0.3s ease',
-                                      boxShadow: itemCompleted ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 2px 8px rgba(245, 158, 11, 0.2)',
-                                    }}
-                                  >
-                                    {itemCompleted ? '✅ Completado' : '⏳ Completar'}
-                                  </button>
-                                  <span style={{flex: 1, fontSize: '0.9rem', color: itemCompleted ? '#94a3b8' : '#1f2937', textDecoration: itemCompleted ? 'line-through' : 'none', lineHeight: '1.5'}}>
-                                    {item.name}
-                                  </span>
+                                <div key={`${task.id}-inv-${item.id}`} style={{background: '#f8fafc', borderRadius: '0.75rem', border: itemCompleted ? '1px solid #10b981' : '1px solid #e5e7eb', padding: '0.85rem', transition: 'all 0.3s ease'}}>
+                                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.65rem'}}>
+                                    <span style={{fontWeight: 700, color: itemCompleted ? '#10b981' : '#1f2937', fontSize: '0.95rem'}}>
+                                      {item.item_name}
+                                    </span>
+                                    <span style={{background: itemCompleted ? '#10b981' : '#f59e0b', color: 'white', padding: '0.25rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.75rem', fontWeight: 700}}>
+                                      {itemCompleted ? 'COMPLETADO' : 'PENDIENTE'}
+                                    </span>
+                                  </div>
+                                  <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                                    <button
+                                      onClick={() => handleInventoryItemToggle(assignmentKey, item.id, true, inventoryByAssignment[assignmentKey].length)}
+                                      style={{
+                                        padding: '0.5rem 0.9rem',
+                                        borderRadius: '0.5rem',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                        background: itemCompleted ? '#10b981' : '#e2e8f0',
+                                        color: itemCompleted ? 'white' : '#0f172a',
+                                        transition: 'all 0.2s ease',
+                                      }}
+                                    >
+                                      ✅ Completado
+                                    </button>
+                                    <button
+                                      onClick={() => handleInventoryItemToggle(assignmentKey, item.id, false, inventoryByAssignment[assignmentKey].length)}
+                                      style={{
+                                        padding: '0.5rem 0.9rem',
+                                        borderRadius: '0.5rem',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                        background: !itemCompleted ? '#f59e0b' : '#e2e8f0',
+                                        color: !itemCompleted ? 'white' : '#0f172a',
+                                        transition: 'all 0.2s ease',
+                                      }}
+                                    >
+                                      ⏳ Incompleto
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}
                           </div>
                         </div>
-                      )}
-
-                      {/* Botón de acción */}
-                      {!isManager && (
-                        <button
-                          className={`btn-mark-completed ${isCompleted ? 'completed' : ''}`}
-                          style={{marginTop: '0.75rem', width: '100%', padding: '0.75rem', borderRadius: '0.625rem', border: 'none', fontWeight: '600', cursor: isCompleted ? 'default' : 'pointer', fontSize: '0.9rem'}}
-                          onClick={() => markTaskComplete(task.id, !isCompleted)}
-                          disabled={isCompleted}
-                        >
-                          {isCompleted ? '✅ Completada' : '⏳ Marcar como completada'}
-                        </button>
                       )}
                     </div>
                   );
@@ -1312,12 +1350,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real
     let subscription: any;
     try {
+      console.log('🔔 Suscribiendo a cambios en tiempo real de inventario para:', selectedHouse);
       subscription = realtimeService.subscribeToInventory(selectedHouse, (payload: any) => {
         if (payload?.eventType === 'INSERT') {
-          addRealtimeNotification(`Nuevo item: ${payload.new?.item || 'Sin nombre'}`, 'info');
+          addRealtimeNotification(`Item agregado: ${payload.new?.item || payload.new?.name || 'Sin nombre'}`, 'info');
           setInventoryList(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
-          addRealtimeNotification(`Item actualizado: ${payload.new?.item || 'Sin nombre'}`, 'info');
+          addRealtimeNotification(`Item actualizado: ${payload.new?.item || payload.new?.name || 'Sin nombre'}`, 'info');
           setInventoryList(prev => prev.map(i => i.id === payload.new?.id ? payload.new : i));
         } else if (payload?.eventType === 'DELETE') {
           addRealtimeNotification('Item eliminado del inventario', 'warning');

@@ -927,6 +927,95 @@ export function subscribeToCleaningChecklistByHouse(house: string, callback: (da
 // ==================== ASSIGNMENT INVENTORY (Inventario por Asignación) ====================
 
 // Obtener template de inventario
+const DEFAULT_INVENTORY_TEMPLATE = [
+  // 1. Cocina
+  { category: 'Cocina', item_name: 'Platos llanos', quantity: 12 },
+  { category: 'Cocina', item_name: 'Platos hondos', quantity: 12 },
+  { category: 'Cocina', item_name: 'Vasos altos (agua/jugo)', quantity: 15 },
+  { category: 'Cocina', item_name: 'Vasos para cerveza', quantity: 10 },
+  { category: 'Cocina', item_name: 'Copas para vino', quantity: 10 },
+  { category: 'Cocina', item_name: 'Tazas para café/té', quantity: 12 },
+  { category: 'Cocina', item_name: 'Cubiertos (tenedores)', quantity: 12 },
+  { category: 'Cocina', item_name: 'Cubiertos (cucharas soperas)', quantity: 12 },
+  { category: 'Cocina', item_name: 'Cubiertos (cucharas de postre)', quantity: 12 },
+  { category: 'Cocina', item_name: 'Cubiertos (cuchillos de mesa)', quantity: 12 },
+  { category: 'Cocina', item_name: 'Cuchillos de cocina (set)', quantity: 5 },
+  { category: 'Cocina', item_name: 'Tablas de picar', quantity: 3 },
+  { category: 'Cocina', item_name: 'Ollas medianas/grandes', quantity: 5 },
+  { category: 'Cocina', item_name: 'Sartenes (incluyendo antiadherente grande)', quantity: 4 },
+  { category: 'Cocina', item_name: 'Licuadora', quantity: 1 },
+  { category: 'Cocina', item_name: 'Cafetera eléctrica', quantity: 1 },
+  { category: 'Cocina', item_name: 'Hervidor eléctrico', quantity: 1 },
+  { category: 'Cocina', item_name: 'Microondas', quantity: 1 },
+  { category: 'Cocina', item_name: 'Toallas de cocina', quantity: 10 },
+  { category: 'Cocina', item_name: 'Trapos de cocina', quantity: 8 },
+  { category: 'Cocina', item_name: 'Detergente para platos', quantity: 2 },
+  { category: 'Cocina', item_name: 'Esponjas', quantity: 6 },
+  { category: 'Cocina', item_name: 'Bolsas de basura (paquete inicial)', quantity: 50 },
+  { category: 'Cocina', item_name: 'Papel aluminio', quantity: 2 },
+  { category: 'Cocina', item_name: 'Film plástico', quantity: 2 },
+  { category: 'Cocina', item_name: 'Servilletas de papel (paquetes grandes)', quantity: 2 },
+  { category: 'Cocina', item_name: 'Sal', quantity: 1 },
+  { category: 'Cocina', item_name: 'Azúcar', quantity: 1 },
+  { category: 'Cocina', item_name: 'Aceite', quantity: 1 },
+
+  // 2. Sala-Comedor
+  { category: 'Sala-Comedor', item_name: 'Controles remoto (TV + A/C o ventilador)', quantity: 2 },
+  { category: 'Sala-Comedor', item_name: 'Pilas extras', quantity: 1 },
+  { category: 'Sala-Comedor', item_name: 'Cojines para sofá', quantity: 10 },
+  { category: 'Sala-Comedor', item_name: 'Mantas ligeras', quantity: 4 },
+  { category: 'Sala-Comedor', item_name: 'Sillas comedor', quantity: 10 },
+  { category: 'Sala-Comedor', item_name: 'Sillas plegables', quantity: 2 },
+  { category: 'Sala-Comedor', item_name: 'Posavasos', quantity: 12 },
+
+  // 3. Dormitorios
+  { category: 'Dormitorios', item_name: 'Sets de sábanas completos', quantity: 12 },
+  { category: 'Dormitorios', item_name: 'Almohadas', quantity: 20 },
+  { category: 'Dormitorios', item_name: 'Fundas de almohada', quantity: 24 },
+  { category: 'Dormitorios', item_name: 'Cobijas o edredones', quantity: 10 },
+  { category: 'Dormitorios', item_name: 'Perchas', quantity: 60 },
+  { category: 'Dormitorios', item_name: 'Lámparas de mesa de noche', quantity: 1 },
+
+  // 4. Baños
+  { category: 'Baños', item_name: 'Toallas grandes (baño)', quantity: 16 },
+  { category: 'Baños', item_name: 'Toallas medianas (mano)', quantity: 12 },
+  { category: 'Baños', item_name: 'Toallas pequeñas (cara)', quantity: 10 },
+  { category: 'Baños', item_name: 'Tapetes de baño', quantity: 4 },
+  { category: 'Baños', item_name: 'Jabón líquido manos/baño (dispensadores)', quantity: 4 },
+  { category: 'Baños', item_name: 'Papel higiénico (rollos)', quantity: 24 },
+  { category: 'Baños', item_name: 'Secador de pelo', quantity: 3 },
+  { category: 'Baños', item_name: 'Basureros con tapa', quantity: 4 },
+
+  // 5. Zona de lavado
+  { category: 'Zona de lavado', item_name: 'Detergente para ropa', quantity: 2 },
+  { category: 'Zona de lavado', item_name: 'Suavizante', quantity: 1 },
+  { category: 'Zona de lavado', item_name: 'Cesto ropa sucia', quantity: 2 },
+  { category: 'Zona de lavado', item_name: 'Plancha', quantity: 1 },
+  { category: 'Zona de lavado', item_name: 'Tabla de planchar', quantity: 1 },
+
+  // 6. Piscina y Jacuzzi
+  { category: 'Piscina y Jacuzzi', item_name: 'Toallas para piscina/exterior', quantity: 15 },
+  { category: 'Piscina y Jacuzzi', item_name: 'Flotadores/inflables', quantity: 6 },
+  { category: 'Piscina y Jacuzzi', item_name: 'Sillas o tumbonas exteriores', quantity: 10 },
+  { category: 'Piscina y Jacuzzi', item_name: 'Sombrillas o toldos', quantity: 3 },
+  { category: 'Piscina y Jacuzzi', item_name: 'Red recogehojas piscina', quantity: 1 },
+  { category: 'Piscina y Jacuzzi', item_name: 'Cepillo/barredor piscina', quantity: 1 },
+
+  // 7. Zona BBQ y Terraza
+  { category: 'Zona BBQ y Terraza', item_name: 'Parrilla/gas o carbón', quantity: 1 },
+  { category: 'Zona BBQ y Terraza', item_name: 'Pinzas/utensilios BBQ (set 4 piezas)', quantity: 1 },
+  { category: 'Zona BBQ y Terraza', item_name: 'Mesa exterior + sillas (puestos)', quantity: 10 },
+  { category: 'Zona BBQ y Terraza', item_name: 'Basurero exterior con tapa', quantity: 2 },
+  { category: 'Zona BBQ y Terraza', item_name: 'Cenicero (exterior)', quantity: 2 },
+
+  // 8. Seguridad y General
+  { category: 'Seguridad y General', item_name: 'Botiquín primeros auxilios', quantity: 1 },
+  { category: 'Seguridad y General', item_name: 'Extintor', quantity: 1 },
+  { category: 'Seguridad y General', item_name: 'Linterna', quantity: 2 },
+  { category: 'Seguridad y General', item_name: 'Manual casa + wifi contraseña', quantity: 1 },
+  { category: 'Seguridad y General', item_name: 'Repelente mosquitos', quantity: 2 },
+];
+
 export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') {
   try {
     console.log('📦 [Inventory Template] Obteniendo template para:', house);
@@ -942,6 +1031,13 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
       console.error('❌ [Inventory Template] Error:', error);
       return [];
     }
+    if (!data || data.length === 0) {
+      console.warn('⚠️ [Inventory Template] Sin template en DB, usando plantilla por defecto. Casa:', house);
+      return DEFAULT_INVENTORY_TEMPLATE.map(item => ({
+        ...item,
+        house
+      }));
+    }
     console.log('✅ [Inventory Template] Items obtenidos:', data?.length);
     return data || [];
   } catch (error) {
@@ -951,15 +1047,15 @@ export async function getInventoryTemplate(house: string = 'HYNTIBA2 APTO 406') 
 }
 
 // Crear inventario para una asignación (copia del template)
-export async function createAssignmentInventory(assignmentId: string, employee: string, house: string = 'HYNTIBA2 APTO 406') {
+export async function createAssignmentInventory(assignmentId: string | number, employee: string, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
+  const id = String(assignmentId);
 
-  console.log('📦 [Assignment Inventory] Creando inventario para asignación:', assignmentId, 'Empleado:', employee, 'Casa:', house);
+  console.log('📦 [Assignment Inventory] Creando inventario para asignación:', id, 'Empleado:', employee, 'Casa:', house);
 
-  // Validate that assignmentId is a valid UUID
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidPattern.test(assignmentId)) {
-    console.error('❌ [Assignment Inventory] Invalid UUID format for assignment ID:', assignmentId);
+  // Validación básica
+  if (!id || id.trim() === '') {
+    console.error('❌ [Assignment Inventory] Assignment ID vacío');
     return [];
   }
 
@@ -968,7 +1064,7 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
     await (supabase
       .from('assignment_inventory') as any)
       .delete()
-      .eq('calendar_assignment_id', assignmentId);
+      .eq('calendar_assignment_id', id);
   } catch (err) {
     console.error('❌ [Assignment Inventory] Error eliminando inventario previo:', err);
   }
@@ -981,75 +1077,78 @@ export async function createAssignmentInventory(assignmentId: string, employee: 
     return [];
   }
 
+  console.log('📝 [Assignment Inventory] Usando template con', template.length, 'items');
+
   // Crear items basados en el template, nunca incluir 'id'
   const now = new Date().toISOString();
-  const itemsToInsert = template.map((item: any) => {
-    const obj = {
-      calendar_assignment_id: assignmentId,
-      employee: employee,
-      house: house,
-      item_name: item.item_name,
-      quantity: item.quantity,
-      category: item.category,
-      is_complete: false,
-      notes: null,
-      checked_by: null,
-      checked_at: null,
-      created_at: now,
-      updated_at: now
-    };
-    if ('id' in obj) delete obj.id;
-    return obj;
-  });
+  const itemsToInsert = template.map((item: any) => ({
+    calendar_assignment_id: id,
+    employee: employee,
+    house: house,
+    item_name: item.item_name,
+    quantity: item.quantity,
+    category: item.category,
+    is_complete: false,
+    notes: null,
+    checked_by: null,
+    checked_at: null,
+    created_at: now,
+    updated_at: now
+  }));
 
   console.log('📝 [Assignment Inventory] Insertando', itemsToInsert.length, 'items');
 
-  let { data, error } = await (supabase
+  const { data, error } = await (supabase
     .from('assignment_inventory') as any)
     .insert(itemsToInsert)
     .select();
 
   if (error) {
-    try {
-      console.error('❌ [Assignment Inventory] Error creating:', JSON.stringify(error, null, 2), '\nassignmentId:', assignmentId);
-    } catch (e) {
-      console.error('❌ [Assignment Inventory] Error creating (raw):', error, '\nassignmentId:', assignmentId);
-    }
+    console.error('❌ [Assignment Inventory] Error creating:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      assignmentId: id
+    });
     return [];
   }
-  if (!data || data.length === 0) {
-    console.warn('⚠️ [Assignment Inventory] No se insertaron items en assignment_inventory. assignmentId:', assignmentId);
-  }
-  console.log('✅ [Assignment Inventory] Items creados:', data?.length, 'para assignmentId:', assignmentId);
+  
+  console.log('✅ [Assignment Inventory] Items creados:', data?.length, 'para assignmentId:', id);
   return data || [];
 }
 
 // Obtener inventario de una asignación
-export async function getAssignmentInventory(assignmentId: string) {
+export async function getAssignmentInventory(assignmentId: string | number) {
   try {
-    console.log('📦 [Assignment Inventory] Obteniendo para asignación:', assignmentId);
-    const supabase = getSupabaseClient();
+    const id = String(assignmentId);
+    console.log('📦 [Assignment Inventory] Obteniendo para asignación:', id);
     
-    // Validate UUID format
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(assignmentId)) {
-      console.warn('⚠️ [Assignment Inventory] Invalid UUID format:', assignmentId);
+    if (!id || id.trim() === '') {
+      console.warn('⚠️ [Assignment Inventory] Assignment ID vacío');
       return [];
     }
+
+    const supabase = getSupabaseClient();
 
     const { data, error } = await (supabase
       .from('assignment_inventory') as any)
       .select('*')
-      .eq('calendar_assignment_id', assignmentId)
+      .eq('calendar_assignment_id', id)
       .order('category', { ascending: true })
       .order('item_name', { ascending: true });
 
     if (error) {
-      console.error('❌ [Assignment Inventory] Error fetching:', error.message);
+      console.error('❌ [Assignment Inventory] Error fetching:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        assignmentId: id,
+        hint: error.hint
+      });
       return [];
     }
     
-    console.log('✅ [Assignment Inventory] Items obtenidos:', data?.length || 0);
+    console.log('✅ [Assignment Inventory] Items obtenidos:', data?.length || 0, 'para ID:', id);
     return data || [];
   } catch (error) {
     console.error('❌ [Assignment Inventory] Exception:', error);
@@ -1152,6 +1251,14 @@ export function subscribeToAssignmentInventory(assignmentId: string, callback: (
 
 export async function resolveAssignmentIdFromTask(task: any) {
   try {
+    console.log('🔍 [resolveAssignmentIdFromTask] Buscando con:', {
+      employee: task.employee,
+      house: task.house,
+      date: task.date,
+      time: task.time,
+      type: task.type
+    });
+
     const supabase = getSupabaseClient();
     const query = (supabase
       .from('calendar_assignments') as any)
@@ -1163,11 +1270,18 @@ export async function resolveAssignmentIdFromTask(task: any) {
       .eq('type', task.type)
       .limit(1)
       .maybeSingle();
+    
     const { data, error } = await query;
-    if (error) return null;
+    
+    if (error) {
+      console.error('❌ [resolveAssignmentIdFromTask] Error:', error);
+      return null;
+    }
+    
+    console.log('✅ [resolveAssignmentIdFromTask] Encontrado:', data?.id || 'null');
     return data?.id || null;
   } catch (error) {
-    console.error('❌ Error resolving assignment id:', error);
+    console.error('❌ [resolveAssignmentIdFromTask] Exception:', error);
     return null;
   }
 }
