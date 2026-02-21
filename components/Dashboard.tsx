@@ -22,6 +22,9 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
   const [houseInventoryExpanded, setHouseInventoryExpanded] = useState(false);
   const [houseInventoryLoading, setHouseInventoryLoading] = useState(false);
   const [houseInventoryProgress, setHouseInventoryProgress] = useState<Record<string, boolean>>({});
+  // Estados para formulario de items incompletos (faltantes/roto)
+  const [incompleteFormOpen, setIncompleteFormOpen] = useState<Record<string, boolean>>({});
+  const [incompleteData, setIncompleteData] = useState<Record<string, { missing: number; reason: string }>>({});
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -735,8 +738,9 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                           <button
                             onClick={async () => {
                               setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: true }));
-                              // Actualizar en base de datos
-                              await (supabase as any).from('inventory').update({ complete: true }).eq('id', item.id);
+                              setIncompleteFormOpen(prev => ({ ...prev, [itemKey]: false }));
+                              // Actualizar en base de datos - limpiar missing y reason
+                              await (supabase as any).from('inventory').update({ complete: true, missing: 0, reason: null }).eq('id', item.id);
                             }}
                             style={{
                               padding: '0.5rem 0.9rem',
@@ -753,10 +757,11 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                             ✅ Completo
                           </button>
                           <button
-                            onClick={async () => {
-                              setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: false }));
-                              // Actualizar en base de datos
-                              await (supabase as any).from('inventory').update({ complete: false }).eq('id', item.id);
+                            onClick={() => {
+                              setIncompleteFormOpen(prev => ({ ...prev, [itemKey]: !prev[itemKey] }));
+                              if (!incompleteData[itemKey]) {
+                                setIncompleteData(prev => ({ ...prev, [itemKey]: { missing: item.missing || 0, reason: item.reason || '' } }));
+                              }
                             }}
                             style={{
                               padding: '0.5rem 0.9rem',
@@ -773,6 +778,87 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                             ⏳ Incompleto
                           </button>
                         </div>
+                        
+                        {/* Formulario de incompleto */}
+                        {incompleteFormOpen[itemKey] && (
+                          <div style={{marginTop: '0.75rem', padding: '0.75rem', background: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #f59e0b'}}>
+                            <div style={{display: 'grid', gap: '0.5rem'}}>
+                              <div>
+                                <label style={{fontSize: '0.8rem', fontWeight: 600, color: '#92400e', marginBottom: '0.25rem', display: 'block'}}>
+                                  ¿Cuántos faltan?
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={item.quantity}
+                                  value={incompleteData[itemKey]?.missing || 0}
+                                  onChange={(e) => setIncompleteData(prev => ({ 
+                                    ...prev, 
+                                    [itemKey]: { ...prev[itemKey], missing: Number(e.target.value) } 
+                                  }))}
+                                  style={{width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #d1d5db', fontSize: '0.9rem'}}
+                                />
+                              </div>
+                              <div>
+                                <label style={{fontSize: '0.8rem', fontWeight: 600, color: '#92400e', marginBottom: '0.25rem', display: 'block'}}>
+                                  Motivo (roto, dañado, etc.)
+                                </label>
+                                <select
+                                  value={incompleteData[itemKey]?.reason || ''}
+                                  onChange={(e) => setIncompleteData(prev => ({ 
+                                    ...prev, 
+                                    [itemKey]: { ...prev[itemKey], reason: e.target.value } 
+                                  }))}
+                                  style={{width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #d1d5db', fontSize: '0.9rem'}}
+                                >
+                                  <option value="">Seleccionar motivo...</option>
+                                  <option value="Faltante">Faltante</option>
+                                  <option value="Roto">Roto - Necesita reemplazo</option>
+                                  <option value="Dañado">Dañado - Necesita reparación</option>
+                                  <option value="Perdido">Perdido</option>
+                                  <option value="Otro">Otro</option>
+                                </select>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  const data = incompleteData[itemKey] || { missing: 0, reason: '' };
+                                  setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: false }));
+                                  // Actualizar en base de datos
+                                  await (supabase as any).from('inventory').update({ 
+                                    complete: false, 
+                                    missing: data.missing, 
+                                    reason: data.reason 
+                                  }).eq('id', item.id);
+                                  // Actualizar el item local
+                                  setHouseInventory(prev => prev.map(i => i.id === item.id ? { ...i, missing: data.missing, reason: data.reason, complete: false } : i));
+                                  setIncompleteFormOpen(prev => ({ ...prev, [itemKey]: false }));
+                                }}
+                                style={{
+                                  marginTop: '0.5rem',
+                                  width: '100%',
+                                  padding: '0.6rem',
+                                  borderRadius: '0.5rem',
+                                  border: 'none',
+                                  fontWeight: 700,
+                                  fontSize: '0.85rem',
+                                  cursor: 'pointer',
+                                  background: '#dc2626',
+                                  color: 'white',
+                                }}
+                              >
+                                💾 Guardar como Incompleto
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Mostrar info de faltantes si existe */}
+                        {!isItemComplete && (item.missing > 0 || item.reason) && !incompleteFormOpen[itemKey] && (
+                          <div style={{marginTop: '0.5rem', padding: '0.5rem', background: '#fee2e2', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#991b1b'}}>
+                            {item.missing > 0 && <span>⚠️ Faltan: {item.missing} </span>}
+                            {item.reason && <span>| Motivo: {item.reason}</span>}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -5036,20 +5122,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <div style={{display: 'grid', gap: '0.5rem'}}>
                         {employeeInventoryProgress.map((item: any) => (
                           <div key={item.id} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
                             padding: '0.75rem 1rem',
                             background: item.complete ? '#f0fdf4' : '#fef2f2',
                             borderRadius: '0.75rem',
                             border: item.complete ? '1px solid #86efac' : '1px solid #fecaca'
                           }}>
-                            <span style={{fontSize: '1.2rem'}}>{item.complete ? '✅' : '⏳'}</span>
-                            <span style={{flex: 1, fontWeight: 600, color: item.complete ? '#166534' : '#991b1b'}}>
-                              {item.name}
-                            </span>
-                            <span style={{color: '#64748b', fontSize: '0.9rem'}}>x{item.quantity}</span>
-                            {item.room && <span style={{color: '#94a3b8', fontSize: '0.85rem'}}>({item.room})</span>}
+                            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                              <span style={{fontSize: '1.2rem'}}>{item.complete ? '✅' : '⏳'}</span>
+                              <span style={{flex: 1, fontWeight: 600, color: item.complete ? '#166534' : '#991b1b'}}>
+                                {item.name}
+                              </span>
+                              <span style={{color: '#64748b', fontSize: '0.9rem'}}>x{item.quantity}</span>
+                              {item.room && <span style={{color: '#94a3b8', fontSize: '0.85rem'}}>({item.room})</span>}
+                            </div>
+                            {!item.complete && (item.missing > 0 || item.reason) && (
+                              <div style={{marginTop: '0.5rem', padding: '0.5rem', background: '#fee2e2', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#991b1b'}}>
+                                {item.missing > 0 && <span style={{fontWeight: 600}}>⚠️ Faltan: {item.missing} </span>}
+                                {item.reason && <span>| Motivo: <strong>{item.reason}</strong></span>}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
