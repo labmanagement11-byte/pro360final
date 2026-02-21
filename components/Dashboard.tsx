@@ -1028,6 +1028,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [selectedAssignmentForInventory, setSelectedAssignmentForInventory] = useState<string | null>(null);
   const [inventorySubscriptions, setInventorySubscriptions] = useState<Map<string, any>>(new Map());
 
+  // Estado para ver progreso de empleado específico (manager view)
+  const [selectedEmployeeForProgress, setSelectedEmployeeForProgress] = useState<{assignment: any; employee: string; type: string} | null>(null);
+  const [employeeInventoryProgress, setEmployeeInventoryProgress] = useState<any[]>([]);
+  const [employeeChecklistProgress, setEmployeeChecklistProgress] = useState<any[]>([]);
+  const [loadingEmployeeProgress, setLoadingEmployeeProgress] = useState(false);
+
   // Estado para notificaciones en tiempo real
   const [realtimeNotifications, setRealtimeNotifications] = useState<Array<{
     id: string;
@@ -1145,6 +1151,40 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
   const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
+
+  // Suscripción en tiempo real para el progreso del empleado (manager view)
+  useEffect(() => {
+    if (!selectedEmployeeForProgress || !supabase) return;
+    
+    const houseName = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
+    
+    // Suscripción a cambios del inventario
+    const inventoryChannel = (supabase as any)
+      .channel(`employee-progress-inventory-${houseName}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, async () => {
+        console.log('📦 Inventario actualizado en tiempo real');
+        const items = await realtimeService.getInventoryItems(houseName);
+        setEmployeeInventoryProgress(items || []);
+      })
+      .subscribe();
+    
+    // Suscripción a cambios del checklist
+    const assignmentId = selectedEmployeeForProgress.assignment.id;
+    const checklistChannel = (supabase as any)
+      .channel(`employee-progress-checklist-${assignmentId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignment_checklist', filter: `assignment_id=eq.${assignmentId}` }, async () => {
+        console.log('✅ Checklist actualizado en tiempo real');
+        const checklistItems = syncedChecklists.get(String(assignmentId)) || [];
+        setEmployeeChecklistProgress(checklistItems);
+      })
+      .subscribe();
+    
+    return () => {
+      inventoryChannel.unsubscribe();
+      checklistChannel.unsubscribe();
+    };
+  }, [selectedEmployeeForProgress, houses, allowedHouseIdx, syncedChecklists]);
+
   const [newHouseName, setNewHouseName] = useState('');
 
   // Estado para checklist
@@ -3550,7 +3590,43 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   </div>
                                   <div className="assigned-tasks-items-v2">
                                     {assignments.map((assignment, idx) => (
-                                      <div key={assignment.id || idx} className="assigned-tasks-item-v2">
+                                      <div 
+                                        key={assignment.id || idx} 
+                                        className="assigned-tasks-item-v2"
+                                        style={{cursor: 'pointer', transition: 'all 0.2s ease'}}
+                                        onClick={async () => {
+                                          console.log('📊 Abriendo progreso del empleado:', assignment.employee);
+                                          setLoadingEmployeeProgress(true);
+                                          setSelectedEmployeeForProgress({
+                                            assignment,
+                                            employee: assignment.employee,
+                                            type: assignment.type
+                                          });
+                                          
+                                          // Cargar inventario de la casa
+                                          try {
+                                            const houseName = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
+                                            const inventoryItems = await realtimeService.getInventoryItems(houseName);
+                                            setEmployeeInventoryProgress(inventoryItems || []);
+                                            
+                                            // Cargar checklist del assignment
+                                            const checklistItems = syncedChecklists.get(String(assignment.id)) || [];
+                                            setEmployeeChecklistProgress(checklistItems);
+                                          } catch (e) {
+                                            console.error('Error cargando progreso:', e);
+                                          } finally {
+                                            setLoadingEmployeeProgress(false);
+                                          }
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          (e.currentTarget as HTMLDivElement).style.transform = 'translateX(4px)';
+                                          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          (e.currentTarget as HTMLDivElement).style.transform = 'translateX(0)';
+                                          (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+                                        }}
+                                      >
                                         <div className="assigned-tasks-item-header-v2">
                                           <div className="assigned-tasks-employee-info">
                                             <div className="assigned-tasks-employee-avatar">👤</div>
@@ -4906,6 +4982,113 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 <div className="modal-body-empty">
                   <p>Cargando inventario...</p>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Progreso del Empleado */}
+      {selectedEmployeeForProgress && (
+        <div className="modal-overlay" onClick={() => setSelectedEmployeeForProgress(null)}>
+          <div className="dashboard-modal ultra-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '800px', maxHeight: '90vh', overflow: 'auto'}}>
+            <div className="modal-header">
+              <h2 style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                👤 Progreso de {selectedEmployeeForProgress.employee}
+              </h2>
+              <button className="modal-close" onClick={() => setSelectedEmployeeForProgress(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {loadingEmployeeProgress ? (
+                <div style={{textAlign: 'center', padding: '2rem', color: '#64748b'}}>
+                  <p>Cargando progreso...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Info de la tarea */}
+                  <div style={{background: '#f0f9ff', borderRadius: '1rem', padding: '1rem', marginBottom: '1.5rem', border: '1px solid #0284c7'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
+                      <span style={{fontSize: '1.5rem'}}>
+                        {selectedEmployeeForProgress.type === 'Limpieza profunda' ? '🧹' : 
+                         selectedEmployeeForProgress.type === 'Limpieza regular' ? '✨' : '🔧'}
+                      </span>
+                      <div>
+                        <h3 style={{margin: 0, color: '#0284c7'}}>{selectedEmployeeForProgress.type}</h3>
+                        <p style={{margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.9rem'}}>
+                          📅 {new Date(selectedEmployeeForProgress.assignment.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                          {selectedEmployeeForProgress.assignment.time && ` • 🕐 ${selectedEmployeeForProgress.assignment.time}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección de Inventario */}
+                  <div style={{marginBottom: '2rem'}}>
+                    <h3 style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a', marginBottom: '1rem'}}>
+                      📦 Inventario
+                      <span style={{background: '#10b981', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700}}>
+                        {employeeInventoryProgress.filter(i => i.complete).length}/{employeeInventoryProgress.length}
+                      </span>
+                    </h3>
+                    {employeeInventoryProgress.length === 0 ? (
+                      <p style={{color: '#64748b', textAlign: 'center'}}>No hay items en el inventario</p>
+                    ) : (
+                      <div style={{display: 'grid', gap: '0.5rem'}}>
+                        {employeeInventoryProgress.map((item: any) => (
+                          <div key={item.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            background: item.complete ? '#f0fdf4' : '#fef2f2',
+                            borderRadius: '0.75rem',
+                            border: item.complete ? '1px solid #86efac' : '1px solid #fecaca'
+                          }}>
+                            <span style={{fontSize: '1.2rem'}}>{item.complete ? '✅' : '⏳'}</span>
+                            <span style={{flex: 1, fontWeight: 600, color: item.complete ? '#166534' : '#991b1b'}}>
+                              {item.name}
+                            </span>
+                            <span style={{color: '#64748b', fontSize: '0.9rem'}}>x{item.quantity}</span>
+                            {item.room && <span style={{color: '#94a3b8', fontSize: '0.85rem'}}>({item.room})</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sección de Checklist */}
+                  <div>
+                    <h3 style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a', marginBottom: '1rem'}}>
+                      ✅ Checklist de Limpieza
+                      <span style={{background: '#10b981', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700}}>
+                        {employeeChecklistProgress.filter(i => i.completed).length}/{employeeChecklistProgress.length}
+                      </span>
+                    </h3>
+                    {employeeChecklistProgress.length === 0 ? (
+                      <p style={{color: '#64748b', textAlign: 'center'}}>No hay tareas en el checklist</p>
+                    ) : (
+                      <div style={{display: 'grid', gap: '0.5rem'}}>
+                        {employeeChecklistProgress.map((task: any, idx: number) => (
+                          <div key={task.id || idx} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            background: task.completed ? '#f0fdf4' : '#fef2f2',
+                            borderRadius: '0.75rem',
+                            border: task.completed ? '1px solid #86efac' : '1px solid #fecaca'
+                          }}>
+                            <span style={{fontSize: '1.2rem'}}>{task.completed ? '✅' : '⏳'}</span>
+                            <span style={{flex: 1, fontWeight: 600, color: task.completed ? '#166534' : '#991b1b'}}>
+                              {task.task_name || task.name || task.title}
+                            </span>
+                            {task.zone && <span style={{color: '#64748b', fontSize: '0.85rem', background: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '0.375rem'}}>{task.zone}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
