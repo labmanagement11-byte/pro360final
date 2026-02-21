@@ -627,10 +627,10 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
       houseName = assignmentData.house;
       console.log('🏠 Reiniciando inventario de la casa:', houseName);
       
-      // Reiniciar el inventario de la casa (complete: false, missing: 0, reason: null)
+      // Reiniciar el inventario de la casa (solo complete existe)
       const { error: resetError } = await (supabase
         .from('inventory') as any)
-        .update({ complete: false, missing: 0, reason: null })
+        .update({ complete: false })
         .eq('house', houseName);
       
       if (resetError) {
