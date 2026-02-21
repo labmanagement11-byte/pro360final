@@ -17,6 +17,11 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
   const [inventoryProgress, setInventoryProgress] = useState<{ [key: string]: boolean }>({});
   const [expandedInventory, setExpandedInventory] = useState<Set<string>>(new Set());
   const [assignmentIdMap, setAssignmentIdMap] = useState<Record<string, string>>({});
+  // Estados para inventario completo de la casa
+  const [houseInventory, setHouseInventory] = useState<any[]>([]);
+  const [houseInventoryExpanded, setHouseInventoryExpanded] = useState(false);
+  const [houseInventoryLoading, setHouseInventoryLoading] = useState(false);
+  const [houseInventoryProgress, setHouseInventoryProgress] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -641,13 +646,26 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
         </div>
       )}
       {/* Botón Ver Inventario al final para empleados */}
-      {!isManager && onNavigateToInventory && (
-        <div style={{marginTop: '1.5rem', textAlign: 'center'}}>
+      {!isManager && (
+        <div style={{marginTop: '1.5rem'}}>
           <button
-            onClick={onNavigateToInventory}
+            onClick={async () => {
+              if (!houseInventoryExpanded && houseInventory.length === 0) {
+                setHouseInventoryLoading(true);
+                try {
+                  const items = await realtimeService.getInventoryItems(user.house || user.house_id);
+                  setHouseInventory(items || []);
+                } catch (e) {
+                  console.error('Error cargando inventario:', e);
+                } finally {
+                  setHouseInventoryLoading(false);
+                }
+              }
+              setHouseInventoryExpanded(!houseInventoryExpanded);
+            }}
             style={{
               width: '100%',
-              maxWidth: '400px',
+              maxWidth: '100%',
               padding: '1rem 2rem',
               borderRadius: '0.75rem',
               border: 'none',
@@ -668,8 +686,100 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
               (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
             }}
           >
-            📦 Ver Inventario Completo
+            📦 {houseInventoryExpanded ? 'Ocultar' : 'Ver'} Inventario Completo ({houseInventory.length})
           </button>
+          
+          {/* Lista de Inventario Expandible */}
+          {houseInventoryExpanded && (
+            <div style={{marginTop: '1rem', background: '#f8fafc', borderRadius: '1rem', padding: '1rem', border: '1px solid #e2e8f0'}}>
+              <div style={{fontWeight: '700', color: '#0f172a', marginBottom: '1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                📋 Inventario de la Casa
+              </div>
+              {houseInventoryLoading ? (
+                <div style={{textAlign: 'center', padding: '1rem', color: '#64748b'}}>Cargando...</div>
+              ) : houseInventory.length === 0 ? (
+                <div style={{textAlign: 'center', padding: '1rem', color: '#64748b'}}>No hay items en el inventario</div>
+              ) : (
+                <div style={{display: 'grid', gap: '0.75rem'}}>
+                  {houseInventory.map((item: any) => {
+                    const itemKey = `house_${item.id}`;
+                    const isItemComplete = houseInventoryProgress[itemKey] ?? item.complete ?? false;
+                    return (
+                      <div key={item.id} style={{
+                        background: 'white',
+                        borderRadius: '0.75rem',
+                        border: isItemComplete ? '2px solid #10b981' : '1px solid #e5e7eb',
+                        padding: '0.85rem',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem'}}>
+                          <div style={{flex: 1}}>
+                            <span style={{fontWeight: 700, color: isItemComplete ? '#10b981' : '#1f2937', fontSize: '0.95rem'}}>
+                              {item.name}
+                            </span>
+                            <span style={{marginLeft: '0.5rem', color: '#64748b', fontSize: '0.85rem'}}>x{item.quantity}</span>
+                            {item.room && <span style={{marginLeft: '0.5rem', color: '#94a3b8', fontSize: '0.8rem'}}>({item.room})</span>}
+                          </div>
+                          <span style={{
+                            background: isItemComplete ? '#10b981' : '#f59e0b',
+                            color: 'white',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 700
+                          }}>
+                            {isItemComplete ? 'COMPLETO' : 'PENDIENTE'}
+                          </span>
+                        </div>
+                        <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                          <button
+                            onClick={async () => {
+                              setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: true }));
+                              // Actualizar en base de datos
+                              await (supabase as any).from('inventory').update({ complete: true }).eq('id', item.id);
+                            }}
+                            style={{
+                              padding: '0.5rem 0.9rem',
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              background: isItemComplete ? '#10b981' : '#e2e8f0',
+                              color: isItemComplete ? 'white' : '#0f172a',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            ✅ Completo
+                          </button>
+                          <button
+                            onClick={async () => {
+                              setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: false }));
+                              // Actualizar en base de datos
+                              await (supabase as any).from('inventory').update({ complete: false }).eq('id', item.id);
+                            }}
+                            style={{
+                              padding: '0.5rem 0.9rem',
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              background: !isItemComplete ? '#f59e0b' : '#e2e8f0',
+                              color: !isItemComplete ? 'white' : '#0f172a',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            ⏳ Incompleto
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
