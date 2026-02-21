@@ -5239,6 +5239,67 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         ))}
                       </div>
                     )}
+                    
+                    {/* Botón de Reinicio de Inventario */}
+                    {employeeInventoryProgress.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          const houseName = selectedEmployeeForProgress.assignment.house || houses[allowedHouseIdx]?.name;
+                          if (!houseName) return;
+                          
+                          if (confirm('¿Reiniciar el inventario para la próxima visita? Todos los items volverán a estar pendientes.')) {
+                            try {
+                              console.log('🔄 Reiniciando inventario de:', houseName);
+                              const { error } = await (supabase as any)
+                                .from('inventory')
+                                .update({ complete: false, missing: 0, reason: null })
+                                .eq('house', houseName);
+                              
+                              if (error) {
+                                console.error('❌ Error reiniciando inventario:', error);
+                                alert('Error al reiniciar el inventario');
+                              } else {
+                                console.log('✅ Inventario reiniciado exitosamente');
+                                // Actualizar estado local
+                                setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, complete: false, missing: 0, reason: null })));
+                                alert('✅ Inventario reiniciado para la próxima visita');
+                              }
+                            } catch (err) {
+                              console.error('❌ Error:', err);
+                              alert('Error al reiniciar el inventario');
+                            }
+                          }
+                        }}
+                        style={{
+                          marginTop: '1rem',
+                          width: '100%',
+                          padding: '0.75rem 1.5rem',
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.75rem',
+                          fontWeight: 700,
+                          fontSize: '0.95rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                          (e.target as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+                          (e.target as HTMLButtonElement).style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.3)';
+                        }}
+                      >
+                        🔄 Reiniciar Inventario para Próxima Visita
+                      </button>
+                    )}
                   </div>
 
                   {/* Sección de Checklist */}
