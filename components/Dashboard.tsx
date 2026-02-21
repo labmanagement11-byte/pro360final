@@ -5245,24 +5245,47 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <button
                         onClick={async () => {
                           const houseName = selectedEmployeeForProgress.assignment.house || houses[allowedHouseIdx]?.name;
-                          if (!houseName) return;
+                          console.log('🏠 Casa para reiniciar:', houseName);
+                          console.log('📋 Assignment:', selectedEmployeeForProgress.assignment);
+                          
+                          if (!houseName) {
+                            alert('No se pudo determinar la casa');
+                            return;
+                          }
                           
                           if (confirm('¿Reiniciar el inventario para la próxima visita? Todos los items volverán a estar pendientes.')) {
                             try {
                               console.log('🔄 Reiniciando inventario de:', houseName);
-                              const { error } = await (supabase as any)
+                              
+                              // Primero verificar cuántos items hay
+                              const { data: items, error: countError } = await (supabase as any)
+                                .from('inventory')
+                                .select('id, name, house, complete')
+                                .eq('house', houseName);
+                              
+                              console.log('📊 Items encontrados:', items?.length, items);
+                              
+                              if (countError) {
+                                console.error('❌ Error buscando items:', countError);
+                              }
+                              
+                              // Ahora actualizar
+                              const { data: updated, error } = await (supabase as any)
                                 .from('inventory')
                                 .update({ complete: false, missing: 0, reason: null })
-                                .eq('house', houseName);
+                                .eq('house', houseName)
+                                .select();
+                              
+                              console.log('📝 Items actualizados:', updated?.length, updated);
                               
                               if (error) {
                                 console.error('❌ Error reiniciando inventario:', error);
-                                alert('Error al reiniciar el inventario');
+                                alert('Error al reiniciar el inventario: ' + error.message);
                               } else {
-                                console.log('✅ Inventario reiniciado exitosamente');
+                                console.log('✅ Inventario reiniciado exitosamente. Items actualizados:', updated?.length || 0);
                                 // Actualizar estado local
                                 setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, complete: false, missing: 0, reason: null })));
-                                alert('✅ Inventario reiniciado para la próxima visita');
+                                alert(`✅ Inventario reiniciado. ${updated?.length || 0} items actualizados.`);
                               }
                             } catch (err) {
                               console.error('❌ Error:', err);
