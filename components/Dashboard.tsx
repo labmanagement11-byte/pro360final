@@ -1280,25 +1280,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   useEffect(() => {
     if (!selectedEmployeeForProgress || !supabase) return;
     
-    const houseName = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
+    const assignmentId = selectedEmployeeForProgress.assignment.id;
     const timestamp = Date.now();
     
     console.log('📡 [Manager View] Suscribiendo a progreso del empleado:', selectedEmployeeForProgress.employee);
+    console.log('📡 [Manager View] Assignment ID:', assignmentId);
     
-    // Suscripción a cambios del inventario
+    // Cargar inventario de la asignación (NO de la casa)
+    const loadAssignmentInventory = async () => {
+      console.log('📦 [Manager View] Cargando inventario de asignación:', assignmentId);
+      const items = await realtimeService.getAssignmentInventory(assignmentId);
+      console.log('📦 [Manager View] Items cargados:', items?.length || 0);
+      setEmployeeInventoryProgress(items || []);
+    };
+    loadAssignmentInventory();
+    
+    // Suscripción a cambios del inventario de la asignación
     const inventoryChannel = (supabase as any)
-      .channel(`employee-progress-inventory-${houseName}-${timestamp}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, async (payload: any) => {
-        console.log('📦 [Manager View] Inventario actualizado en tiempo real:', payload);
-        const items = await realtimeService.getInventoryItems(houseName);
+      .channel(`employee-progress-inventory-${assignmentId}-${timestamp}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignment_inventory', filter: `calendar_assignment_id=eq.${assignmentId}` }, async (payload: any) => {
+        console.log('📦 [Manager View] Inventario asignación actualizado en tiempo real:', payload);
+        const items = await realtimeService.getAssignmentInventory(assignmentId);
         setEmployeeInventoryProgress(items || []);
       })
       .subscribe((status: string) => {
         console.log('📡 [Manager View] Estado suscripción inventario:', status);
       });
     
-    // Suscripción a cambios del checklist
-    const assignmentId = selectedEmployeeForProgress.assignment.id;
+    // Suscripción a cambios del checklist (usa el mismo assignmentId definido arriba)
     const checklistChannel = (supabase as any)
       .channel(`employee-progress-checklist-${assignmentId}-${timestamp}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'assignment_checklist', filter: `assignment_id=eq.${assignmentId}` }, async (payload: any) => {
@@ -5207,7 +5216,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     <h3 style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a', marginBottom: '1rem'}}>
                       📦 Inventario
                       <span style={{background: '#10b981', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700}}>
-                        {employeeInventoryProgress.filter(i => i.complete).length}/{employeeInventoryProgress.length}
+                        {employeeInventoryProgress.filter(i => i.is_complete).length}/{employeeInventoryProgress.length}
                       </span>
                     </h3>
                     {employeeInventoryProgress.length === 0 ? (
@@ -5217,22 +5226,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         {employeeInventoryProgress.map((item: any) => (
                           <div key={item.id} style={{
                             padding: '0.75rem 1rem',
-                            background: item.complete ? '#f0fdf4' : '#fef2f2',
+                            background: item.is_complete ? '#f0fdf4' : '#fef2f2',
                             borderRadius: '0.75rem',
-                            border: item.complete ? '1px solid #86efac' : '1px solid #fecaca'
+                            border: item.is_complete ? '1px solid #86efac' : '1px solid #fecaca'
                           }}>
                             <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                              <span style={{fontSize: '1.2rem'}}>{item.complete ? '✅' : '⏳'}</span>
-                              <span style={{flex: 1, fontWeight: 600, color: item.complete ? '#166534' : '#991b1b'}}>
-                                {item.name}
+                              <span style={{fontSize: '1.2rem'}}>{item.is_complete ? '✅' : '⏳'}</span>
+                              <span style={{flex: 1, fontWeight: 600, color: item.is_complete ? '#166534' : '#991b1b'}}>
+                                {item.item_name || item.name}
                               </span>
                               <span style={{color: '#64748b', fontSize: '0.9rem'}}>x{item.quantity}</span>
-                              {item.room && <span style={{color: '#94a3b8', fontSize: '0.85rem'}}>({item.room})</span>}
+                              {item.category && <span style={{color: '#94a3b8', fontSize: '0.85rem'}}>({item.category})</span>}
                             </div>
-                            {!item.complete && (item.missing > 0 || item.reason) && (
-                              <div style={{marginTop: '0.5rem', padding: '0.5rem', background: '#fee2e2', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#991b1b'}}>
-                                {item.missing > 0 && <span style={{fontWeight: 600}}>⚠️ Faltan: {item.missing} </span>}
-                                {item.reason && <span>| Motivo: <strong>{item.reason}</strong></span>}
+                            {item.is_complete && item.checked_by && (
+                              <div style={{marginTop: '0.5rem', fontSize: '0.85rem', color: '#166534'}}>
+                                ✓ Verificado por {item.checked_by}
+                              </div>
+                            )}
+                            {item.notes && (
+                              <div style={{marginTop: '0.5rem', padding: '0.5rem', background: '#f1f5f9', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#475569'}}>
+                                📝 {item.notes}
                               </div>
                             )}
                           </div>
@@ -5244,36 +5257,41 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     {employeeInventoryProgress.length > 0 && (
                       <button
                         onClick={async () => {
-                          const houseName = selectedEmployeeForProgress.assignment.house || houses[allowedHouseIdx]?.name;
-                          console.log('🏠 Casa para reiniciar:', houseName);
-                          console.log('📋 Assignment:', selectedEmployeeForProgress.assignment);
+                          const assignmentId = selectedEmployeeForProgress.assignment.id;
+                          console.log('🔄 [Reset] Assignment ID:', assignmentId);
+                          console.log('📋 [Reset] Assignment:', selectedEmployeeForProgress.assignment);
                           
-                          if (!houseName) {
-                            alert('No se pudo determinar la casa');
+                          if (!assignmentId) {
+                            alert('No se pudo determinar la asignación');
                             return;
                           }
                           
                           if (confirm('¿Reiniciar el inventario para la próxima visita? Todos los items volverán a estar pendientes.')) {
                             try {
-                              console.log('🔄 Reiniciando inventario de:', houseName);
+                              console.log('🔄 Reiniciando inventario de asignación:', assignmentId);
                               
-                              // Primero verificar cuántos items hay
+                              // Primero verificar cuántos items hay en assignment_inventory
                               const { data: items, error: countError } = await (supabase as any)
-                                .from('inventory')
-                                .select('id, name, house, complete')
-                                .eq('house', houseName);
+                                .from('assignment_inventory')
+                                .select('id, item_name, is_complete')
+                                .eq('calendar_assignment_id', assignmentId);
                               
-                              console.log('📊 Items encontrados:', items?.length, items);
+                              console.log('📊 Items encontrados en assignment_inventory:', items?.length, items);
                               
                               if (countError) {
                                 console.error('❌ Error buscando items:', countError);
                               }
                               
-                              // Ahora actualizar - solo complete y notes existen en la tabla
+                              // Ahora actualizar assignment_inventory
                               const { data: updated, error } = await (supabase as any)
-                                .from('inventory')
-                                .update({ complete: false })
-                                .eq('house', houseName)
+                                .from('assignment_inventory')
+                                .update({ 
+                                  is_complete: false,
+                                  checked_by: null,
+                                  checked_at: null,
+                                  updated_at: new Date().toISOString()
+                                })
+                                .eq('calendar_assignment_id', assignmentId)
                                 .select();
                               
                               console.log('📝 Items actualizados:', updated?.length, updated);
@@ -5284,7 +5302,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               } else {
                                 console.log('✅ Inventario reiniciado exitosamente. Items actualizados:', updated?.length || 0);
                                 // Actualizar estado local
-                                setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, complete: false })));
+                                setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, is_complete: false, checked_by: null, checked_at: null })));
                                 alert(`✅ Inventario reiniciado. ${updated?.length || 0} items actualizados.`);
                               }
                             } catch (err) {
