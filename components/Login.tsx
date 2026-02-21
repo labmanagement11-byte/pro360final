@@ -117,6 +117,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         } catch (e) { /* ignored */ }
       }
 
+      // 5) Si no existe, buscar en app_users por username
+      if (!record) {
+        try {
+          const { data: appUser } = await supabase.from('app_users').select('*').ilike('username', localPart).single();
+          if (appUser) {
+            // Mapear house_name a house para compatibilidad
+            const appUserData = appUser as any;
+            record = { ...appUserData, house: appUserData.house_name };
+            console.log('✅ [Login] Perfil encontrado en app_users:', record);
+          }
+        } catch (e) { /* ignored */ }
+      }
+
       if (!record) {
         console.error('❌ [Login] No se encontró perfil para:', { userId, email, localPart });
         console.error('❌ [Login] Intentó buscar en profiles y users sin éxito');
@@ -132,16 +145,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       });
 
       // Normalizar rol 'dueno' a 'owner' para compatibilidad con el código existente
-      let userRole = record.role || (record.user_metadata && record.user_metadata.role) || 'empleado';
+      let userRole = record.role || record.rol || (record.user_metadata && record.user_metadata.role) || 'empleado';
       if (userRole === 'dueno') {
         userRole = 'owner';
       }
+
+      // Obtener house del campo correcto según la tabla
+      const userHouse = record.house || record.house_name || record.property_id || 'EPIC D1';
 
       const user: User = {
         username: record.username || record.full_name || localPart,
         password: '',
         role: userRole,
-        house: record.house || 'EPIC D1',
+        house: userHouse,
       };
 
       console.log('✅ [Login] Usuario cargado desde tabla users:', user);
