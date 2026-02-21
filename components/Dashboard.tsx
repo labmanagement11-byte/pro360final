@@ -2533,11 +2533,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
     // Suscribirse a cambios en tiempo real
     let subscription: any;
+    let houseSubscription: any;
     try {
       console.log('🔔 Suscribiendo a cambios de calendario en tiempo real...');
       console.log('🏠 House:', houseName);
       if (user.role === 'empleado') {
-        console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
+        console.log('👤 Empleado:', user.username, '- Casa:', user.house);
       }
       
       if (user.role === 'empleado' && user.username) {
@@ -2549,7 +2550,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             if (payload?.eventType === 'INSERT') {
               // Verificar que la asignación es para este empleado
               if (payload.new?.employee === user.username) {
-                setCalendarAssignments(prev => [...prev, payload.new]);
+                setCalendarAssignments(prev => {
+                  if (prev.some(a => a.id === payload.new?.id)) return prev;
+                  return [...prev, payload.new];
+                });
               }
             } else if (payload?.eventType === 'UPDATE') {
               setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
@@ -2558,6 +2562,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             }
           }
         );
+        
+        // También suscribirse a la casa para recibir cambios cuando el manager asigna tareas
+        if (user.house) {
+          houseSubscription = realtimeService.subscribeToCalendarAssignmentsByHouse(
+            user.house,
+            (payload: any) => {
+              console.log('⚡ Evento de casa recibido (empleado):', payload);
+              // Solo procesar si es para este empleado
+              if (payload?.eventType === 'INSERT' && payload.new?.employee === user.username) {
+                setCalendarAssignments(prev => {
+                  if (prev.some(a => a.id === payload.new?.id)) return prev;
+                  return [...prev, payload.new];
+                });
+              }
+            }
+          );
+        }
       } else if ((user.role === 'manager' || user.role === 'owner') && houseName) {
         // Manager/Owner: suscribirse a TODOS los cambios de la casa
         subscription = realtimeService.subscribeToCalendarAssignmentsByHouse(
@@ -2580,21 +2601,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       }
       
       console.log('✅ Suscripción de calendario activa:', subscription);
+      if (houseSubscription) {
+        console.log('✅ Suscripción de casa activa para empleado');
+      }
     } catch (error) {
       console.error('❌ Error subscribing to calendar assignments:', error);
     }
 
     return () => {
       try {
-        console.log('🔌 Desconectando suscripción de calendario...');
+        console.log('🔌 Desconectando suscripciones de calendario...');
         if (subscription) {
           supabase?.removeChannel(subscription);
+        }
+        if (houseSubscription) {
+          supabase?.removeChannel(houseSubscription);
         }
       } catch (error) {
         console.error('❌ Error unsubscribing from calendar:', error);
       }
     };
-  }, [user.role, user.username, houses, selectedHouseIdx]);
+  }, [user.role, user.username, user.house, houses, selectedHouseIdx]);
 
   // Solución robusta: solo renderizar dashboard en cliente, nunca en SSR
   const [isClient, setIsClient] = useState(false);
