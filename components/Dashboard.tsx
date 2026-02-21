@@ -26,6 +26,35 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
   const [incompleteFormOpen, setIncompleteFormOpen] = useState<Record<string, boolean>>({});
   const [incompleteData, setIncompleteData] = useState<Record<string, { missing: number; reason: string }>>({});
 
+  // Suscripción realtime al inventario de la casa para sincronización entre dispositivos
+  useEffect(() => {
+    if (!houseInventoryExpanded || !supabase || !user.house) return;
+    
+    const houseName = user.house || user.house_id;
+    console.log('📡 [Realtime] Suscribiendo a cambios de inventario de:', houseName);
+    
+    const channel = (supabase as any)
+      .channel(`house-inventory-sync-${houseName}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, async (payload: any) => {
+        console.log('📦 [Realtime] Cambio en inventario detectado:', payload);
+        // Recargar inventario completo para sincronizar
+        const items = await realtimeService.getInventoryItems(houseName);
+        setHouseInventory(items || []);
+        // Actualizar progreso local basado en los items actualizados
+        const progressUpdate: Record<string, boolean> = {};
+        (items || []).forEach((item: any) => {
+          progressUpdate[`house_${item.id}`] = item.complete ?? false;
+        });
+        setHouseInventoryProgress(prev => ({ ...prev, ...progressUpdate }));
+      })
+      .subscribe();
+    
+    return () => {
+      console.log('📡 [Realtime] Desuscribiendo de inventario de:', houseName);
+      channel.unsubscribe();
+    };
+  }, [houseInventoryExpanded, user.house, user.house_id]);
+
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
     console.log('[AssignedTasksCard] Tareas asignadas recibidas:', assignedTasks);
