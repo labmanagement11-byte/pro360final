@@ -2534,13 +2534,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('👤 Empleado:', user.username, '- Solo verá sus propias asignaciones');
       }
       
-      if (user.role === 'empleado' && user.id !== undefined) {
+      if (user.role === 'empleado' && user.username) {
+        // Empleado: suscribirse a cambios de SU username
         subscription = realtimeService.subscribeToCalendarAssignments(
-          String(user.id),
+          user.username,
           (payload: any) => {
-            console.log('⚡ Evento de calendario recibido:', payload);
+            console.log('⚡ Evento de calendario recibido (empleado):', payload);
             if (payload?.eventType === 'INSERT') {
-              setCalendarAssignments(prev => [...prev, payload.new]);
+              // Verificar que la asignación es para este empleado
+              if (payload.new?.employee === user.username) {
+                setCalendarAssignments(prev => [...prev, payload.new]);
+              }
             } else if (payload?.eventType === 'UPDATE') {
               setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
             } else if (payload?.eventType === 'DELETE') {
@@ -2548,8 +2552,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             }
           }
         );
-      } else {
-        // Si es manager/owner, puedes suscribirte a todos o implementar lógica similar si lo deseas
+      } else if ((user.role === 'manager' || user.role === 'owner') && houseName) {
+        // Manager/Owner: suscribirse a TODOS los cambios de la casa
+        subscription = realtimeService.subscribeToCalendarAssignmentsByHouse(
+          houseName,
+          (payload: any) => {
+            console.log('⚡ Evento de calendario recibido (manager):', payload);
+            if (payload?.eventType === 'INSERT') {
+              setCalendarAssignments(prev => {
+                // Evitar duplicados
+                if (prev.some(a => a.id === payload.new?.id)) return prev;
+                return [...prev, payload.new];
+              });
+            } else if (payload?.eventType === 'UPDATE') {
+              setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+            } else if (payload?.eventType === 'DELETE') {
+              setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
+            }
+          }
+        );
       }
       
       console.log('✅ Suscripción de calendario activa:', subscription);

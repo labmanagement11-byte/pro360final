@@ -1,20 +1,23 @@
 // ==================== CALENDAR ASSIGNMENTS REALTIME POR CASA ====================
 export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (data: any) => void) {
   try {
-    console.log('🔔 [Realtime Service] Iniciando suscripción a calendar_assignments para casa:', house);
+    console.log('🔔 [Realtime Service] Suscripción a calendar_assignments para casa:', house);
     const supabase = getSupabaseClient();
+    const uniqueId = Date.now();
+    
+    // Suscribirse por house (nombre de la casa) - este es el campo que se usa en la tabla
     const channel = supabase
-      .channel(`calendar-assignments-changes-houseid-${house}`)
+      .channel(`calendar-assignments-house-${house.replace(/\s+/g, '-')}-${uniqueId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'calendar_assignments',
-          filter: `house_id=eq.${house}`
+          filter: `house=eq.${house}`
         },
         (payload: any) => {
-          console.log('⚡ [Realtime Service] Evento recibido (por house_id):', payload);
+          console.log('⚡ [Realtime Service] Evento recibido para casa', house, ':', payload);
           const mappedPayload = {
             eventType: payload.eventType,
             new: payload.new,
@@ -24,9 +27,9 @@ export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (
         }
       )
       .subscribe((status: any) => {
-        console.log('📡 [Realtime Service] Estado de suscripción (por house_id):', status);
+        console.log('📡 [Realtime Service] Estado suscripción casa', house, ':', status);
       });
-    console.log('✅ [Realtime Service] Canal creado (por house_id):', channel);
+    console.log('✅ [Realtime Service] Canal creado para casa:', house);
     return channel;
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse (por casa):', error);
@@ -34,23 +37,25 @@ export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (
   }
 }
 // ==================== CALENDAR ASSIGNMENTS REALTIME ====================
-export function subscribeToCalendarAssignments(employeeId: string, callback: (data: any) => void) {
+export function subscribeToCalendarAssignments(employeeUsername: string, callback: (data: any) => void) {
   try {
-    console.log('🔔 [Realtime Service] Iniciando suscripción a calendar_assignments para empleado:', employeeId);
+    console.log('🔔 [Realtime Service] Suscripción a calendar_assignments para empleado:', employeeUsername);
     const supabase = getSupabaseClient();
-    // Suscribirse por employee_id
-    const channelId = supabase
-      .channel(`calendar-assignments-changes-id-${employeeId}`)
+    const uniqueId = Date.now();
+    
+    // Suscribirse por employee (username) - este es el campo que se usa en la tabla
+    const channel = supabase
+      .channel(`calendar-assignments-employee-${employeeUsername}-${uniqueId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'calendar_assignments',
-          filter: `employee_id=eq.${employeeId}`
+          filter: `employee=eq.${employeeUsername}`
         },
         (payload: any) => {
-          console.log('⚡ [Realtime Service] Evento recibido (employee_id):', payload);
+          console.log('⚡ [Realtime Service] Evento recibido para', employeeUsername, ':', payload);
           callback({
             eventType: payload.eventType,
             new: payload.new,
@@ -59,35 +64,10 @@ export function subscribeToCalendarAssignments(employeeId: string, callback: (da
         }
       )
       .subscribe((status: any) => {
-        console.log('📡 [Realtime Service] Estado de suscripción (employee_id):', status);
+        console.log('📡 [Realtime Service] Estado suscripción empleado', employeeUsername, ':', status);
       });
 
-    // Suscribirse por employee (username)
-    const channelUsername = supabase
-      .channel(`calendar-assignments-changes-username-${employeeId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'calendar_assignments',
-          filter: `employee=eq.${employeeId}`
-        },
-        (payload: any) => {
-          console.log('⚡ [Realtime Service] Evento recibido (employee):', payload);
-          callback({
-            eventType: payload.eventType,
-            new: payload.new,
-            old: payload.old
-          });
-        }
-      )
-      .subscribe((status: any) => {
-        console.log('📡 [Realtime Service] Estado de suscripción (employee):', status);
-      });
-
-    // Retornar ambos canales para poder limpiar después
-    return [channelId, channelUsername];
+    return channel;
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse:', error);
     return null;
