@@ -685,16 +685,22 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
         <div style={{marginTop: '1.5rem'}}>
           <button
             onClick={async () => {
-              if (!houseInventoryExpanded && houseInventory.length === 0) {
-                setHouseInventoryLoading(true);
-                try {
-                  const items = await realtimeService.getInventoryItems(user.house || user.house_id);
-                  setHouseInventory(items || []);
-                } catch (e) {
-                  console.error('Error cargando inventario:', e);
-                } finally {
-                  setHouseInventoryLoading(false);
-                }
+              // SIEMPRE recargar el inventario desde la BD para obtener estado actualizado
+              setHouseInventoryLoading(true);
+              try {
+                const items = await realtimeService.getInventoryItems(user.house || user.house_id);
+                console.log('📦 Inventario recargado desde BD:', items);
+                setHouseInventory(items || []);
+                // Sincronizar progreso con valores de la BD
+                const progressFromDB: Record<string, boolean> = {};
+                (items || []).forEach((item: any) => {
+                  progressFromDB[`house_${item.id}`] = item.complete ?? false;
+                });
+                setHouseInventoryProgress(progressFromDB);
+              } catch (e) {
+                console.error('Error cargando inventario:', e);
+              } finally {
+                setHouseInventoryLoading(false);
               }
               setHouseInventoryExpanded(!houseInventoryExpanded);
             }}

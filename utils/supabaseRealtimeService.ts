@@ -576,22 +576,25 @@ export async function deleteCalendarAssignment(assignmentId: string) {
       .single();
     
     if (assignmentData?.house) {
-      console.log('🏠 Reiniciando inventario de la casa:', assignmentData.house);
+      console.log('🏠 [DELETE] Reiniciando inventario de la casa:', assignmentData.house);
       
       // Reiniciar el inventario de la casa (complete: false, missing: 0, reason: null)
-      const { error: resetError } = await (supabase
+      const { data: resetData, error: resetError, count } = await (supabase
         .from('inventory') as any)
         .update({ complete: false, missing: 0, reason: null })
-        .eq('house', assignmentData.house);
+        .eq('house', assignmentData.house)
+        .select();
       
       if (resetError) {
-        console.error('Error reiniciando inventario:', resetError);
+        console.error('❌ [DELETE] Error reiniciando inventario:', resetError);
       } else {
-        console.log('✅ Inventario reiniciado exitosamente');
+        console.log('✅ [DELETE] Inventario reiniciado. Items actualizados:', resetData?.length || 0);
       }
+    } else {
+      console.log('⚠️ [DELETE] No se encontró casa para asignación:', assignmentId);
     }
   } catch (error) {
-    console.error('Error obteniendo casa de la asignación:', error);
+    console.error('❌ [DELETE] Error obteniendo casa de la asignación:', error);
   }
   
   const { error } = await (supabase
