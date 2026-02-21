@@ -586,6 +586,34 @@ export async function updateCalendarAssignment(assignmentId: string, updates: an
 
 export async function deleteCalendarAssignment(assignmentId: string) {
   const supabase = getSupabaseClient();
+  
+  // Primero obtener la casa de la asignación para reiniciar el inventario
+  try {
+    const { data: assignmentData } = await (supabase
+      .from('calendar_assignments') as any)
+      .select('house')
+      .eq('id', assignmentId)
+      .single();
+    
+    if (assignmentData?.house) {
+      console.log('🏠 Reiniciando inventario de la casa:', assignmentData.house);
+      
+      // Reiniciar el inventario de la casa (complete: false, missing: 0, reason: null)
+      const { error: resetError } = await (supabase
+        .from('inventory') as any)
+        .update({ complete: false, missing: 0, reason: null })
+        .eq('house', assignmentData.house);
+      
+      if (resetError) {
+        console.error('Error reiniciando inventario:', resetError);
+      } else {
+        console.log('✅ Inventario reiniciado exitosamente');
+      }
+    }
+  } catch (error) {
+    console.error('Error obteniendo casa de la asignación:', error);
+  }
+  
   const { error } = await (supabase
     .from('calendar_assignments') as any)
     .delete()
@@ -602,6 +630,35 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
   const supabase = getSupabaseClient();
   const assignmentIdStr = String(assignmentId);
   const isNumericId = /^\d+$/.test(assignmentIdStr);
+
+  // Primero obtener la casa de la asignación para reiniciar el inventario
+  let houseName: string | null = null;
+  try {
+    const { data: assignmentData } = await (supabase
+      .from('calendar_assignments') as any)
+      .select('house')
+      .eq('id', assignmentIdStr)
+      .single();
+    
+    if (assignmentData?.house) {
+      houseName = assignmentData.house;
+      console.log('🏠 Reiniciando inventario de la casa:', houseName);
+      
+      // Reiniciar el inventario de la casa (complete: false, missing: 0, reason: null)
+      const { error: resetError } = await (supabase
+        .from('inventory') as any)
+        .update({ complete: false, missing: 0, reason: null })
+        .eq('house', houseName);
+      
+      if (resetError) {
+        console.error('Error reiniciando inventario:', resetError);
+      } else {
+        console.log('✅ Inventario reiniciado exitosamente');
+      }
+    }
+  } catch (error) {
+    console.error('Error obteniendo casa de la asignación:', error);
+  }
 
   // Eliminar checklist asociado
   try {
