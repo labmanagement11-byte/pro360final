@@ -2182,7 +2182,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'inventory',
       title: 'Inventario',
       desc: 'Controla y revisa el inventario de la propiedad.',
-      show: user.role === 'owner' || user.role === 'manager', // Solo manager/owner pueden editar template
+      show: user.role === 'owner' || user.role === 'manager' || user.role === 'empleado',
     },
     {
       key: 'shopping',
