@@ -610,18 +610,22 @@ export async function deleteCalendarAssignment(assignmentId: string) {
 }
 
 export async function deleteCalendarAssignmentCascade(assignmentId: string) {
+  console.log('🗑️ [DELETE] Iniciando eliminación de asignación:', assignmentId);
   const supabase = getSupabaseClient();
   const assignmentIdStr = String(assignmentId);
   const isNumericId = /^\d+$/.test(assignmentIdStr);
+  console.log('🗑️ [DELETE] ID string:', assignmentIdStr, 'Es numérico:', isNumericId);
 
   // Primero obtener la casa de la asignación para reiniciar el inventario
   let houseName: string | null = null;
   try {
-    const { data: assignmentData } = await (supabase
+    const { data: assignmentData, error: fetchError } = await (supabase
       .from('calendar_assignments') as any)
       .select('house')
       .eq('id', assignmentIdStr)
       .single();
+    
+    console.log('🗑️ [DELETE] Asignación encontrada:', assignmentData, 'Error:', fetchError);
     
     if (assignmentData?.house) {
       houseName = assignmentData.house;
@@ -668,6 +672,7 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
       .delete()
       .eq('calendar_assignment_id', assignmentIdStr);
 
+    console.log('🗑️ [DELETE] Inventario de asignación eliminado, error:', inventoryError);
     if (inventoryError) {
       console.error('Error deleting assignment inventory items:', inventoryError);
     }
@@ -676,16 +681,21 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
   }
 
   // Eliminar la asignación del calendario
-  const { error: assignmentError } = await (supabase
+  console.log('🗑️ [DELETE] Eliminando asignación del calendario con ID:', assignmentIdStr);
+  const { data: deletedData, error: assignmentError } = await (supabase
     .from('calendar_assignments') as any)
     .delete()
-    .eq('id', assignmentIdStr);
+    .eq('id', assignmentIdStr)
+    .select();
+
+  console.log('🗑️ [DELETE] Resultado eliminación:', deletedData, 'Error:', assignmentError);
 
   if (assignmentError) {
-    console.error('Error deleting calendar assignment:', assignmentError);
+    console.error('❌ Error deleting calendar assignment:', assignmentError);
     return false;
   }
 
+  console.log('✅ [DELETE] Asignación eliminada exitosamente');
   return true;
 }
 
