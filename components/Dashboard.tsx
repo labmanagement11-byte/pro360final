@@ -9,7 +9,7 @@ import './RealtimeNotification.css';
 import Tasks from './Tasks';
 
 // Tarjeta personalizada para tareas asignadas
-const AssignedTasksCard = ({ user }: { user: any }) => {
+const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavigateToInventory?: () => void }) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [inventoryByAssignment, setInventoryByAssignment] = useState<Record<string, any[]>>({});
@@ -744,6 +744,38 @@ const AssignedTasksCard = ({ user }: { user: any }) => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Botón Ver Inventario al final para empleados */}
+      {!isManager && onNavigateToInventory && (
+        <div style={{marginTop: '1.5rem', textAlign: 'center'}}>
+          <button
+            onClick={onNavigateToInventory}
+            style={{
+              width: '100%',
+              maxWidth: '400px',
+              padding: '1rem 2rem',
+              borderRadius: '0.75rem',
+              border: 'none',
+              fontWeight: '700',
+              fontSize: '1.1rem',
+              cursor: 'pointer',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseEnter={(e) => {
+              (e.target as HTMLButtonElement).style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.4)';
+              (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.3)';
+              (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+            }}
+          >
+            📦 Ver Inventario Completo
+          </button>
         </div>
       )}
     </div>
@@ -3112,7 +3144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'assignedTasks' && (
-                <AssignedTasksCard user={user} />
+                <AssignedTasksCard user={user} onNavigateToInventory={() => { setSelectedModalCard(null); setView('inventory'); }} />
               )}
               {selectedModalCard === 'shopping' && (
                 <>
