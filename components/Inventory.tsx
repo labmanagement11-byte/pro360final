@@ -92,16 +92,21 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 
 
     if (!supabase) return;
 
-    // Suscripción realtime a cambios en inventory
+    // Suscripción realtime a cambios en inventory - canal único por casa y timestamp
+    console.log('📡 [Inventory] Suscribiendo a realtime para:', houseName);
+    const channelName = `inventory-changes-${houseName}-${Date.now()}`;
     const channel = supabase
-      .channel(`inventory-changes-${houseName}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, (payload: any) => {
-        console.log('Cambio en inventory:', payload);
+        console.log('📦 [Inventory Realtime] Cambio detectado:', payload);
         fetchInventory();
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('📡 [Inventory] Estado de suscripción:', status);
+      });
 
     return () => {
+      console.log('📡 [Inventory] Desuscribiendo de:', channelName);
       channel.unsubscribe();
     };
   }, [houseName]);

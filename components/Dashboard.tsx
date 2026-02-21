@@ -27,14 +27,15 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
   const [incompleteData, setIncompleteData] = useState<Record<string, { missing: number; reason: string }>>({});
 
   // Suscripción realtime al inventario de la casa para sincronización entre dispositivos
+  // Se activa siempre que el usuario tenga una casa asignada
   useEffect(() => {
-    if (!houseInventoryExpanded || !supabase || !user.house) return;
+    if (!supabase || !user.house) return;
     
     const houseName = user.house || user.house_id;
     console.log('📡 [Realtime] Suscribiendo a cambios de inventario de:', houseName);
     
     const channel = (supabase as any)
-      .channel(`house-inventory-sync-${houseName}`)
+      .channel(`house-inventory-sync-${houseName}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, async (payload: any) => {
         console.log('📦 [Realtime] Cambio en inventario detectado:', payload);
         // Recargar inventario completo para sincronizar
@@ -47,13 +48,15 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
         });
         setHouseInventoryProgress(prev => ({ ...prev, ...progressUpdate }));
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('📡 [Realtime] Estado de suscripción:', status);
+      });
     
     return () => {
       console.log('📡 [Realtime] Desuscribiendo de inventario de:', houseName);
       channel.unsubscribe();
     };
-  }, [houseInventoryExpanded, user.house, user.house_id]);
+  }, [user.house, user.house_id]);
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -1272,29 +1275,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     if (!selectedEmployeeForProgress || !supabase) return;
     
     const houseName = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
+    const timestamp = Date.now();
+    
+    console.log('📡 [Manager View] Suscribiendo a progreso del empleado:', selectedEmployeeForProgress.employee);
     
     // Suscripción a cambios del inventario
     const inventoryChannel = (supabase as any)
-      .channel(`employee-progress-inventory-${houseName}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, async () => {
-        console.log('📦 Inventario actualizado en tiempo real');
+      .channel(`employee-progress-inventory-${houseName}-${timestamp}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, async (payload: any) => {
+        console.log('📦 [Manager View] Inventario actualizado en tiempo real:', payload);
         const items = await realtimeService.getInventoryItems(houseName);
         setEmployeeInventoryProgress(items || []);
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('📡 [Manager View] Estado suscripción inventario:', status);
+      });
     
     // Suscripción a cambios del checklist
     const assignmentId = selectedEmployeeForProgress.assignment.id;
     const checklistChannel = (supabase as any)
-      .channel(`employee-progress-checklist-${assignmentId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignment_checklist', filter: `assignment_id=eq.${assignmentId}` }, async () => {
-        console.log('✅ Checklist actualizado en tiempo real');
+      .channel(`employee-progress-checklist-${assignmentId}-${timestamp}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignment_checklist', filter: `assignment_id=eq.${assignmentId}` }, async (payload: any) => {
+        console.log('✅ [Manager View] Checklist actualizado en tiempo real:', payload);
         const checklistItems = syncedChecklists.get(String(assignmentId)) || [];
         setEmployeeChecklistProgress(checklistItems);
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('📡 [Manager View] Estado suscripción checklist:', status);
+      });
     
     return () => {
+      console.log('📡 [Manager View] Desuscribiendo de progreso del empleado');
       inventoryChannel.unsubscribe();
       checklistChannel.unsubscribe();
     };

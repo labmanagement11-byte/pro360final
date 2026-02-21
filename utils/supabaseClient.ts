@@ -47,7 +47,21 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 let supabaseInstance: SupabaseClient<Database> | null = null;
 
 if (supabaseUrl && supabaseAnonKey) {
-	supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey);
+	supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+		realtime: {
+			params: {
+				eventsPerSecond: 10
+			}
+		},
+		global: {
+			headers: {
+				'x-application-name': '360pro'
+			}
+		}
+	});
+	
+	// Log para confirmar que realtime está configurado
+	console.log('✅ Supabase client inicializado con Realtime habilitado');
 } else {
 	console.error('Missing Supabase environment variables. Supabase client will not be initialized.');
 }
