@@ -5269,10 +5269,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 console.error('❌ Error buscando items:', countError);
                               }
                               
-                              // Ahora actualizar
+                              // Ahora actualizar - solo complete y notes existen en la tabla
                               const { data: updated, error } = await (supabase as any)
                                 .from('inventory')
-                                .update({ complete: false, missing: 0, reason: null })
+                                .update({ complete: false })
                                 .eq('house', houseName)
                                 .select();
                               
@@ -5284,7 +5284,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               } else {
                                 console.log('✅ Inventario reiniciado exitosamente. Items actualizados:', updated?.length || 0);
                                 // Actualizar estado local
-                                setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, complete: false, missing: 0, reason: null })));
+                                setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, complete: false })));
                                 alert(`✅ Inventario reiniciado. ${updated?.length || 0} items actualizados.`);
                               }
                             } catch (err) {
