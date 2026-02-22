@@ -1593,52 +1593,52 @@ export function subscribeToShoppingList(house: string = 'HYNTIBA2 APTO 406', cal
   }
 }
 
-// ==================== RECORDATORIOS ====================
+// ==================== RECORDATORIOS (via RPC para evitar schema cache) ====================
 export async function createReminder(reminder: any) {
   const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
-    .from('reminders') as any)
-    .insert([{
-      name: reminder.name,
-      due_date: reminder.due,
-      bank: reminder.bank,
-      account: reminder.account,
-      invoice_number: reminder.invoiceNumber || null,
-      frequency: reminder.frequency || 'once',
-      amount: reminder.amount || null,
-      house: reminder.house || 'HYNTIBA2 APTO 406',
-      created_at: new Date().toISOString()
-    }])
-    .select();
-  
-  if (error) {
-    console.error('Error creating reminder:', error);
+  try {
+    const { data, error } = await (supabase as any).rpc('create_reminder', {
+      p_name: reminder.name,
+      p_due_date: reminder.due,
+      p_bank: reminder.bank || '',
+      p_account: reminder.account || '',
+      p_invoice_number: reminder.invoiceNumber || null,
+      p_frequency: reminder.frequency || 'once',
+      p_amount: reminder.amount ? parseFloat(reminder.amount) : null,
+      p_house: reminder.house || 'EPIC D1',
+    });
+
+    if (error) {
+      console.error('Error creating reminder via RPC:', error);
+      return null;
+    }
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result) {
+      result.due = result.due_date;
+      result.invoiceNumber = result.invoice_number;
+    }
+    console.log('✅ Recordatorio creado via RPC:', result);
+    return result;
+  } catch (error) {
+    console.error('Exception creating reminder:', error);
     return null;
   }
-  const result = data?.[0] || null;
-  if (result) {
-    result.due = result.due_date;
-    result.invoiceNumber = result.invoice_number;
-  }
-  return result;
 }
 
-export async function getReminders(house: string = 'HYNTIBA2 APTO 406') {
+export async function getReminders(house: string = 'EPIC D1') {
   try {
     const supabase = getSupabaseClient();
     if (!supabase) {
       console.warn('Supabase client not available, using local reminders');
       return [];
     }
-    
-    const { data, error } = await (supabase
-      .from('reminders') as any)
-      .select('*')
-      .eq('house', house)
-      .order('due_date', { ascending: true });
-    
+
+    const { data, error } = await (supabase as any).rpc('get_reminders', {
+      p_house: house
+    });
+
     if (error) {
-      console.warn('Reminders table might not exist, using fallback:', error?.message);
+      console.warn('Error fetching reminders via RPC:', error?.message);
       return [];
     }
     // Mapear campos snake_case a camelCase
@@ -1648,55 +1648,59 @@ export async function getReminders(house: string = 'HYNTIBA2 APTO 406') {
       invoiceNumber: r.invoice_number
     }));
   } catch (error) {
-    console.warn('Exception fetching reminders, using fallback:', error);
+    console.warn('Exception fetching reminders:', error);
     return [];
   }
 }
 
 export async function updateReminder(reminderId: string, updates: any) {
   const supabase = getSupabaseClient();
-  const mappedUpdates: any = { ...updates };
-  
-  // Map camelCase to snake_case
-  if ('due' in mappedUpdates) {
-    mappedUpdates.due_date = mappedUpdates.due;
-    delete mappedUpdates.due;
-  }
-  if ('invoiceNumber' in mappedUpdates) {
-    mappedUpdates.invoice_number = mappedUpdates.invoiceNumber;
-    delete mappedUpdates.invoiceNumber;
-  }
-  
-  const { data, error } = await (supabase
-    .from('reminders') as any)
-    .update(mappedUpdates)
-    .eq('id', reminderId)
-    .select();
-  
-  if (error) {
-    console.error('Error updating reminder:', error);
+  try {
+    const { data, error } = await (supabase as any).rpc('update_reminder', {
+      p_id: reminderId,
+      p_name: updates.name || null,
+      p_due_date: updates.due || updates.due_date || null,
+      p_bank: updates.bank || null,
+      p_account: updates.account || null,
+      p_invoice_number: updates.invoiceNumber || updates.invoice_number || null,
+      p_frequency: updates.frequency || null,
+      p_amount: updates.amount ? parseFloat(updates.amount) : null,
+      p_paid: updates.paid !== undefined ? updates.paid : null,
+      p_paid_date: updates.paid_date || null,
+    });
+
+    if (error) {
+      console.error('Error updating reminder via RPC:', error);
+      return null;
+    }
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result) {
+      result.due = result.due_date;
+      result.invoiceNumber = result.invoice_number;
+    }
+    return result;
+  } catch (error) {
+    console.error('Exception updating reminder:', error);
     return null;
   }
-  const result = data?.[0] || null;
-  if (result) {
-    result.due = result.due_date;
-    result.invoiceNumber = result.invoice_number;
-  }
-  return result;
 }
 
 export async function deleteReminder(reminderId: string) {
   const supabase = getSupabaseClient();
-  const { error } = await (supabase
-    .from('reminders') as any)
-    .delete()
-    .eq('id', reminderId);
-  
-  if (error) {
-    console.error('Error deleting reminder:', error);
+  try {
+    const { error } = await (supabase as any).rpc('delete_reminder', {
+      p_id: reminderId
+    });
+
+    if (error) {
+      console.error('Error deleting reminder via RPC:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Exception deleting reminder:', error);
     return false;
   }
-  return true;
 }
 
 export function subscribeToReminders(house: string = 'HYNTIBA2 APTO 406', callback: (data: any) => void) {
