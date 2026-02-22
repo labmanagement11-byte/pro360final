@@ -1593,129 +1593,108 @@ export function subscribeToShoppingList(house: string = 'HYNTIBA2 APTO 406', cal
   }
 }
 
-// ==================== RECORDATORIOS (via fetch directo a Supabase API) ====================
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hecvlywrahigujakkguw.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlY3ZseXdyYWhpZ3VqYWtrZ3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcyMjY3MTgsImV4cCI6MjA1MjgwMjcxOH0.ackGPeFHCLnzVBP3S_coDwdhPbNKhSfKcJfJtAYPNcc';
+// ==================== RECORDATORIOS (localStorage - Supabase schema cache issue) ====================
+// Usando localStorage porque PostgREST no reconoce tablas nuevas en este proyecto
 
-async function supabaseFetch(endpoint: string, options: RequestInit = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-  const headers: HeadersInit = {
-    'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
-    ...options.headers
-  };
-  
-  const response = await fetch(url, { ...options, headers });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase API error: ${response.status} - ${errorText}`);
+function getLocalReminders(house: string): any[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const key = `reminders_${house}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
   }
-  
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
+}
+
+function saveLocalReminders(house: string, reminders: any[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = `reminders_${house}`;
+    localStorage.setItem(key, JSON.stringify(reminders));
+  } catch (e) {
+    console.error('Error saving reminders to localStorage:', e);
+  }
 }
 
 export async function createReminder(reminder: any) {
   const house = reminder.house || 'EPIC D1';
   const newReminder = {
+    id: crypto.randomUUID(),
     name: reminder.name,
     due_date: reminder.due,
+    due: reminder.due,
     bank: reminder.bank || '',
     account: reminder.account || '',
     invoice_number: reminder.invoiceNumber || null,
+    invoiceNumber: reminder.invoiceNumber || null,
     frequency: reminder.frequency || 'once',
     amount: reminder.amount ? parseFloat(reminder.amount) : null,
     house: house,
     paid: false,
+    paid_date: null,
     created_at: new Date().toISOString()
   };
   
-  try {
-    const data = await supabaseFetch('reminders', {
-      method: 'POST',
-      body: JSON.stringify(newReminder)
-    });
-    
-    const result = Array.isArray(data) ? data[0] : data;
-    if (result) {
-      result.due = result.due_date;
-      result.invoiceNumber = result.invoice_number;
-    }
-    console.log('✅ Recordatorio guardado en Supabase:', result);
-    return result;
-  } catch (error) {
-    console.error('Error creating reminder:', error);
-    return null;
-  }
+  const reminders = getLocalReminders(house);
+  reminders.push(newReminder);
+  saveLocalReminders(house, reminders);
+  
+  console.log('✅ Recordatorio guardado:', newReminder);
+  return newReminder;
 }
 
 export async function getReminders(house: string = 'EPIC D1') {
-  try {
-    const encodedHouse = encodeURIComponent(house);
-    const data = await supabaseFetch(`reminders?house=eq.${encodedHouse}&order=due_date.asc`);
-    
-    const reminders = (data || []).map((r: any) => ({
-      ...r,
-      due: r.due_date,
-      invoiceNumber: r.invoice_number
-    }));
-    
-    console.log(`📋 Recordatorios cargados de Supabase para ${house}:`, reminders.length);
-    return reminders;
-  } catch (error) {
-    console.error('Error fetching reminders:', error);
-    return [];
-  }
+  const reminders = getLocalReminders(house);
+  console.log(`📋 Recordatorios para ${house}:`, reminders.length);
+  return reminders.sort((a: any, b: any) => 
+    new Date(a.due_date || a.due).getTime() - new Date(b.due_date || b.due).getTime()
+  );
 }
 
 export async function updateReminder(reminderId: string, updates: any) {
-  try {
-    const mappedUpdates: any = {};
+  const houses = ['EPIC D1', 'HYNTIBA2 APTO 406', 'TORRE MAGNA PI'];
+  
+  for (const house of houses) {
+    const reminders = getLocalReminders(house);
+    const index = reminders.findIndex((r: any) => r.id === reminderId);
     
-    if (updates.name !== undefined) mappedUpdates.name = updates.name;
-    if (updates.due !== undefined) mappedUpdates.due_date = updates.due;
-    if (updates.due_date !== undefined) mappedUpdates.due_date = updates.due_date;
-    if (updates.bank !== undefined) mappedUpdates.bank = updates.bank;
-    if (updates.account !== undefined) mappedUpdates.account = updates.account;
-    if (updates.invoiceNumber !== undefined) mappedUpdates.invoice_number = updates.invoiceNumber;
-    if (updates.invoice_number !== undefined) mappedUpdates.invoice_number = updates.invoice_number;
-    if (updates.frequency !== undefined) mappedUpdates.frequency = updates.frequency;
-    if (updates.amount !== undefined) mappedUpdates.amount = parseFloat(updates.amount);
-    if (updates.paid !== undefined) mappedUpdates.paid = updates.paid;
-    if (updates.paid_date !== undefined) mappedUpdates.paid_date = updates.paid_date;
-    
-    const data = await supabaseFetch(`reminders?id=eq.${reminderId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(mappedUpdates)
-    });
-    
-    const result = Array.isArray(data) ? data[0] : data;
-    if (result) {
-      result.due = result.due_date;
-      result.invoiceNumber = result.invoice_number;
+    if (index !== -1) {
+      reminders[index] = {
+        ...reminders[index],
+        ...updates,
+        due_date: updates.due || updates.due_date || reminders[index].due_date,
+        due: updates.due || updates.due_date || reminders[index].due,
+        invoice_number: updates.invoiceNumber || updates.invoice_number || reminders[index].invoice_number,
+        invoiceNumber: updates.invoiceNumber || updates.invoice_number || reminders[index].invoiceNumber,
+      };
+      saveLocalReminders(house, reminders);
+      console.log('✅ Recordatorio actualizado:', reminders[index]);
+      return reminders[index];
     }
-    console.log('✅ Recordatorio actualizado:', result);
-    return result;
-  } catch (error) {
-    console.error('Error updating reminder:', error);
-    return null;
   }
+  
+  console.warn('Recordatorio no encontrado:', reminderId);
+  return null;
 }
 
 export async function deleteReminder(reminderId: string) {
-  try {
-    await supabaseFetch(`reminders?id=eq.${reminderId}`, {
-      method: 'DELETE'
-    });
-    console.log('✅ Recordatorio eliminado:', reminderId);
-    return true;
-  } catch (error) {
-    console.error('Error deleting reminder:', error);
-    return false;
+  const houses = ['EPIC D1', 'HYNTIBA2 APTO 406', 'TORRE MAGNA PI'];
+  
+  for (const house of houses) {
+    const reminders = getLocalReminders(house);
+    const index = reminders.findIndex((r: any) => r.id === reminderId);
+    
+    if (index !== -1) {
+      reminders.splice(index, 1);
+      saveLocalReminders(house, reminders);
+      console.log('✅ Recordatorio eliminado:', reminderId);
+      return true;
+    }
   }
+  
+  console.warn('Recordatorio no encontrado para eliminar:', reminderId);
+  return false;
 }
 
 export function subscribeToReminders(house: string = 'HYNTIBA2 APTO 406', callback: (data: any) => void) {
