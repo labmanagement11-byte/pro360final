@@ -1593,114 +1593,110 @@ export function subscribeToShoppingList(house: string = 'HYNTIBA2 APTO 406', cal
   }
 }
 
-// ==================== RECORDATORIOS (via RPC para evitar schema cache) ====================
-export async function createReminder(reminder: any) {
-  const supabase = getSupabaseClient();
+// ==================== RECORDATORIOS (localStorage fallback) ====================
+// Debido a problemas persistentes con PostgREST schema cache, usamos localStorage
+
+function getLocalReminders(house: string): any[] {
+  if (typeof window === 'undefined') return [];
   try {
-    const { data, error } = await (supabase as any).rpc('create_reminder', {
-      p_name: reminder.name,
-      p_due_date: reminder.due,
-      p_bank: reminder.bank || '',
-      p_account: reminder.account || '',
-      p_invoice_number: reminder.invoiceNumber || null,
-      p_frequency: reminder.frequency || 'once',
-      p_amount: reminder.amount ? parseFloat(reminder.amount) : null,
-      p_house: reminder.house || 'EPIC D1',
-    });
-
-    if (error) {
-      console.error('Error creating reminder via RPC:', error);
-      return null;
-    }
-    const result = Array.isArray(data) ? data[0] : data;
-    if (result) {
-      result.due = result.due_date;
-      result.invoiceNumber = result.invoice_number;
-    }
-    console.log('✅ Recordatorio creado via RPC:', result);
-    return result;
-  } catch (error) {
-    console.error('Exception creating reminder:', error);
-    return null;
-  }
-}
-
-export async function getReminders(house: string = 'EPIC D1') {
-  try {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      console.warn('Supabase client not available, using local reminders');
-      return [];
-    }
-
-    const { data, error } = await (supabase as any).rpc('get_reminders', {
-      p_house: house
-    });
-
-    if (error) {
-      console.warn('Error fetching reminders via RPC:', error?.message);
-      return [];
-    }
-    // Mapear campos snake_case a camelCase
-    return (data || []).map((r: any) => ({
-      ...r,
-      due: r.due_date,
-      invoiceNumber: r.invoice_number
-    }));
-  } catch (error) {
-    console.warn('Exception fetching reminders:', error);
+    const key = `reminders_${house}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
     return [];
   }
 }
 
-export async function updateReminder(reminderId: string, updates: any) {
-  const supabase = getSupabaseClient();
+function saveLocalReminders(house: string, reminders: any[]) {
+  if (typeof window === 'undefined') return;
   try {
-    const { data, error } = await (supabase as any).rpc('update_reminder', {
-      p_id: reminderId,
-      p_name: updates.name || null,
-      p_due_date: updates.due || updates.due_date || null,
-      p_bank: updates.bank || null,
-      p_account: updates.account || null,
-      p_invoice_number: updates.invoiceNumber || updates.invoice_number || null,
-      p_frequency: updates.frequency || null,
-      p_amount: updates.amount ? parseFloat(updates.amount) : null,
-      p_paid: updates.paid !== undefined ? updates.paid : null,
-      p_paid_date: updates.paid_date || null,
-    });
-
-    if (error) {
-      console.error('Error updating reminder via RPC:', error);
-      return null;
-    }
-    const result = Array.isArray(data) ? data[0] : data;
-    if (result) {
-      result.due = result.due_date;
-      result.invoiceNumber = result.invoice_number;
-    }
-    return result;
-  } catch (error) {
-    console.error('Exception updating reminder:', error);
-    return null;
+    const key = `reminders_${house}`;
+    localStorage.setItem(key, JSON.stringify(reminders));
+  } catch (e) {
+    console.error('Error saving reminders to localStorage:', e);
   }
 }
 
-export async function deleteReminder(reminderId: string) {
-  const supabase = getSupabaseClient();
-  try {
-    const { error } = await (supabase as any).rpc('delete_reminder', {
-      p_id: reminderId
-    });
+export async function createReminder(reminder: any) {
+  const house = reminder.house || 'EPIC D1';
+  const newReminder = {
+    id: crypto.randomUUID(),
+    name: reminder.name,
+    due_date: reminder.due,
+    due: reminder.due,
+    bank: reminder.bank || '',
+    account: reminder.account || '',
+    invoice_number: reminder.invoiceNumber || null,
+    invoiceNumber: reminder.invoiceNumber || null,
+    frequency: reminder.frequency || 'once',
+    amount: reminder.amount ? parseFloat(reminder.amount) : null,
+    house: house,
+    paid: false,
+    paid_date: null,
+    created_at: new Date().toISOString()
+  };
+  
+  const reminders = getLocalReminders(house);
+  reminders.push(newReminder);
+  saveLocalReminders(house, reminders);
+  
+  console.log('✅ Recordatorio guardado localmente:', newReminder);
+  return newReminder;
+}
 
-    if (error) {
-      console.error('Error deleting reminder via RPC:', error);
-      return false;
+export async function getReminders(house: string = 'EPIC D1') {
+  const reminders = getLocalReminders(house);
+  console.log(`📋 Recordatorios cargados para ${house}:`, reminders.length);
+  return reminders.sort((a: any, b: any) => 
+    new Date(a.due_date || a.due).getTime() - new Date(b.due_date || b.due).getTime()
+  );
+}
+
+export async function updateReminder(reminderId: string, updates: any) {
+  // Buscar en todas las casas
+  const houses = ['EPIC D1', 'HYNTIBA2 APTO 406', 'TORRE MAGNA PI'];
+  
+  for (const house of houses) {
+    const reminders = getLocalReminders(house);
+    const index = reminders.findIndex((r: any) => r.id === reminderId);
+    
+    if (index !== -1) {
+      reminders[index] = {
+        ...reminders[index],
+        ...updates,
+        due_date: updates.due || updates.due_date || reminders[index].due_date,
+        due: updates.due || updates.due_date || reminders[index].due,
+        invoice_number: updates.invoiceNumber || updates.invoice_number || reminders[index].invoice_number,
+        invoiceNumber: updates.invoiceNumber || updates.invoice_number || reminders[index].invoiceNumber,
+      };
+      saveLocalReminders(house, reminders);
+      console.log('✅ Recordatorio actualizado:', reminders[index]);
+      return reminders[index];
     }
-    return true;
-  } catch (error) {
-    console.error('Exception deleting reminder:', error);
-    return false;
   }
+  
+  console.warn('Recordatorio no encontrado:', reminderId);
+  return null;
+}
+
+export async function deleteReminder(reminderId: string) {
+  // Buscar en todas las casas
+  const houses = ['EPIC D1', 'HYNTIBA2 APTO 406', 'TORRE MAGNA PI'];
+  
+  for (const house of houses) {
+    const reminders = getLocalReminders(house);
+    const index = reminders.findIndex((r: any) => r.id === reminderId);
+    
+    if (index !== -1) {
+      reminders.splice(index, 1);
+      saveLocalReminders(house, reminders);
+      console.log('✅ Recordatorio eliminado:', reminderId);
+      return true;
+    }
+  }
+  
+  console.warn('Recordatorio no encontrado para eliminar:', reminderId);
+  return false;
 }
 
 export function subscribeToReminders(house: string = 'HYNTIBA2 APTO 406', callback: (data: any) => void) {
