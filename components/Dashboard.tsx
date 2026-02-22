@@ -2860,9 +2860,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             const bank = (form.elements.namedItem('bank') as HTMLInputElement).value;
             const account = (form.elements.namedItem('account') as HTMLInputElement).value;
             const invoiceNumber = (form.elements.namedItem('invoiceNumber') as HTMLInputElement)?.value || '';
+            const frequency = (form.elements.namedItem('frequency') as HTMLSelectElement)?.value || 'once';
+            const amount = (form.elements.namedItem('amount') as HTMLInputElement)?.value || '';
             const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
             try {
-              const created = await realtimeService.createReminder({ name, due, bank, account, invoiceNumber, house: selectedHouse });
+              const created = await realtimeService.createReminder({ name, due, bank, account, invoiceNumber, frequency, amount, house: selectedHouse });
               if (created) {
                 setReminders(prev => prev.some(r => r.id === created.id) ? prev : [...prev, created]);
               }
@@ -2882,6 +2884,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               <input id="reminder-bank" name="bank" type="text" placeholder="Banco" required />
               <label htmlFor="reminder-account">N° de cuenta</label>
               <input id="reminder-account" name="account" type="text" placeholder="N° de cuenta" required />
+              <label htmlFor="reminder-frequency">Frecuencia</label>
+              <select id="reminder-frequency" name="frequency" defaultValue="once" required>
+                <option value="once">Única vez</option>
+                <option value="monthly">Mensual</option>
+                <option value="yearly">Anual</option>
+              </select>
+              <label htmlFor="reminder-amount">Monto (opcional)</label>
+              <input id="reminder-amount" name="amount" type="number" min="0" step="any" placeholder="Monto" />
               <button type="submit" className="dashboard-btn main">Agregar</button>
             </div>
           </form>
