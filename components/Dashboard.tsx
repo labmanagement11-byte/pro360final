@@ -1126,6 +1126,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     bank: '',
     account: '',
     invoiceNumber: '',
+    frequency: 'once' as 'once' | 'monthly' | 'yearly',
+    amount: '',
   });
   const [editingReminderIdx, setEditingReminderIdx] = useState(-1);
 
@@ -3544,7 +3546,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             due: newReminder.due,
                             bank: newReminder.bank,
                             account: newReminder.account,
-                            invoiceNumber: newReminder.invoiceNumber
+                            invoiceNumber: newReminder.invoiceNumber,
+                            frequency: newReminder.frequency,
+                            amount: newReminder.amount ? parseFloat(newReminder.amount) : null
                           });
                           if (updated) {
                             setReminders(prev => prev.map(r => r.id === reminder.id ? updated : r));
@@ -3558,13 +3562,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             bank: newReminder.bank,
                             account: newReminder.account,
                             invoiceNumber: newReminder.invoiceNumber,
+                            frequency: newReminder.frequency,
+                            amount: newReminder.amount ? parseFloat(newReminder.amount) : null,
                             house: selectedHouse
                           });
                           if (created) {
                             setReminders(prev => [...prev, created]);
                           }
                         }
-                        setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '' });
+                        setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '', frequency: 'once', amount: '' });
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
@@ -3624,6 +3630,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               title="Número de factura"
                             />
                           </div>
+                          
+                          <div className="form-group">
+                            <label>💰 Monto</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newReminder.amount}
+                              onChange={(e) => setNewReminder({...newReminder, amount: e.target.value})}
+                              placeholder="Ej: 150.00"
+                              title="Monto del pago"
+                            />
+                          </div>
+                          
+                          <div className="form-group">
+                            <label>🔄 Frecuencia</label>
+                            <select
+                              value={newReminder.frequency}
+                              onChange={(e) => setNewReminder({...newReminder, frequency: e.target.value as 'once' | 'monthly' | 'yearly'})}
+                              title="Frecuencia del pago"
+                              style={{padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', fontSize: '1rem', width: '100%'}}
+                            >
+                              <option value="once">📅 Una vez</option>
+                              <option value="monthly">🔁 Mensual</option>
+                              <option value="yearly">📆 Anual</option>
+                            </select>
+                          </div>
                         </div>
                         
                         <div style={{display: 'flex', gap: '1rem'}}>
@@ -3636,7 +3668,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               className="dashboard-btn danger" 
                               onClick={() => {
                                 setEditingReminderIdx(-1);
-                                setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '' });
+                                setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '', frequency: 'once', amount: '' });
                               }}
                             >
                               ❌ Cancelar
@@ -3664,9 +3696,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <div className="subcard-header">
                             <div className="subcard-icon">🔔</div>
                             <h3>{item.name}</h3>
+                            {item.frequency && item.frequency !== 'once' && (
+                              <span style={{
+                                background: item.frequency === 'monthly' ? '#3b82f6' : '#8b5cf6',
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '1rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                marginLeft: 'auto'
+                              }}>
+                                {item.frequency === 'monthly' ? '🔁 Mensual' : '📆 Anual'}
+                              </span>
+                            )}
                           </div>
                           <div className="subcard-content">
                             <p><strong>📅 Fecha:</strong> {item.due}</p>
+                            {item.amount && <p><strong>💰 Monto:</strong> ${parseFloat(item.amount).toFixed(2)}</p>}
                             <p><strong>🏦 Banco:</strong> {item.bank}</p>
                             <p><strong>🔢 Cuenta:</strong> {item.account}</p>
                             {item.invoiceNumber && <p><strong>📄 Factura:</strong> {item.invoiceNumber}</p>}
@@ -3676,7 +3722,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <div className="subcard-actions">
                               <button 
                                 onClick={() => {
-                                  setNewReminder(item);
+                                  setNewReminder({
+                                    ...item,
+                                    frequency: item.frequency || 'once',
+                                    amount: item.amount ? String(item.amount) : ''
+                                  });
                                   setEditingReminderIdx(idx);
                                 }}
                               >

@@ -1604,6 +1604,8 @@ export async function createReminder(reminder: any) {
       bank: reminder.bank,
       account: reminder.account,
       invoice_number: reminder.invoiceNumber || null,
+      frequency: reminder.frequency || 'once',
+      amount: reminder.amount || null,
       house: reminder.house || 'HYNTIBA2 APTO 406',
       created_at: new Date().toISOString()
     }])
