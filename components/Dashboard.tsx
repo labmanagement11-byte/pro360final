@@ -2448,6 +2448,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     size: 'Mediano'
   });
   const [purchaseDraft, setPurchaseDraft] = useState({ itemId: '', amount: '' });
+  const [editPurchaseAmount, setEditPurchaseAmount] = useState({ itemId: '', amount: '' });
   const [shoppingHistoryFilterType, setShoppingHistoryFilterType] = useState<'total' | 'year' | 'month'>('total');
   const [shoppingHistoryFilterYear, setShoppingHistoryFilterYear] = useState('');
   const [shoppingHistoryFilterMonth, setShoppingHistoryFilterMonth] = useState('');
@@ -2517,6 +2518,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
     await realtimeService.markAsPurchased(itemId, user.username, amount);
     setPurchaseDraft({ itemId: '', amount: '' });
+  };
+
+  const handleUpdatePurchaseAmount = async (itemId: string) => {
+    const amount = Number(editPurchaseAmount.amount);
+    if (!editPurchaseAmount.amount.trim() || !Number.isFinite(amount) || amount < 0) {
+      alert('Ingresa un valor válido.');
+      return;
+    }
+    const updated = await realtimeService.updateShoppingPurchaseAmount(itemId, amount);
+    if (updated) {
+      setShoppingHistory(prev => prev.map(h => h.id === itemId ? { ...h, purchase_amount: amount } : h));
+    }
+    setEditPurchaseAmount({ itemId: '', amount: '' });
   };
 
   // Cargar lista de compras desde Supabase
@@ -2954,7 +2968,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <small>💵 Valor: {formatPurchaseAmount(h.purchase_amount)}</small>
                           <small>📅 {formatPurchaseDate(h.purchased_at)}</small>
                         </div>
+                        {editPurchaseAmount.itemId === h.id && (
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Nuevo valor"
+                              value={editPurchaseAmount.amount}
+                              onChange={e => setEditPurchaseAmount({ itemId: h.id, amount: e.target.value })}
+                              className="dashboard-inventory-input"
+                              style={{ maxWidth: 140 }}
+                              autoFocus
+                            />
+                            <button className="dashboard-btn" onClick={() => handleUpdatePurchaseAmount(h.id)}>💾 Guardar</button>
+                            <button className="dashboard-btn" onClick={() => setEditPurchaseAmount({ itemId: '', amount: '' })}>Cancelar</button>
+                          </div>
+                        )}
                         <div className="dashboard-inventory-actions">
+                          <button className="dashboard-btn" onClick={() => setEditPurchaseAmount({ itemId: h.id, amount: String(h.purchase_amount ?? '') })}>✏️ Editar valor</button>
                           <button className="dashboard-btn danger" onClick={async () => {
                             if (confirm('¿Eliminar del historial?')) {
                               await realtimeService.deleteShoppingListItem(h.id);
@@ -3732,7 +3763,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <p><strong>📅 Fecha compra:</strong> {formatPurchaseDate(h.purchased_at)}</p>
                               <span className="subcard-badge">✅ Comprado</span>
                             </div>
+                            {editPurchaseAmount.itemId === h.id && (
+                              <div className="form-row" style={{ gap: 8, alignItems: 'center', padding: '8px 0' }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="Nuevo valor"
+                                  value={editPurchaseAmount.amount}
+                                  onChange={e => setEditPurchaseAmount({ itemId: h.id, amount: e.target.value })}
+                                  className="form-input"
+                                  style={{ maxWidth: 150 }}
+                                  autoFocus
+                                />
+                                <button className="btn-primary" onClick={() => handleUpdatePurchaseAmount(h.id)}>💾 Guardar</button>
+                                <button className="btn-secondary" onClick={() => setEditPurchaseAmount({ itemId: '', amount: '' })}>Cancelar</button>
+                              </div>
+                            )}
                             <div className="subcard-actions">
+                              <button
+                                onClick={() => setEditPurchaseAmount({ itemId: h.id, amount: String(h.purchase_amount ?? '') })}
+                              >
+                                ✏️ Editar valor
+                              </button>
                               <button 
                                 className="danger"
                                 onClick={async () => {

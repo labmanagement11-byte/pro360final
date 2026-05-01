@@ -1571,6 +1571,21 @@ export async function markAsPurchased(itemId: string, purchasedBy: string, purch
 }
 
 // Eliminar item de la lista de compras
+export async function updateShoppingPurchaseAmount(itemId: string, purchaseAmount: number) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await (supabase
+    .from('shopping_list') as any)
+    .update({ purchase_amount: purchaseAmount, updated_at: new Date().toISOString() })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('Error updating purchase amount:', error);
+    return null;
+  }
+  return data?.[0] || null;
+}
+
 export async function deleteShoppingListItem(itemId: string) {
   const supabase = getSupabaseClient();
   const { error } = await (supabase
