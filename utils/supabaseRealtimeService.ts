@@ -2498,16 +2498,23 @@ export async function createInventoryTemplate(template: {
 }) {
   try {
     const supabase = getSupabaseClient();
-    const { data, error } = await (supabase
-      .from('inventory_templates') as any)
+    let { data, error } = await (supabase
+      .from('inventory_template') as any)
       .insert([template])
       .select();
-    
+
+    if (error?.message?.includes('inventory_template')) {
+      ({ data, error } = await (supabase
+        .from('inventory_templates') as any)
+        .insert([template])
+        .select());
+    }
+
     if (error) {
       console.error('❌ Error creando template de inventario:', error);
       return null;
     }
-    
+
     return data?.[0] || null;
   } catch (error) {
     console.error('❌ Exception en createInventoryTemplate:', error);
@@ -2547,17 +2554,25 @@ export async function createInventoryTemplatesBulk(templates: Array<{
 export async function updateInventoryTemplate(id: string, updates: any) {
   try {
     const supabase = getSupabaseClient();
-    const { data, error } = await (supabase
-      .from('inventory_templates') as any)
+    let { data, error } = await (supabase
+      .from('inventory_template') as any)
       .update(updates)
       .eq('id', id)
       .select();
-    
+
+    if (error?.message?.includes('inventory_template')) {
+      ({ data, error } = await (supabase
+        .from('inventory_templates') as any)
+        .update(updates)
+        .eq('id', id)
+        .select());
+    }
+
     if (error) {
       console.error('❌ Error actualizando template de inventario:', error);
       return null;
     }
-    
+
     return data?.[0] || null;
   } catch (error) {
     console.error('❌ Exception en updateInventoryTemplate:', error);
@@ -2568,16 +2583,23 @@ export async function updateInventoryTemplate(id: string, updates: any) {
 export async function deleteInventoryTemplate(id: string) {
   try {
     const supabase = getSupabaseClient();
-    const { error } = await (supabase
-      .from('inventory_templates') as any)
+    let { error } = await (supabase
+      .from('inventory_template') as any)
       .delete()
       .eq('id', id);
-    
+
+    if (error?.message?.includes('inventory_template')) {
+      ({ error } = await (supabase
+        .from('inventory_templates') as any)
+        .delete()
+        .eq('id', id));
+    }
+
     if (error) {
       console.error('❌ Error eliminando template de inventario:', error);
       return false;
     }
-    
+
     return true;
   } catch (error) {
     console.error('❌ Exception en deleteInventoryTemplate:', error);
@@ -2592,13 +2614,22 @@ export async function createInventoryFromTemplate(assignmentId: string, employee
     const supabase = getSupabaseClient();
     
     // Obtener templates activos para esta casa
-    const { data: templates, error: templateError } = await (supabase
-      .from('inventory_templates') as any)
+    let { data: templates, error: templateError } = await (supabase
+      .from('inventory_template') as any)
       .select('*')
       .eq('house', house)
       .eq('active', true)
       .order('order_num', { ascending: true });
-    
+
+    if (templateError?.message?.includes('inventory_template')) {
+      ({ data: templates, error: templateError } = await (supabase
+        .from('inventory_templates') as any)
+        .select('*')
+        .eq('house', house)
+        .eq('active', true)
+        .order('order_num', { ascending: true }));
+    }
+
     if (templateError) {
       console.error('❌ Error obteniendo templates de inventario:', templateError);
       return { success: false, error: templateError };
