@@ -1187,8 +1187,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [newTemplateItem, setNewTemplateItem] = useState({
     item_name: '',
     quantity: '',
-    category: 'Cocina',
-    location: ''
+    category: 'Cocina'
   });
   const checklistFormRef = useRef<HTMLDivElement | null>(null);
   const inventoryFormRef = useRef<HTMLDivElement | null>(null);
@@ -4631,8 +4630,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           const updated = await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
                             item_name: newTemplateItem.item_name,
                             quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category,
-                            location: newTemplateItem.location || undefined
+                            category: newTemplateItem.category
                           });
                           if (updated) {
                             setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? { ...updated, _legacyTable: true } : item));
@@ -4641,8 +4639,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
                             item_name: newTemplateItem.item_name,
                             quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category,
-                            location: newTemplateItem.location || undefined
+                            category: newTemplateItem.category
                           });
                           if (updated) {
                             setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
@@ -4655,8 +4652,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           const created = await realtimeService.createInventoryTemplateItem({
                             item_name: newTemplateItem.item_name,
                             quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category,
-                            location: newTemplateItem.location || undefined
+                            category: newTemplateItem.category
                           }, selectedHouse);
                           if (created) {
                             setInventoryTemplate(prev => [...prev, { ...created, _legacyTable: true }]);
@@ -4666,8 +4662,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             house: selectedHouse,
                             item_name: newTemplateItem.item_name,
                             quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category,
-                            location: newTemplateItem.location || undefined
+                            category: newTemplateItem.category
                           });
                           if (created) {
                             setInventoryTemplate(prev => [...prev, created]);
@@ -4675,7 +4670,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         }
                       }
                       
-                      setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina', location: '' });
+                      setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
                     }}>
                       <div className="assignment-form-grid">
                         <div className="form-group">
@@ -4723,17 +4718,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           </select>
                         </div>
 
-                        <div className="form-group">
-                          <label>📍 Ubicación (opcional)</label>
-                          <input
-                            id="inventory-template-location"
-                            type="text"
-                            value={newTemplateItem.location}
-                            onChange={(e) => setNewTemplateItem({...newTemplateItem, location: e.target.value})}
-                            placeholder="Ej: Gabinete cocina"
-                            title="Ubicación"
-                          />
-                        </div>
                       </div>
                       
                       <div style={{display: 'flex', gap: '1rem'}}>
@@ -4746,7 +4730,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             className="dashboard-btn danger" 
                             onClick={() => {
                               setEditingTemplateItemId(null);
-                              setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina', location: '' });
+                              setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
                             }}
                           >
                             ❌ Cancelar

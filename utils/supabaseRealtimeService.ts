@@ -1362,7 +1362,6 @@ export async function createInventoryTemplateItem(item: any, house: string = 'HY
     quantity: item.quantity,
     category: item.category,
   };
-  if (item.location) payload.location = item.location;
   if (item.order_num !== undefined && item.order_num !== null) payload.order_num = item.order_num;
   if (item.active !== undefined) payload.active = item.active;
 
