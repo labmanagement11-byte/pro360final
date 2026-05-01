@@ -1356,22 +1356,33 @@ export async function resolveAssignmentIdFromTask(task: any) {
 // CRUD para inventory_template (manager edita el template)
 export async function createInventoryTemplateItem(item: any, house: string = 'HYNTIBA2 APTO 406') {
   const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
+  const payload: any = {
+    house: house,
+    item_name: item.item_name,
+    quantity: item.quantity,
+    category: item.category,
+  };
+  if (item.location) payload.location = item.location;
+  if (item.order_num !== undefined && item.order_num !== null) payload.order_num = item.order_num;
+  if (item.active !== undefined) payload.active = item.active;
+
+  let { data, error } = await (supabase
     .from('inventory_template') as any)
-    .insert([{
-      house: house,
-      item_name: item.item_name,
-      quantity: item.quantity,
-      category: item.category,
-      location: item.location || null,
-      order_num: item.order_num || null,
-      active: item.active !== undefined ? item.active : true
-    }])
+    .insert([payload])
     .select();
 
   if (error) {
-    console.error('Error creating inventory template item:', error);
-    return null;
+    console.error('Error creating inventory template item:', error?.message, error?.code, error?.details, error?.hint);
+    // Fallback: intentar con inventory_templates
+    const { data: data2, error: error2 } = await (supabase
+      .from('inventory_templates') as any)
+      .insert([payload])
+      .select();
+    if (error2) {
+      console.error('Error fallback inventory_templates:', error2?.message, error2?.code, error2?.details);
+      return null;
+    }
+    return data2?.[0] || null;
   }
   return data?.[0] || null;
 }
@@ -1388,7 +1399,7 @@ export async function updateInventoryTemplateItem(itemId: string, updates: any) 
     .select();
 
   if (error) {
-    console.error('Error updating inventory template item:', error);
+    console.error('Error updating inventory template item:', error?.message, error?.code, error?.details);
     return null;
   }
   return data?.[0] || null;
@@ -1402,7 +1413,7 @@ export async function deleteInventoryTemplateItem(itemId: string) {
     .eq('id', itemId);
 
   if (error) {
-    console.error('Error deleting inventory template item:', error);
+    console.error('Error deleting inventory template item:', error?.message, error?.code, error?.details);
     return false;
   }
   return true;
