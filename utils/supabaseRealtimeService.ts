@@ -1875,16 +1875,48 @@ export function subscribeToHouses(callback: (data: any) => void) {
 export async function getUsers() {
   try {
     const supabase = getSupabaseClient();
-    const { data, error } = await (supabase
+    // app_users (actual) -> profiles -> users (legacy)
+    const { data: appUsersData, error: appUsersError } = await (supabase
+      .from('app_users') as any)
+      .select('id, username, role, house_name, created_at')
+      .order('username', { ascending: true });
+
+    if (!appUsersError && appUsersData) {
+      return (appUsersData || []).map((u: any) => ({
+        id: u.id,
+        username: u.username,
+        role: u.role,
+        house: u.house_name,
+        created_at: u.created_at
+      }));
+    }
+
+    const { data: profilesData, error: profilesError } = await (supabase
+      .from('profiles') as any)
+      .select('id, username, role, house, created_at')
+      .order('username', { ascending: true });
+
+    if (!profilesError && profilesData) {
+      return (profilesData || []).map((u: any) => ({
+        id: u.id,
+        username: u.username,
+        role: u.role,
+        house: u.house,
+        created_at: u.created_at
+      }));
+    }
+
+    const { data: usersData, error: usersError } = await (supabase
       .from('users') as any)
       .select('id, correo, rol, property_id, created_at')
       .order('correo', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching users:', error);
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
       return [];
     }
-    return (data || []).map((u: any) => ({
+
+    return (usersData || []).map((u: any) => ({
       id: u.id,
       username: u.correo,
       role: u.rol,

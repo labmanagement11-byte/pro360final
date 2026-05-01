@@ -31,6 +31,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+
+    if (!normalizedEmail || !normalizedPassword) {
+      setError('Ingresa email y contraseña.');
+      setLoading(false);
+      return;
+    }
     
     // Limpiar sesión anterior corrupta
     if (typeof window !== 'undefined') {
@@ -47,8 +56,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
       // Login con Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: normalizedEmail,
+        password: normalizedPassword,
       });
 
       if (authError || !authData.user) {
@@ -64,11 +73,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Buscar perfil robustamente en varias fuentes (users, profiles)
-      const localPart = email.split('@')[0].toLowerCase();
+      const localPart = normalizedEmail.split('@')[0].toLowerCase();
       const userId = authData.user.id;
       let record: any = null;
 
-      console.log('🔍 [Login] Buscando perfil para:', { userId, email, localPart });
+      console.log('🔍 [Login] Buscando perfil para:', { userId, email: normalizedEmail, localPart });
 
       // 1) PRIMERO: Buscar en profiles por ID de usuario (más confiable)
       try {
@@ -131,7 +140,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
 
       if (!record) {
-        console.error('❌ [Login] No se encontró perfil para:', { userId, email, localPart });
+        console.error('❌ [Login] No se encontró perfil para:', { userId, email: normalizedEmail, localPart });
         console.error('❌ [Login] Intentó buscar en profiles y users sin éxito');
         setError('Usuario no encontrado en base de datos. Por favor contacte al administrador.');
         setLoading(false);
@@ -168,8 +177,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
       onLogin(user);
       setLoading(false);
-    } catch (err) {
-      setError('Error durante login');
+    } catch (err: any) {
+      setError(err?.message || 'Error durante login. Verifica tu conexión.');
       setLoading(false);
     }
   };
@@ -198,6 +207,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
               placeholder="tu@email.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="email"
+              spellCheck={false}
+              inputMode="email"
               required
             />
           </div>
@@ -209,6 +223,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="current-password"
+              spellCheck={false}
               required
             />
           </div>
