@@ -4693,47 +4693,64 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {/* ============ VISTA EMPLEADO: completo/incompleto ============ */}
                   {user.role === 'empleado' && (
                     <div>
-                      {/* Progreso general */}
-                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem', background:'#f0f9ff', borderRadius:'0.75rem', padding:'0.75rem 1rem', border:'1px solid #0284c7'}}>
-                        <span style={{fontWeight:700, color:'#0284c7', fontSize:'1rem'}}>📦 Inventario de la Casa</span>
-                        <span style={{background: inventoryList.filter(i => i.complete).length === inventoryList.length && inventoryList.length > 0 ? '#10b981' : '#f59e0b', color:'white', padding:'0.25rem 0.75rem', borderRadius:'1rem', fontWeight:700, fontSize:'0.9rem'}}>
-                          {inventoryList.filter(i => i.complete).length}/{inventoryList.length} completos
-                        </span>
+                      {/* Stats de progreso */}
+                      <div className="modal-stats" style={{marginBottom:'1.5rem'}}>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{inventoryList.length}</p>
+                          <p className="stat-box-label">Total Items</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number" style={{color:'#10b981'}}>{inventoryList.filter(i => i.complete).length}</p>
+                          <p className="stat-box-label">Completos</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number" style={{color:'#f59e0b'}}>{inventoryList.filter(i => !i.complete).length}</p>
+                          <p className="stat-box-label">Pendientes</p>
+                        </div>
                       </div>
                       {loadingInventory ? (
-                        <div style={{textAlign:'center', padding:'2rem', color:'#64748b'}}>Cargando inventario...</div>
+                        <div className="modal-body-empty"><p>Cargando inventario...</p></div>
                       ) : inventoryList.length === 0 ? (
-                        <div style={{textAlign:'center', padding:'2rem', color:'#64748b'}}>No hay items en el inventario.</div>
+                        <div className="modal-body-empty"><p>📭 No hay items en el inventario de esta casa.</p></div>
                       ) : (
                         (() => {
                           // Agrupar por room/category
-                          const grouped: Record<string, any[]> = {};
+                          const grouped = new Map<string, any[]>();
                           inventoryList.forEach(item => {
                             const key = item.room || item.category || 'General';
-                            if (!grouped[key]) grouped[key] = [];
-                            grouped[key].push(item);
+                            if (!grouped.has(key)) grouped.set(key, []);
+                            grouped.get(key)!.push(item);
                           });
                           return (
-                            <div style={{display:'grid', gap:'1rem'}}>
-                              {Object.entries(grouped).map(([group, groupItems]) => (
-                                <div key={group} style={{background:'#f8fafc', borderRadius:'0.75rem', padding:'0.75rem', border:'1px solid #e2e8f0'}}>
-                                  <div style={{fontWeight:700, color:'#374151', marginBottom:'0.5rem', fontSize:'0.9rem'}}>{group}</div>
-                                  <div style={{display:'grid', gap:'0.35rem'}}>
+                            <div>
+                              {Array.from(grouped.entries()).map(([group, groupItems]) => (
+                                <div key={group} style={{marginBottom:'2rem'}}>
+                                  <h3 style={{marginBottom:'1rem', color:'#2563eb'}}>{group} ({groupItems.length} items)</h3>
+                                  <div className="subcards-grid">
                                     {groupItems.map((item: any) => (
-                                      <div key={item.id} style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.75rem', background:'white', borderRadius:'0.5rem', border: item.complete ? '1px solid #10b981' : '1px solid #e5e7eb', transition:'all 0.2s ease'}}>
-                                        <span style={{flex:1, fontWeight:600, color: item.complete ? '#166534' : '#1f2937', fontSize:'0.9rem'}}>
-                                          {item.name} <span style={{color:'#94a3b8', fontWeight:400, fontSize:'0.82rem'}}>x{item.quantity}</span>
-                                        </span>
-                                        <button
-                                          onClick={async () => {
-                                            const newVal = !item.complete;
-                                            setInventoryList(prev => prev.map(i => i.id === item.id ? {...i, complete: newVal} : i));
-                                            await (supabase as any).from('inventory').update({ complete: newVal, missing: newVal ? 0 : (item.missing || 0) }).eq('id', item.id);
-                                          }}
-                                          style={{padding:'0.35rem 0.85rem', borderRadius:'0.375rem', border:'none', fontWeight:700, fontSize:'0.8rem', cursor:'pointer', background: item.complete ? '#10b981' : '#f59e0b', color:'white', whiteSpace:'nowrap', flexShrink:0, transition:'all 0.2s ease'}}
-                                        >
-                                          {item.complete ? '✅ Completo' : '⏳ Incompleto'}
-                                        </button>
+                                      <div key={item.id} className="subcard" style={{borderTop: item.complete ? '4px solid #10b981' : '4px solid #f59e0b'}}>
+                                        <div className="subcard-header">
+                                          <div className="subcard-icon">{item.complete ? '✅' : '📦'}</div>
+                                          <h3 style={{color: item.complete ? '#166534' : '#1f2937'}}>{item.name}</h3>
+                                        </div>
+                                        <div className="subcard-content">
+                                          <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
+                                          {item.room && <p><strong>📍 Área:</strong> {item.room}</p>}
+                                          <p><strong>📊 Estado:</strong> <span style={{color: item.complete ? '#10b981' : '#f59e0b', fontWeight:700}}>{item.complete ? 'Completo' : 'Pendiente'}</span></p>
+                                        </div>
+                                        <div className="subcard-actions">
+                                          <button
+                                            type="button"
+                                            style={{background: item.complete ? '#10b981' : '#f59e0b', color:'white', border:'none', borderRadius:'0.5rem', padding:'0.6rem 1rem', fontWeight:700, fontSize:'0.9rem', cursor:'pointer', width:'100%', transition:'all 0.2s ease'}}
+                                            onClick={async () => {
+                                              const newVal = !item.complete;
+                                              setInventoryList(prev => prev.map(i => i.id === item.id ? {...i, complete: newVal} : i));
+                                              await (supabase as any).from('inventory').update({ complete: newVal, missing: newVal ? 0 : (item.missing || 0) }).eq('id', item.id);
+                                            }}
+                                          >
+                                            {item.complete ? '✅ Marcar Incompleto' : '⏳ Marcar Completo'}
+                                          </button>
+                                        </div>
                                       </div>
                                     ))}
                                   </div>
@@ -4773,38 +4790,77 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       )}
 
                       {/* Estado del inventario en tiempo real */}
-                      <div style={{marginBottom:'1.5rem', background:'#f0fdf4', borderRadius:'0.75rem', padding:'0.75rem 1rem', border:'1px solid #86efac'}}>
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'0.5rem'}}>
-                          <span style={{fontWeight:700, color:'#166534', fontSize:'0.95rem'}}>📊 Estado actual del inventario (en tiempo real)</span>
-                          <span style={{background: inventoryList.filter(i => i.complete).length === inventoryList.length && inventoryList.length > 0 ? '#10b981' : '#f59e0b', color:'white', padding:'0.25rem 0.75rem', borderRadius:'1rem', fontWeight:700, fontSize:'0.85rem'}}>
+                      <div style={{marginBottom:'1.5rem'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'0.5rem', marginBottom:'1rem'}}>
+                          <h3 style={{margin:0, color:'#166534'}}>📊 Estado del Inventario (Tiempo Real)</h3>
+                          <span style={{background: inventoryList.filter(i => i.complete).length === inventoryList.length && inventoryList.length > 0 ? '#10b981' : '#f59e0b', color:'white', padding:'0.35rem 0.85rem', borderRadius:'1rem', fontWeight:700, fontSize:'0.9rem'}}>
                             {inventoryList.filter(i => i.complete).length}/{inventoryList.length} completos
                           </span>
                         </div>
                         {inventoryList.length > 0 && (
-                          <div style={{marginTop:'0.75rem', display:'grid', gap:'0.35rem', maxHeight:'30vh', overflowY:'auto'}}>
-                            {inventoryList.map((item: any) => (
-                              <div key={item.id} style={{display:'flex', alignItems:'center', gap:'0.5rem', padding:'0.4rem 0.75rem', background:'white', borderRadius:'0.375rem', border: item.complete ? '1px solid #86efac' : '1px solid #fca5a5'}}>
-                                <span style={{fontSize:'0.95rem'}}>{item.complete ? '✅' : '⏳'}</span>
-                                <span style={{flex:1, fontSize:'0.85rem', fontWeight:600, color: item.complete ? '#166534' : '#991b1b'}}>{item.name}</span>
-                                <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>x{item.quantity}</span>
-                                {item.room && <span style={{color:'#94a3b8', fontSize:'0.75rem', background:'#f1f5f9', padding:'0.1rem 0.4rem', borderRadius:'0.25rem'}}>{item.room}</span>}
+                          <>
+                            <div className="modal-stats" style={{marginBottom:'1rem'}}>
+                              <div className="stat-box">
+                                <p className="stat-box-number">{inventoryList.length}</p>
+                                <p className="stat-box-label">Total Items</p>
                               </div>
-                            ))}
-                          </div>
+                              <div className="stat-box">
+                                <p className="stat-box-number" style={{color:'#10b981'}}>{inventoryList.filter(i => i.complete).length}</p>
+                                <p className="stat-box-label">Completos</p>
+                              </div>
+                              <div className="stat-box">
+                                <p className="stat-box-number" style={{color:'#f59e0b'}}>{inventoryList.filter(i => !i.complete).length}</p>
+                                <p className="stat-box-label">Pendientes</p>
+                              </div>
+                            </div>
+                            {(() => {
+                              const grouped = new Map<string, any[]>();
+                              inventoryList.forEach((item: any) => {
+                                const key = item.room || item.category || 'General';
+                                if (!grouped.has(key)) grouped.set(key, []);
+                                grouped.get(key)!.push(item);
+                              });
+                              return (
+                                <div>
+                                  {Array.from(grouped.entries()).map(([group, groupItems]) => (
+                                    <div key={group} style={{marginBottom:'1.5rem'}}>
+                                      <h3 style={{marginBottom:'0.75rem', color:'#2563eb'}}>{group} ({groupItems.length} items)</h3>
+                                      <div className="subcards-grid">
+                                        {groupItems.map((item: any) => (
+                                          <div key={item.id} className="subcard" style={{borderTop: item.complete ? '4px solid #10b981' : '4px solid #f59e0b'}}>
+                                            <div className="subcard-header">
+                                              <div className="subcard-icon">{item.complete ? '✅' : '⏳'}</div>
+                                              <h3 style={{color: item.complete ? '#166534' : '#92400e'}}>{item.name}</h3>
+                                            </div>
+                                            <div className="subcard-content">
+                                              <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
+                                              {item.room && <p><strong>📍 Área:</strong> {item.room}</p>}
+                                              <p><strong>📊 Estado:</strong> <span style={{color: item.complete ? '#10b981' : '#f59e0b', fontWeight:700}}>{item.complete ? 'Completo' : 'Pendiente'}</span></p>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                            <button
+                              onClick={async () => {
+                                if (!confirm('¿Reiniciar inventario? Todos los items volverán a estar pendientes.')) return;
+                                const ids = inventoryList.map(i => i.id).filter(Boolean);
+                                if (ids.length === 0) return;
+                                await (supabase as any).from('inventory').update({ complete: false, missing: 0, reason: null }).in('id', ids);
+                                setInventoryList(prev => prev.map(i => ({...i, complete: false, missing: 0, reason: null})));
+                              }}
+                              style={{marginTop:'0.75rem', width:'100%', padding:'0.75rem 1rem', background:'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color:'white', border:'none', borderRadius:'0.5rem', fontWeight:700, fontSize:'0.95rem', cursor:'pointer'}}
+                            >
+                              🔄 Reiniciar Inventario para Próxima Revisión
+                            </button>
+                          </>
                         )}
-                        {inventoryList.length > 0 && (
-                          <button
-                            onClick={async () => {
-                              if (!confirm('¿Reiniciar inventario? Todos los items volverán a estar pendientes.')) return;
-                              const ids = inventoryList.map(i => i.id).filter(Boolean);
-                              if (ids.length === 0) return;
-                              await (supabase as any).from('inventory').update({ complete: false, missing: 0, reason: null }).in('id', ids);
-                              setInventoryList(prev => prev.map(i => ({...i, complete: false, missing: 0, reason: null})));
-                            }}
-                            style={{marginTop:'0.75rem', width:'100%', padding:'0.6rem 1rem', background:'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color:'white', border:'none', borderRadius:'0.5rem', fontWeight:700, fontSize:'0.9rem', cursor:'pointer'}}
-                          >
-                            🔄 Reiniciar Inventario para Próxima Revisión
-                          </button>
+                        {inventoryList.length === 0 && !loadingInventory && (
+                          <div className="modal-body-empty"><p>📭 No hay items registrados en el inventario de esta casa.</p></div>
                         )}
                       </div>
 
