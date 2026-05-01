@@ -4690,259 +4690,343 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
               {selectedModalCard === 'inventory' && (
                 <>
-                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
-                    <div className="modal-assignment-form" style={{marginBottom: '1.5rem'}}>
-                      <h3>🏠 Casa</h3>
-                      <div className="assignment-form-grid">
-                        <div className="form-group" style={{gridColumn: '1 / -1'}}>
-                          <label>Seleccionar casa</label>
-                          <select
-                            value={selectedHouseIdx}
-                            onChange={(e) => setSelectedHouseIdx(parseInt(e.target.value, 10))}
-                            title="Seleccionar casa"
-                          >
-                            {houses.map((house, idx) => (
-                              <option key={house.id || idx} value={idx}>
-                                {house.houseName || house.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                  {/* ============ VISTA EMPLEADO: completo/incompleto ============ */}
+                  {user.role === 'empleado' && (
+                    <div>
+                      {/* Progreso general */}
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem', background:'#f0f9ff', borderRadius:'0.75rem', padding:'0.75rem 1rem', border:'1px solid #0284c7'}}>
+                        <span style={{fontWeight:700, color:'#0284c7', fontSize:'1rem'}}>📦 Inventario de la Casa</span>
+                        <span style={{background: inventoryList.filter(i => i.complete).length === inventoryList.length && inventoryList.length > 0 ? '#10b981' : '#f59e0b', color:'white', padding:'0.25rem 0.75rem', borderRadius:'1rem', fontWeight:700, fontSize:'0.9rem'}}>
+                          {inventoryList.filter(i => i.complete).length}/{inventoryList.length} completos
+                        </span>
                       </div>
-                      <p style={{margin: '0.75rem 0 0', color: '#6b7280', fontSize: '0.9rem'}}>
-                        Este inventario se sincroniza con las asignaciones de la casa seleccionada.
-                      </p>
+                      {loadingInventory ? (
+                        <div style={{textAlign:'center', padding:'2rem', color:'#64748b'}}>Cargando inventario...</div>
+                      ) : inventoryList.length === 0 ? (
+                        <div style={{textAlign:'center', padding:'2rem', color:'#64748b'}}>No hay items en el inventario.</div>
+                      ) : (
+                        (() => {
+                          // Agrupar por room/category
+                          const grouped: Record<string, any[]> = {};
+                          inventoryList.forEach(item => {
+                            const key = item.room || item.category || 'General';
+                            if (!grouped[key]) grouped[key] = [];
+                            grouped[key].push(item);
+                          });
+                          return (
+                            <div style={{display:'grid', gap:'1rem'}}>
+                              {Object.entries(grouped).map(([group, groupItems]) => (
+                                <div key={group} style={{background:'#f8fafc', borderRadius:'0.75rem', padding:'0.75rem', border:'1px solid #e2e8f0'}}>
+                                  <div style={{fontWeight:700, color:'#374151', marginBottom:'0.5rem', fontSize:'0.9rem'}}>{group}</div>
+                                  <div style={{display:'grid', gap:'0.35rem'}}>
+                                    {groupItems.map((item: any) => (
+                                      <div key={item.id} style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.6rem 0.75rem', background:'white', borderRadius:'0.5rem', border: item.complete ? '1px solid #10b981' : '1px solid #e5e7eb', transition:'all 0.2s ease'}}>
+                                        <span style={{flex:1, fontWeight:600, color: item.complete ? '#166534' : '#1f2937', fontSize:'0.9rem'}}>
+                                          {item.name} <span style={{color:'#94a3b8', fontWeight:400, fontSize:'0.82rem'}}>x{item.quantity}</span>
+                                        </span>
+                                        <button
+                                          onClick={async () => {
+                                            const newVal = !item.complete;
+                                            setInventoryList(prev => prev.map(i => i.id === item.id ? {...i, complete: newVal} : i));
+                                            await (supabase as any).from('inventory').update({ complete: newVal, missing: newVal ? 0 : (item.missing || 0) }).eq('id', item.id);
+                                          }}
+                                          style={{padding:'0.35rem 0.85rem', borderRadius:'0.375rem', border:'none', fontWeight:700, fontSize:'0.8rem', cursor:'pointer', background: item.complete ? '#10b981' : '#f59e0b', color:'white', whiteSpace:'nowrap', flexShrink:0, transition:'all 0.2s ease'}}
+                                        >
+                                          {item.complete ? '✅ Completo' : '⏳ Incompleto'}
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()
+                      )}
                     </div>
                   )}
-                  {/* Formulario para agregar/editar items del template */}
-                  <div className="modal-assignment-form">
-                    <h3>📦 {editingTemplateItemId ? 'Editar Item del Template' : 'Agregar Item al Template'}</h3>
-                    <form onSubmit={async (e) => {
-                      e.preventDefault();
-                      const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
-                      
-                      if (editingTemplateItemId) {
-                        // Actualizar item existente
-                        const editingItem = inventoryTemplate.find(i => i.id === editingTemplateItemId);
-                        if (editingItem?._legacyTable) {
-                          const updated = await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
-                            item_name: newTemplateItem.item_name,
-                            quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category
-                          });
-                          if (updated) {
-                            setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? { ...updated, _legacyTable: true } : item));
-                          }
-                        } else {
-                          const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
-                            item_name: newTemplateItem.item_name,
-                            quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category
-                          });
-                          if (updated) {
-                            setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
-                          }
-                        }
-                        setEditingTemplateItemId(null);
-                      } else {
-                        // Crear nuevo item
-                        if (inventoryTemplateSource === 'inventory_template') {
-                          const created = await realtimeService.createInventoryTemplateItem({
-                            item_name: newTemplateItem.item_name,
-                            quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category
-                          }, selectedHouse);
-                          if (created) {
-                            setInventoryTemplate(prev => [...prev, { ...created, _legacyTable: true }]);
-                          }
-                        } else {
-                          const created = await realtimeService.createInventoryTemplate({
-                            house: selectedHouse,
-                            item_name: newTemplateItem.item_name,
-                            quantity: parseInt(newTemplateItem.quantity),
-                            category: newTemplateItem.category
-                          });
-                          if (created) {
-                            setInventoryTemplate(prev => [...prev, created]);
-                          }
-                        }
-                      }
-                      
-                      setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
-                    }}>
-                      <div className="assignment-form-grid">
-                        <div className="form-group">
-                          <label>📝 Nombre del artículo</label>
-                          <input
-                            id="inventory-template-item-name"
-                            type="text"
-                            value={newTemplateItem.item_name}
-                            onChange={(e) => setNewTemplateItem({...newTemplateItem, item_name: e.target.value})}
-                            required
-                            placeholder="Ej: Tenedores"
-                            title="Nombre del artículo"
-                          />
-                        </div>
-                        
-                        <div className="form-group">
-                          <label>🔢 Cantidad</label>
-                          <input
-                            id="inventory-template-quantity"
-                            type="number"
-                            value={newTemplateItem.quantity}
-                            onChange={(e) => setNewTemplateItem({...newTemplateItem, quantity: e.target.value})}
-                            required
-                            min="1"
-                            placeholder="Ej: 10"
-                            title="Cantidad"
-                          />
-                        </div>
-                        
-                        <div className="form-group">
-                          <label>🏷️ Categoría</label>
-                          <select
-                            id="inventory-template-category"
-                            value={newTemplateItem.category}
-                            onChange={(e) => setNewTemplateItem({...newTemplateItem, category: e.target.value})}
-                            required
-                          >
-                            <option value="Cocina">Cocina</option>
-                            <option value="Baños">Baños</option>
-                            <option value="Dormitorios">Dormitorios</option>
-                            <option value="Sala">Sala</option>
-                            <option value="Comedor">Comedor</option>
-                            <option value="Lavandería">Lavandería</option>
-                            <option value="Limpieza">Limpieza</option>
-                          </select>
-                        </div>
 
-                      </div>
-                      
-                      <div style={{display: 'flex', gap: '1rem'}}>
-                        <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
-                          {editingTemplateItemId ? '✏️ Actualizar' : '➕ Agregar al Template'}
-                        </button>
-                        {editingTemplateItemId && (
-                          <button 
-                            type="button" 
-                            className="dashboard-btn danger" 
-                            onClick={() => {
-                              setEditingTemplateItemId(null);
-                              setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
-                            }}
-                          >
-                            ❌ Cancelar
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                  </div>
-                  
-                  <div className="subcards-grid">
-                    <div className="modal-stats">
-                      <div className="stat-box">
-                        <p className="stat-box-number">{inventoryTemplate.length}</p>
-                        <p className="stat-box-label">Items en Template</p>
-                      </div>
-                      <div className="stat-box">
-                        <p className="stat-box-number">
-                          {new Set(inventoryTemplate.map(i => i.category)).size}
-                        </p>
-                        <p className="stat-box-label">Categorías</p>
-                      </div>
-                      <div className="stat-box">
-                        <p className="stat-box-number">
-                          {inventoryTemplate.reduce((sum, i) => sum + i.quantity, 0)}
-                        </p>
-                        <p className="stat-box-label">Items Totales</p>
-                      </div>
-                    </div>
-                    
-                    {loadingInventoryTemplate ? (
-                      <div className="modal-body-empty">
-                        <p>Cargando template...</p>
-                      </div>
-                    ) : inventoryTemplate.length > 0 ? (
-                      (() => {
-                        // Agrupar por categoría
-                        const categories = new Map<string, any[]>();
-                        inventoryTemplate.forEach(item => {
-                          if (!categories.has(item.category)) {
-                            categories.set(item.category, []);
-                          }
-                          categories.get(item.category)!.push(item);
-                        });
-                        
-                        return (
-                          <div style={{gridColumn: '1 / -1'}}>
-                            {Array.from(categories.entries()).map(([category, items]) => (
-                              <div key={category} style={{marginBottom: '2rem'}}>
-                                <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
-                                  {category} ({items.length} items)
-                                </h3>
-                                <div className="subcards-grid">
-                                  {items.map((item) => (
-                                    <div key={item.id} className="subcard">
-                                      <div className="subcard-header">
-                                        <div className="subcard-icon">📦</div>
-                                        <h3>{item.item_name}</h3>
-                                      </div>
-                                      <div className="subcard-content">
-                                        <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
-                                        <p><strong>🏷️ Categoría:</strong> {item.category}</p>
-                                        {item.location && <p><strong>📍 Ubicación:</strong> {item.location}</p>}
-                                      </div>
-                                      <div className="subcard-actions">
-                                        <button 
-                                          type="button"
-                                          onClick={() => {
-                                            setNewTemplateItem({
-                                              item_name: item.item_name,
-                                              quantity: item.quantity.toString(),
-                                              category: item.category,
-                                              location: item.location || ''
-                                            });
-                                            setEditingTemplateItemId(item.id);
-                                            requestAnimationFrame(() => {
-                                              inventoryFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                              const input = document.getElementById('inventory-template-item-name') as HTMLInputElement | null;
-                                              input?.focus();
-                                            });
-                                          }}
-                                        >
-                                          ✏️ Editar
-                                        </button>
-                                        <button 
-                                          type="button"
-                                          className="danger"
-                                          onClick={async () => {
-                                            if (confirm(`¿Eliminar "${item.item_name}" del template?`)) {
-                                              const ok = item._legacyTable
-                                                ? await realtimeService.deleteInventoryTemplateItem(item.id)
-                                                : await realtimeService.deleteInventoryTemplate(item.id);
-                                              if (ok) {
-                                                setInventoryTemplate(prev => prev.filter(i => i.id !== item.id));
-                                              }
-                                            }
-                                          }}
-                                        >
-                                          🗑️ Eliminar
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                  {/* ============ VISTA ADMIN/MANAGER/JONATHAN ============ */}
+                  {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
+                    <>
+                      {/* Selector de casa (solo owner o jonathan) */}
+                      {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
+                        <div className="modal-assignment-form" style={{marginBottom: '1.5rem'}}>
+                          <h3>🏠 Casa</h3>
+                          <div className="assignment-form-grid">
+                            <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                              <label>Seleccionar casa</label>
+                              <select
+                                value={selectedHouseIdx}
+                                onChange={(e) => setSelectedHouseIdx(parseInt(e.target.value, 10))}
+                                title="Seleccionar casa"
+                              >
+                                {houses.map((house, idx) => (
+                                  <option key={house.id || idx} value={idx}>
+                                    {house.houseName || house.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Estado del inventario en tiempo real */}
+                      <div style={{marginBottom:'1.5rem', background:'#f0fdf4', borderRadius:'0.75rem', padding:'0.75rem 1rem', border:'1px solid #86efac'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'0.5rem'}}>
+                          <span style={{fontWeight:700, color:'#166534', fontSize:'0.95rem'}}>📊 Estado actual del inventario (en tiempo real)</span>
+                          <span style={{background: inventoryList.filter(i => i.complete).length === inventoryList.length && inventoryList.length > 0 ? '#10b981' : '#f59e0b', color:'white', padding:'0.25rem 0.75rem', borderRadius:'1rem', fontWeight:700, fontSize:'0.85rem'}}>
+                            {inventoryList.filter(i => i.complete).length}/{inventoryList.length} completos
+                          </span>
+                        </div>
+                        {inventoryList.length > 0 && (
+                          <div style={{marginTop:'0.75rem', display:'grid', gap:'0.35rem', maxHeight:'30vh', overflowY:'auto'}}>
+                            {inventoryList.map((item: any) => (
+                              <div key={item.id} style={{display:'flex', alignItems:'center', gap:'0.5rem', padding:'0.4rem 0.75rem', background:'white', borderRadius:'0.375rem', border: item.complete ? '1px solid #86efac' : '1px solid #fca5a5'}}>
+                                <span style={{fontSize:'0.95rem'}}>{item.complete ? '✅' : '⏳'}</span>
+                                <span style={{flex:1, fontSize:'0.85rem', fontWeight:600, color: item.complete ? '#166534' : '#991b1b'}}>{item.name}</span>
+                                <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>x{item.quantity}</span>
+                                {item.room && <span style={{color:'#94a3b8', fontSize:'0.75rem', background:'#f1f5f9', padding:'0.1rem 0.4rem', borderRadius:'0.25rem'}}>{item.room}</span>}
                               </div>
                             ))}
                           </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="modal-body-empty">
-                        <p>📭 No hay items en el template de inventario</p>
+                        )}
+                        {inventoryList.length > 0 && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm('¿Reiniciar inventario? Todos los items volverán a estar pendientes.')) return;
+                              const ids = inventoryList.map(i => i.id).filter(Boolean);
+                              if (ids.length === 0) return;
+                              await (supabase as any).from('inventory').update({ complete: false, missing: 0, reason: null }).in('id', ids);
+                              setInventoryList(prev => prev.map(i => ({...i, complete: false, missing: 0, reason: null})));
+                            }}
+                            style={{marginTop:'0.75rem', width:'100%', padding:'0.6rem 1rem', background:'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color:'white', border:'none', borderRadius:'0.5rem', fontWeight:700, fontSize:'0.9rem', cursor:'pointer'}}
+                          >
+                            🔄 Reiniciar Inventario para Próxima Revisión
+                          </button>
+                        )}
                       </div>
-                    )}
-                  </div>
+
+                      {/* Formulario para agregar/editar items del template */}
+                      <div className="modal-assignment-form">
+                        <h3>📦 {editingTemplateItemId ? 'Editar Item del Template' : 'Agregar Item al Template'}</h3>
+                        <form onSubmit={async (e) => {
+                          e.preventDefault();
+                          const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+                          
+                          if (editingTemplateItemId) {
+                            const editingItem = inventoryTemplate.find(i => i.id === editingTemplateItemId);
+                            if (editingItem?._legacyTable) {
+                              const updated = await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
+                                item_name: newTemplateItem.item_name,
+                                quantity: parseInt(newTemplateItem.quantity),
+                                category: newTemplateItem.category
+                              });
+                              if (updated) {
+                                setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? { ...updated, _legacyTable: true } : item));
+                              }
+                            } else {
+                              const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
+                                item_name: newTemplateItem.item_name,
+                                quantity: parseInt(newTemplateItem.quantity),
+                                category: newTemplateItem.category
+                              });
+                              if (updated) {
+                                setInventoryTemplate(prev => prev.map(item => item.id === updated.id ? updated : item));
+                              }
+                            }
+                            setEditingTemplateItemId(null);
+                          } else {
+                            if (inventoryTemplateSource === 'inventory_template') {
+                              const created = await realtimeService.createInventoryTemplateItem({
+                                item_name: newTemplateItem.item_name,
+                                quantity: parseInt(newTemplateItem.quantity),
+                                category: newTemplateItem.category
+                              }, selectedHouse);
+                              if (created) {
+                                setInventoryTemplate(prev => [...prev, { ...created, _legacyTable: true }]);
+                              }
+                            } else {
+                              const created = await realtimeService.createInventoryTemplate({
+                                house: selectedHouse,
+                                item_name: newTemplateItem.item_name,
+                                quantity: parseInt(newTemplateItem.quantity),
+                                category: newTemplateItem.category
+                              });
+                              if (created) {
+                                setInventoryTemplate(prev => [...prev, created]);
+                              }
+                            }
+                          }
+                          
+                          setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
+                        }}>
+                          <div className="assignment-form-grid">
+                            <div className="form-group">
+                              <label>📝 Nombre del artículo</label>
+                              <input
+                                id="inventory-template-item-name"
+                                type="text"
+                                value={newTemplateItem.item_name}
+                                onChange={(e) => setNewTemplateItem({...newTemplateItem, item_name: e.target.value})}
+                                required
+                                placeholder="Ej: Tenedores"
+                                title="Nombre del artículo"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>🔢 Cantidad</label>
+                              <input
+                                id="inventory-template-quantity"
+                                type="number"
+                                value={newTemplateItem.quantity}
+                                onChange={(e) => setNewTemplateItem({...newTemplateItem, quantity: e.target.value})}
+                                required
+                                min="1"
+                                placeholder="Ej: 10"
+                                title="Cantidad"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>🏷️ Categoría</label>
+                              <select
+                                id="inventory-template-category"
+                                value={newTemplateItem.category}
+                                onChange={(e) => setNewTemplateItem({...newTemplateItem, category: e.target.value})}
+                                required
+                              >
+                                <option value="Cocina">Cocina</option>
+                                <option value="Baños">Baños</option>
+                                <option value="Dormitorios">Dormitorios</option>
+                                <option value="Sala">Sala</option>
+                                <option value="Comedor">Comedor</option>
+                                <option value="Lavandería">Lavandería</option>
+                                <option value="Limpieza">Limpieza</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div style={{display: 'flex', gap: '1rem'}}>
+                            <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
+                              {editingTemplateItemId ? '✏️ Actualizar' : '➕ Agregar al Template'}
+                            </button>
+                            {editingTemplateItemId && (
+                              <button 
+                                type="button" 
+                                className="dashboard-btn danger" 
+                                onClick={() => {
+                                  setEditingTemplateItemId(null);
+                                  setNewTemplateItem({ item_name: '', quantity: '', category: 'Cocina' });
+                                }}
+                              >
+                                ❌ Cancelar
+                              </button>
+                            )}
+                          </div>
+                        </form>
+                      </div>
+                      
+                      <div className="subcards-grid">
+                        <div className="modal-stats">
+                          <div className="stat-box">
+                            <p className="stat-box-number">{inventoryTemplate.length}</p>
+                            <p className="stat-box-label">Items en Template</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">
+                              {new Set(inventoryTemplate.map(i => i.category)).size}
+                            </p>
+                            <p className="stat-box-label">Categorías</p>
+                          </div>
+                          <div className="stat-box">
+                            <p className="stat-box-number">
+                              {inventoryTemplate.reduce((sum, i) => sum + i.quantity, 0)}
+                            </p>
+                            <p className="stat-box-label">Items Totales</p>
+                          </div>
+                        </div>
+                        
+                        {loadingInventoryTemplate ? (
+                          <div className="modal-body-empty">
+                            <p>Cargando template...</p>
+                          </div>
+                        ) : inventoryTemplate.length > 0 ? (
+                          (() => {
+                            const categories = new Map<string, any[]>();
+                            inventoryTemplate.forEach(item => {
+                              if (!categories.has(item.category)) categories.set(item.category, []);
+                              categories.get(item.category)!.push(item);
+                            });
+                            return (
+                              <div style={{gridColumn: '1 / -1'}}>
+                                {Array.from(categories.entries()).map(([category, items]) => (
+                                  <div key={category} style={{marginBottom: '2rem'}}>
+                                    <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
+                                      {category} ({items.length} items)
+                                    </h3>
+                                    <div className="subcards-grid">
+                                      {items.map((item) => (
+                                        <div key={item.id} className="subcard">
+                                          <div className="subcard-header">
+                                            <div className="subcard-icon">📦</div>
+                                            <h3>{item.item_name}</h3>
+                                          </div>
+                                          <div className="subcard-content">
+                                            <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
+                                            <p><strong>🏷️ Categoría:</strong> {item.category}</p>
+                                          </div>
+                                          <div className="subcard-actions">
+                                            <button 
+                                              type="button"
+                                              onClick={() => {
+                                                setNewTemplateItem({
+                                                  item_name: item.item_name,
+                                                  quantity: item.quantity.toString(),
+                                                  category: item.category,
+                                                });
+                                                setEditingTemplateItemId(item.id);
+                                                requestAnimationFrame(() => {
+                                                  inventoryFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                  const input = document.getElementById('inventory-template-item-name') as HTMLInputElement | null;
+                                                  input?.focus();
+                                                });
+                                              }}
+                                            >
+                                              ✏️ Editar
+                                            </button>
+                                            <button 
+                                              type="button"
+                                              className="danger"
+                                              onClick={async () => {
+                                                if (confirm(`¿Eliminar "${item.item_name}" del template?`)) {
+                                                  const ok = item._legacyTable
+                                                    ? await realtimeService.deleteInventoryTemplateItem(item.id)
+                                                    : await realtimeService.deleteInventoryTemplate(item.id);
+                                                  if (ok) {
+                                                    setInventoryTemplate(prev => prev.filter(i => i.id !== item.id));
+                                                  }
+                                                }
+                                              }}
+                                            >
+                                              🗑️ Eliminar
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div className="modal-body-empty">
+                            <p>📭 No hay items en el template de inventario</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               
