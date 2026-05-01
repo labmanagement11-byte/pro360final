@@ -2431,10 +2431,11 @@ export async function getInventoryTemplates(house: string) {
       .from('inventory_template') as any)
       .select('*')
       .eq('house', house)
-      .order('order_num', { ascending: true });
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
     
     if (error) {
-      console.error('❌ Error obteniendo templates de inventario:', error);
+      console.error('❌ Error obteniendo templates de inventario:', error?.message, error?.code, error?.details, error?.hint);
       return [];
     }
     
