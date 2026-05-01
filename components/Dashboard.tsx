@@ -390,6 +390,19 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
     setAssignedTasks(tasks => tasks.map(t => t.id === taskId ? { ...t, completed: isCompleted } : t));
   }
 
+  // Manejar complete/incompleto de items de assignment_inventory (empleado toggle)
+  async function handleAssignmentInventoryToggle(assignmentKey: string, item: any, isComplete: boolean) {
+    // Optimistic update
+    setInventoryByAssignment(prev => ({
+      ...prev,
+      [assignmentKey]: (prev[assignmentKey] || []).map((i: any) =>
+        i.id === item.id ? { ...i, is_complete: isComplete, checked_by: isComplete ? user.username : null } : i
+      )
+    }));
+    // Guardar en DB
+    await realtimeService.updateAssignmentInventoryItem(item.id, isComplete, undefined, user.username);
+  }
+
   // Manejar completar items de inventario
   async function handleInventoryItemToggle(assignmentId: string, itemId: string, checked: boolean, totalItems: number) {
     const progressKey = `${assignmentId}_${itemId}`;
@@ -660,6 +673,91 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                           </div>
                         </div>
                       )}
+
+                      {/* Inventario por Asignación - completo/incompleto */}
+                      {(() => {
+                        const invItems = inventoryByAssignment[assignmentKey] || [];
+                        if (invItems.length === 0) return null;
+                        const completedInv = invItems.filter((i: any) => i.is_complete).length;
+                        const isInvExpanded = expandedInventory.has(assignmentKey);
+                        const categoryMap: Record<string, any[]> = {};
+                        invItems.forEach((i: any) => {
+                          const cat = i.category || 'General';
+                          if (!categoryMap[cat]) categoryMap[cat] = [];
+                          categoryMap[cat].push(i);
+                        });
+                        return (
+                          <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
+                            <div
+                              style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isInvExpanded ? '0.75rem' : 0}}
+                              onClick={() => setExpandedInventory(prev => {
+                                const next = new Set(prev);
+                                if (next.has(assignmentKey)) next.delete(assignmentKey); else next.add(assignmentKey);
+                                return next;
+                              })}
+                            >
+                              <span style={{fontWeight: '600', color: '#0f172a', fontSize: '0.95rem'}}>📦 Inventario</span>
+                              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                <span style={{background: completedInv === invItems.length ? '#10b981' : '#f59e0b', color: 'white', padding: '0.25rem 0.6rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700}}>
+                                  {completedInv}/{invItems.length}
+                                </span>
+                                <span style={{color: '#64748b', fontSize: '0.85rem'}}>{isInvExpanded ? '▲' : '▼'}</span>
+                              </div>
+                            </div>
+                            {isInvExpanded && (
+                              <div style={{display: 'grid', gap: '0.5rem', maxHeight: '55vh', overflowY: 'auto'}}>
+                                {Object.entries(categoryMap).map(([category, catItems]) => (
+                                  <div key={category} style={{background: '#f8fafc', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid #e2e8f0'}}>
+                                    <div style={{fontWeight: '700', color: '#374151', marginBottom: '0.5rem', fontSize: '0.875rem'}}>{category}</div>
+                                    <div style={{display: 'grid', gap: '0.35rem'}}>
+                                      {catItems.map((invItem: any) => (
+                                        <div key={invItem.id} style={{display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'white', borderRadius: '0.5rem', border: invItem.is_complete ? '1px solid #10b981' : '1px solid #e5e7eb'}}>
+                                          <span style={{flex: 1, fontSize: '0.9rem', color: invItem.is_complete ? '#166534' : '#1f2937'}}>
+                                            {invItem.item_name} <span style={{color: '#94a3b8', fontSize: '0.82rem'}}>x{invItem.quantity}</span>
+                                          </span>
+                                          {!isManager ? (
+                                            <button
+                                              onClick={() => handleAssignmentInventoryToggle(assignmentKey, invItem, !invItem.is_complete)}
+                                              style={{
+                                                padding: '0.35rem 0.75rem',
+                                                borderRadius: '0.375rem',
+                                                border: 'none',
+                                                fontWeight: 700,
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer',
+                                                background: invItem.is_complete ? '#10b981' : '#f59e0b',
+                                                color: 'white',
+                                                whiteSpace: 'nowrap',
+                                                flexShrink: 0,
+                                                transition: 'all 0.2s ease'
+                                              }}
+                                            >
+                                              {invItem.is_complete ? '✅ Completo' : '⏳ Incompleto'}
+                                            </button>
+                                          ) : (
+                                            <span style={{
+                                              padding: '0.25rem 0.6rem',
+                                              borderRadius: '0.375rem',
+                                              fontWeight: 700,
+                                              fontSize: '0.8rem',
+                                              background: invItem.is_complete ? '#10b981' : '#f59e0b',
+                                              color: 'white',
+                                              whiteSpace: 'nowrap',
+                                              flexShrink: 0
+                                            }}>
+                                              {invItem.is_complete ? '✅ Completo' : '⏳ Pendiente'}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Botón de acción */}
                       {!isManager && (
