@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS shopping_list (
   notes TEXT,
   is_purchased BOOLEAN DEFAULT false,
   purchased_by TEXT,
+  purchase_amount NUMERIC(12,2),
   purchased_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now()

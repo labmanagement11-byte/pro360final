@@ -10,6 +10,7 @@ CREATE TABLE shopping_list (
   added_by TEXT NOT NULL,  -- Usuario que agregó el item
   is_purchased BOOLEAN DEFAULT false,
   purchased_by TEXT,
+  purchase_amount NUMERIC(12,2),
   purchased_at TIMESTAMP,
   notes TEXT,
   created_at TIMESTAMP DEFAULT now(),

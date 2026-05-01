@@ -1448,11 +1448,17 @@ export async function getShoppingList(house: string = 'HYNTIBA2 APTO 406', inclu
     let query = (supabase
       .from('shopping_list') as any)
       .select('*')
-      .eq('house', house)
-      .order('created_at', { ascending: false });
+      .eq('house', house);
     
     if (!includePurchased) {
-      query = query.eq('is_purchased', false);
+      query = query
+        .eq('is_purchased', false)
+        .order('created_at', { ascending: false });
+    } else {
+      query = query
+        .eq('is_purchased', true)
+        .order('purchased_at', { ascending: false })
+        .order('created_at', { ascending: false });
     }
     
     const { data, error } = await query;
@@ -1473,32 +1479,37 @@ export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 A
   try {
     const supabase = getSupabaseClient();
     console.log('📝 Adding shopping item:', { item, house });
+    const payload = {
+      house: house,
+      item_name: item.item_name,
+      quantity: item.quantity || '',
+      category: item.category || 'General',
+      added_by: item.added_by,
+      notes: item.notes || ''
+    } as any;
+
+    if (item.size) {
+      payload.size = item.size;
+    }
     
-    const { data, error } = await (supabase
+    let { data, error } = await (supabase
       .from('shopping_list') as any)
-      .insert([{
-        house: house,
-        item_name: item.item_name,
-        quantity: item.quantity || '',
-        category: item.category || 'General',
-        added_by: item.added_by,
-        notes: item.notes || ''
-      }])
+      .insert([payload])
       .select();
+
+    if (error?.message?.includes("'size' column")) {
+      delete payload.size;
+      ({ data, error } = await (supabase
+        .from('shopping_list') as any)
+        .insert([payload])
+        .select());
+    }
 
     if (error) {
       console.error('❌ Error adding shopping list item:', error);
       return null;
     }
     console.log('✅ Shopping item added:', data?.[0]);
-    
-    // Actualizar el item con el size después de insertarlo
-    if (data?.[0]?.id && item.size) {
-      await (supabase
-        .from('shopping_list') as any)
-        .update({ size: item.size })
-        .eq('id', data[0].id);
-    }
     
     return data?.[0] || null;
   } catch (err) {
@@ -1527,18 +1538,30 @@ export async function updateShoppingListItem(itemId: string, updates: any) {
 }
 
 // Marcar item como comprado
-export async function markAsPurchased(itemId: string, purchasedBy: string) {
+export async function markAsPurchased(itemId: string, purchasedBy: string, purchaseAmount?: number) {
   const supabase = getSupabaseClient();
-  const { data, error } = await (supabase
+  const updates = {
+    is_purchased: true,
+    purchased_by: purchasedBy,
+    purchase_amount: typeof purchaseAmount === 'number' ? purchaseAmount : null,
+    purchased_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  } as any;
+
+  let { data, error } = await (supabase
     .from('shopping_list') as any)
-    .update({
-      is_purchased: true,
-      purchased_by: purchasedBy,
-      purchased_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
+    .update(updates)
     .eq('id', itemId)
     .select();
+
+  if (error?.message?.includes("'purchase_amount' column")) {
+    delete updates.purchase_amount;
+    ({ data, error } = await (supabase
+      .from('shopping_list') as any)
+      .update(updates)
+      .eq('id', itemId)
+      .select());
+  }
 
   if (error) {
     console.error('Error marking as purchased:', error);

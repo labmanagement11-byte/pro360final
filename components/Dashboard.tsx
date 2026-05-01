@@ -2447,6 +2447,77 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     category: 'General',
     size: 'Mediano'
   });
+  const [purchaseDraft, setPurchaseDraft] = useState({ itemId: '', amount: '' });
+  const [shoppingHistoryFilterType, setShoppingHistoryFilterType] = useState<'total' | 'year' | 'month'>('total');
+  const [shoppingHistoryFilterYear, setShoppingHistoryFilterYear] = useState('');
+  const [shoppingHistoryFilterMonth, setShoppingHistoryFilterMonth] = useState('');
+
+  const formatPurchaseAmount = (value: number | string | null | undefined) => {
+    const amount = Number(value ?? 0);
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(Number.isFinite(amount) ? amount : 0);
+  };
+
+  const formatPurchaseDate = (value: string | null | undefined) => {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+  };
+
+  const availableShoppingYears = Array.from(
+    new Set(
+      shoppingHistory
+        .map(item => item.purchased_at ? new Date(item.purchased_at).getFullYear().toString() : null)
+        .filter((year): year is string => Boolean(year))
+    )
+  ).sort((a, b) => Number(b) - Number(a));
+
+  const filteredShoppingHistory = shoppingHistory.filter(item => {
+    if (!item.purchased_at) {
+      return shoppingHistoryFilterType === 'total';
+    }
+
+    const purchaseDate = new Date(item.purchased_at);
+    const itemYear = purchaseDate.getFullYear().toString();
+    const itemMonth = (purchaseDate.getMonth() + 1).toString().padStart(2, '0');
+
+    if (shoppingHistoryFilterType === 'year') {
+      return !shoppingHistoryFilterYear || itemYear === shoppingHistoryFilterYear;
+    }
+
+    if (shoppingHistoryFilterType === 'month') {
+      return (!shoppingHistoryFilterYear || itemYear === shoppingHistoryFilterYear)
+        && (!shoppingHistoryFilterMonth || itemMonth === shoppingHistoryFilterMonth);
+    }
+
+    return true;
+  });
+
+  const shoppingHistoryTotal = filteredShoppingHistory.reduce((sum, item) => {
+    const amount = Number(item.purchase_amount ?? 0);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+
+  const shoppingHistoryTotalLabel = shoppingHistoryFilterType === 'month'
+    ? 'Total del mes'
+    : shoppingHistoryFilterType === 'year'
+      ? 'Total del año'
+      : 'Total histórico';
+
+  const handleShoppingPurchase = async (itemId: string) => {
+    const amount = Number(purchaseDraft.amount);
+
+    if (!purchaseDraft.amount.trim() || !Number.isFinite(amount) || amount < 0) {
+      alert('Ingresa un valor de compra válido.');
+      return;
+    }
+
+    await realtimeService.markAsPurchased(itemId, user.username, amount);
+    setPurchaseDraft({ itemId: '', amount: '' });
+  };
 
   // Cargar lista de compras desde Supabase
   useEffect(() => {
@@ -2460,6 +2531,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       setLoadingShopping(false);
     };
     loadShopping();
+    setPurchaseDraft({ itemId: '', amount: '' });
     
     // Suscribirse a cambios en tiempo real
     const subscription = realtimeService.subscribeToShoppingList(selectedHouse, (payload: any) => {
@@ -2473,7 +2545,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           // Movido a comprado
           addRealtimeNotification(`Item comprado: ${payload.new.item_name}`, 'success');
           setShoppingList(prev => prev.filter(i => i.id !== payload.new.id));
-          setShoppingHistory(prev => [payload.new, ...prev]);
+          setShoppingHistory(prev => {
+            const exists = prev.some(i => i.id === payload.new.id);
+            if (exists) {
+              return prev.map(i => i.id === payload.new.id ? payload.new : i);
+            }
+            return [payload.new, ...prev];
+          });
         } else {
           addRealtimeNotification('Item de compras actualizado', 'info');
           // Actualizado
@@ -2752,9 +2830,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     <div className="dashboard-inventory-actions">
                       {(user.role === 'owner' || user.role === 'manager') && (
                         <>
-                          <button className="dashboard-btn" onClick={async () => {
-                            await realtimeService.markAsPurchased(item.id, user.username);
-                          }}>✅ Comprado</button>
+                          <button className="dashboard-btn" onClick={() => setPurchaseDraft({ itemId: item.id, amount: '' })}>✅ Comprado</button>
                           <button className="dashboard-btn danger" onClick={async () => {
                             if (confirm('¿Eliminar este producto?')) {
                               await realtimeService.deleteShoppingListItem(item.id);
@@ -2763,6 +2839,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         </>
                       )}
                     </div>
+                    {purchaseDraft.itemId === item.id && (
+                      <div className="dashboard-inventory-add-form" style={{ marginTop: 12 }}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={purchaseDraft.amount}
+                          onChange={e => setPurchaseDraft({ itemId: item.id, amount: e.target.value })}
+                          placeholder="Valor de la compra"
+                          className="dashboard-inventory-input"
+                        />
+                        <button type="button" className="dashboard-btn main" onClick={async () => {
+                          await handleShoppingPurchase(item.id);
+                        }}>Guardar compra</button>
+                        <button type="button" className="dashboard-btn" onClick={() => setPurchaseDraft({ itemId: '', amount: '' })}>Cancelar</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2804,8 +2897,53 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {(user.role === 'owner' || user.role === 'manager') && shoppingHistory.length > 0 && (
                 <div className="dashboard-inventory-history" style={{ marginTop: 24 }}>
                   <h3>Historial de compras</h3>
+                  <div className="dashboard-inventory-add-form" style={{ marginBottom: 16 }}>
+                    <select
+                      value={shoppingHistoryFilterType}
+                      onChange={e => setShoppingHistoryFilterType(e.target.value as 'total' | 'year' | 'month')}
+                      className="dashboard-inventory-input"
+                    >
+                      <option value="total">Totales</option>
+                      <option value="year">Por año</option>
+                      <option value="month">Por mes</option>
+                    </select>
+                    <select
+                      value={shoppingHistoryFilterYear}
+                      onChange={e => setShoppingHistoryFilterYear(e.target.value)}
+                      className="dashboard-inventory-input"
+                      disabled={shoppingHistoryFilterType === 'total'}
+                    >
+                      <option value="">Todos los años</option>
+                      {availableShoppingYears.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={shoppingHistoryFilterMonth}
+                      onChange={e => setShoppingHistoryFilterMonth(e.target.value)}
+                      className="dashboard-inventory-input"
+                      disabled={shoppingHistoryFilterType !== 'month'}
+                    >
+                      <option value="">Todos los meses</option>
+                      <option value="01">Enero</option>
+                      <option value="02">Febrero</option>
+                      <option value="03">Marzo</option>
+                      <option value="04">Abril</option>
+                      <option value="05">Mayo</option>
+                      <option value="06">Junio</option>
+                      <option value="07">Julio</option>
+                      <option value="08">Agosto</option>
+                      <option value="09">Septiembre</option>
+                      <option value="10">Octubre</option>
+                      <option value="11">Noviembre</option>
+                      <option value="12">Diciembre</option>
+                    </select>
+                    <div className="dashboard-inventory-input" style={{ display: 'flex', alignItems: 'center', fontWeight: 700 }}>
+                      {shoppingHistoryTotalLabel}: {formatPurchaseAmount(shoppingHistoryTotal)}
+                    </div>
+                  </div>
                   <div className="dashboard-inventory-list">
-                    {shoppingHistory.map((h, idx) => (
+                    {filteredShoppingHistory.map((h, idx) => (
                       <div className="dashboard-inventory-card" key={h.id || idx}>
                         <span className="dashboard-inventory-name">{h.item_name}</span>
                         {h.quantity && <span className="dashboard-inventory-qty">{h.quantity}</span>}
@@ -2813,7 +2951,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           {h.size && <small>📏 {h.size}</small>}
                           <small>👤 Agregado por {h.added_by}</small>
                           <small>✅ Comprado por {h.purchased_by || 'N/A'}</small>
-                          <small>� {h.purchased_at ? new Date(h.purchased_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : ''}</small>
+                          <small>💵 Valor: {formatPurchaseAmount(h.purchase_amount)}</small>
+                          <small>📅 {formatPurchaseDate(h.purchased_at)}</small>
                         </div>
                         <div className="dashboard-inventory-actions">
                           <button className="dashboard-btn danger" onClick={async () => {
@@ -3449,8 +3588,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <p className="stat-box-label">Comprados</p>
                       </div>
                       <div className="stat-box">
-                        <p className="stat-box-number">{new Set(shoppingList.map(i => i.category)).size}</p>
-                        <p className="stat-box-label">Categorías</p>
+                        <p className="stat-box-number">{formatPurchaseAmount(shoppingHistoryTotal)}</p>
+                        <p className="stat-box-label">{shoppingHistoryTotalLabel}</p>
                       </div>
                     </div>
                     
@@ -3472,22 +3611,43 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           {(user.role === 'owner' || user.role === 'manager') && (
                             <div className="subcard-actions">
                               <button 
-                                onClick={async () => {
-                                  await realtimeService.markAsPurchased(item.id, user.username);
-                                }}
+                                onClick={() => setPurchaseDraft({ itemId: item.id, amount: '' })}
                               >
                                 ✅ Marcar Comprado
-                                                            <button 
-                                                              onClick={async () => {
-                                                                if (confirm('¿Eliminar este item?')) {
-                                                                  await realtimeService.deleteShoppingListItem(item.id);
-                                                                }
-                                                              }}
-                                                              className="danger"
-                                                            >
-                                                              🗑️ Eliminar
-                                                            </button>
                               </button>
+                              <button 
+                                onClick={async () => {
+                                  if (confirm('¿Eliminar este item?')) {
+                                    await realtimeService.deleteShoppingListItem(item.id);
+                                  }
+                                }}
+                                className="danger"
+                              >
+                                🗑️ Eliminar
+                              </button>
+                            </div>
+                          )}
+                          {purchaseDraft.itemId === item.id && (
+                            <div className="modal-assignment-form" style={{ marginTop: '1rem' }}>
+                              <div className="assignment-form-grid">
+                                <div className="form-group">
+                                  <label>💵 Valor de la compra</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={purchaseDraft.amount}
+                                    onChange={(e) => setPurchaseDraft({ itemId: item.id, amount: e.target.value })}
+                                    placeholder="Ej: 25000"
+                                  />
+                                </div>
+                              </div>
+                              <div className="subcard-actions">
+                                <button type="button" onClick={async () => {
+                                  await handleShoppingPurchase(item.id);
+                                }}>Guardar compra</button>
+                                <button type="button" className="secondary" onClick={() => setPurchaseDraft({ itemId: '', amount: '' })}>Cancelar</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3503,9 +3663,61 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <>
                         <div className="subcard-full-width" style={{marginTop: '2rem', borderTop: '3px solid #e5e7eb', paddingTop: '2rem'}}>
                           <h3 style={{margin: '0 0 1rem 0', color: '#0284c7'}}>📋 Historial de Compras</h3>
+                          <div className="assignment-form-grid" style={{marginTop: '1rem'}}>
+                            <div className="form-group">
+                              <label>Filtro</label>
+                              <select
+                                value={shoppingHistoryFilterType}
+                                onChange={(e) => setShoppingHistoryFilterType(e.target.value as 'total' | 'year' | 'month')}
+                              >
+                                <option value="total">Totales</option>
+                                <option value="year">Por año</option>
+                                <option value="month">Por mes</option>
+                              </select>
+                            </div>
+                            <div className="form-group">
+                              <label>Año</label>
+                              <select
+                                value={shoppingHistoryFilterYear}
+                                onChange={(e) => setShoppingHistoryFilterYear(e.target.value)}
+                                disabled={shoppingHistoryFilterType === 'total'}
+                              >
+                                <option value="">Todos los años</option>
+                                {availableShoppingYears.map(year => (
+                                  <option key={year} value={year}>{year}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="form-group">
+                              <label>Mes</label>
+                              <select
+                                value={shoppingHistoryFilterMonth}
+                                onChange={(e) => setShoppingHistoryFilterMonth(e.target.value)}
+                                disabled={shoppingHistoryFilterType !== 'month'}
+                              >
+                                <option value="">Todos los meses</option>
+                                <option value="01">Enero</option>
+                                <option value="02">Febrero</option>
+                                <option value="03">Marzo</option>
+                                <option value="04">Abril</option>
+                                <option value="05">Mayo</option>
+                                <option value="06">Junio</option>
+                                <option value="07">Julio</option>
+                                <option value="08">Agosto</option>
+                                <option value="09">Septiembre</option>
+                                <option value="10">Octubre</option>
+                                <option value="11">Noviembre</option>
+                                <option value="12">Diciembre</option>
+                              </select>
+                            </div>
+                            <div className="form-group">
+                              <label>{shoppingHistoryTotalLabel}</label>
+                              <input value={formatPurchaseAmount(shoppingHistoryTotal)} readOnly />
+                            </div>
+                          </div>
                         </div>
                         
-                        {shoppingHistory.map((h, idx) => (
+                        {filteredShoppingHistory.map((h, idx) => (
                           <div key={h.id || idx} className="subcard">
                             <div className="subcard-header">
                               <div className="subcard-icon">📦</div>
@@ -3516,7 +3728,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               {h.size && <p><strong>📏 Tamaño:</strong> {h.size}</p>}
                               <p><strong>👤 Agregado por:</strong> {h.added_by}</p>
                               <p><strong>✅ Comprado por:</strong> {h.purchased_by}</p>
-                              <p><strong>📅 Fecha compra:</strong> {h.purchased_at ? new Date(h.purchased_at.replace('Z', '+00:00')).toLocaleString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'N/A'}</p>
+                              <p><strong>💵 Valor:</strong> {formatPurchaseAmount(h.purchase_amount)}</p>
+                              <p><strong>📅 Fecha compra:</strong> {formatPurchaseDate(h.purchased_at)}</p>
                               <span className="subcard-badge">✅ Comprado</span>
                             </div>
                             <div className="subcard-actions">
