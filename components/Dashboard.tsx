@@ -573,13 +573,23 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                   const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
                   
                   return (
-                    <div key={task.id} className="assigned-tasks-item-v2">
+                    <div
+                      key={task.id}
+                      className="assigned-tasks-item-v2"
+                      style={{
+                        background: '#ffffff',
+                        border: '2px solid #dbe7f3',
+                        borderRadius: '1rem',
+                        padding: '1rem',
+                        boxShadow: '0 4px 14px rgba(15, 23, 42, 0.06)'
+                      }}
+                    >
                       <div className="assigned-tasks-item-header-v2">
                         <div style={{flex: 1}}>
-                          <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#0284c7', marginBottom: '0.25rem'}}>
+                          <div style={{fontSize: '1rem', fontWeight: '700', color: '#0284c7', marginBottom: '0.3rem'}}>
                             {task.type === 'Limpieza profunda' ? '🧹 Profunda' : task.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
                           </div>
-                          <div style={{fontSize: '0.9rem', color: '#64748b'}}>
+                          <div style={{fontSize: '0.95rem', color: '#64748b'}}>
                             📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
                           </div>
                         </div>
@@ -621,8 +631,8 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                       {/* Zonas/Subtareas para empleados */}
                       {!isManager && subtasksMap && (
                         <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
-                          <div style={{fontWeight: '600', color: '#0f172a', marginBottom: '0.75rem', fontSize: '0.95rem'}}>📋 Zonas de Limpieza</div>
-                          <div style={{display: 'grid', gap: '1rem'}}>
+                          <div style={{fontWeight: '800', color: '#0f172a', marginBottom: '1rem', fontSize: '1.1rem'}}>📋 Zonas de Limpieza</div>
+                          <div style={{display: 'grid', gap: '1.2rem'}}>
                             {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => {
                               const zoneItemsCount = (subtasks as string[]).length;
                               const zoneCompletedCount = (subtasks as string[]).filter((_, idx) => {
@@ -630,28 +640,29 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                                 return progressArr[globalIdx];
                               }).length;
                               return (
-                                <div key={zona} style={{background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0'}}>
-                                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0'}}>
-                                    <span style={{fontWeight: '700', color: '#1f2937', fontSize: '0.95rem'}}>{zona}</span>
-                                    <span style={{background: '#0284c7', color: 'white', padding: '0.35rem 0.65rem', borderRadius: '0.375rem', fontSize: '0.8rem', fontWeight: '600'}}>{zoneCompletedCount}/{zoneItemsCount}</span>
+                                <div key={zona} style={{background: '#f8fbff', padding: '1.2rem', borderRadius: '1rem', border: '2px solid #dbeafe', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'}}>
+                                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem', paddingBottom: '0.9rem', borderBottom: '1px solid #dbeafe'}}>
+                                    <span style={{fontWeight: '800', color: '#1f2937', fontSize: '1.05rem'}}>{zona}</span>
+                                    <span style={{background: '#0284c7', color: 'white', padding: '0.4rem 0.8rem', borderRadius: '0.5rem', fontSize: '0.9rem', fontWeight: '700'}}>{zoneCompletedCount}/{zoneItemsCount}</span>
                                   </div>
-                                  <div style={{display: 'grid', gap: '0.65rem'}}>
+                                  <div style={{display: 'grid', gap: '0.8rem'}}>
                                     {(subtasks as string[]).map((subtask, idx) => {
                                       const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                       const isCompleted = progressArr[globalIdx];
                                       return (
-                                        <div key={`${zona}-${idx}`} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'white', borderRadius: '0.5rem', border: isCompleted ? '1px solid #10b981' : '1px solid #e5e7eb', transition: 'all 0.3s ease'}}>
+                                        <div key={`${zona}-${idx}`} style={{display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#ffffff', borderRadius: '0.75rem', border: isCompleted ? '2px solid #10b981' : '2px solid #e5e7eb', transition: 'all 0.3s ease'}}>
                                           <button
                                             onClick={() => handleSubtaskToggle(task.id, globalIdx, !isCompleted, allSubtasks.length)}
                                             style={{
-                                              padding: '0.5rem 1rem',
-                                              borderRadius: '0.375rem',
+                                              padding: '0.7rem 1.2rem',
+                                              borderRadius: '0.6rem',
                                               border: 'none',
-                                              fontWeight: '600',
-                                              fontSize: '0.85rem',
+                                              fontWeight: '700',
+                                              fontSize: '0.95rem',
                                               cursor: 'pointer',
                                               whiteSpace: 'nowrap',
                                               flexShrink: 0,
+                                              minWidth: '165px',
                                               background: isCompleted ? '#10b981' : '#f59e0b',
                                               color: 'white',
                                               transition: 'all 0.3s ease',
@@ -660,7 +671,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                                           >
                                             {isCompleted ? '✅ Completada' : '⏳ Completar'}
                                           </button>
-                                          <span style={{flex: 1, fontSize: '0.9rem', color: isCompleted ? '#94a3b8' : '#1f2937', textDecoration: isCompleted ? 'line-through' : 'none', lineHeight: '1.5'}}>
+                                          <span style={{flex: 1, fontSize: '1rem', color: isCompleted ? '#94a3b8' : '#1f2937', textDecoration: isCompleted ? 'line-through' : 'none', lineHeight: '1.55', fontWeight: 500}}>
                                             {subtask}
                                           </span>
                                         </div>
@@ -776,232 +787,6 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
               </div>
             </div>
           ))}
-        </div>
-      )}
-      {/* Botón Ver Inventario al final para empleados */}
-      {!isManager && (
-        <div style={{marginTop: '1.5rem'}}>
-          <button
-            onClick={async () => {
-              // SIEMPRE recargar el inventario desde la BD para obtener estado actualizado
-              setHouseInventoryLoading(true);
-              try {
-                const items = await realtimeService.getInventoryItems(user.house || user.house_id);
-                console.log('📦 Inventario recargado desde BD:', items);
-                setHouseInventory(items || []);
-                // Sincronizar progreso con valores de la BD
-                const progressFromDB: Record<string, boolean> = {};
-                (items || []).forEach((item: any) => {
-                  progressFromDB[`house_${item.id}`] = item.complete ?? false;
-                });
-                setHouseInventoryProgress(progressFromDB);
-              } catch (e) {
-                console.error('Error cargando inventario:', e);
-              } finally {
-                setHouseInventoryLoading(false);
-              }
-              setHouseInventoryExpanded(!houseInventoryExpanded);
-            }}
-            style={{
-              width: '100%',
-              maxWidth: '100%',
-              padding: '1rem 2rem',
-              borderRadius: '0.75rem',
-              border: 'none',
-              fontWeight: '700',
-              fontSize: '1.1rem',
-              cursor: 'pointer',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white',
-              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.3)',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.4)';
-              (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.3)';
-              (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
-            }}
-          >
-            📦 {houseInventoryExpanded ? 'Ocultar' : 'Ver'} Inventario Completo ({houseInventory.length})
-          </button>
-          
-          {/* Lista de Inventario Expandible */}
-          {houseInventoryExpanded && (
-            <div style={{marginTop: '1rem', background: '#f8fafc', borderRadius: '1rem', padding: '1rem', border: '1px solid #e2e8f0'}}>
-              <div style={{fontWeight: '700', color: '#0f172a', marginBottom: '1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                📋 Inventario de la Casa
-              </div>
-              {houseInventoryLoading ? (
-                <div style={{textAlign: 'center', padding: '1rem', color: '#64748b'}}>Cargando...</div>
-              ) : houseInventory.length === 0 ? (
-                <div style={{textAlign: 'center', padding: '1rem', color: '#64748b'}}>No hay items en el inventario</div>
-              ) : (
-                <div style={{display: 'grid', gap: '0.75rem'}}>
-                  {houseInventory.map((item: any) => {
-                    const itemKey = `house_${item.id}`;
-                    const isItemComplete = houseInventoryProgress[itemKey] ?? item.complete ?? false;
-                    return (
-                      <div key={item.id} style={{
-                        background: 'white',
-                        borderRadius: '0.75rem',
-                        border: isItemComplete ? '2px solid #10b981' : '1px solid #e5e7eb',
-                        padding: '0.85rem',
-                        transition: 'all 0.3s ease'
-                      }}>
-                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem'}}>
-                          <div style={{flex: 1}}>
-                            <span style={{fontWeight: 700, color: isItemComplete ? '#10b981' : '#1f2937', fontSize: '0.95rem'}}>
-                              {item.name}
-                            </span>
-                            <span style={{marginLeft: '0.5rem', color: '#64748b', fontSize: '0.85rem'}}>x{item.quantity}</span>
-                            {item.room && <span style={{marginLeft: '0.5rem', color: '#94a3b8', fontSize: '0.8rem'}}>({item.room})</span>}
-                          </div>
-                          <span style={{
-                            background: isItemComplete ? '#10b981' : '#f59e0b',
-                            color: 'white',
-                            padding: '0.25rem 0.6rem',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 700
-                          }}>
-                            {isItemComplete ? 'COMPLETO' : 'PENDIENTE'}
-                          </span>
-                        </div>
-                        <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                          <button
-                            onClick={async () => {
-                              setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: true }));
-                              setIncompleteFormOpen(prev => ({ ...prev, [itemKey]: false }));
-                              // Actualizar en base de datos - limpiar missing y reason
-                              await (supabase as any).from('inventory').update({ complete: true, missing: 0, reason: null }).eq('id', item.id);
-                            }}
-                            style={{
-                              padding: '0.5rem 0.9rem',
-                              borderRadius: '0.5rem',
-                              border: 'none',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              cursor: 'pointer',
-                              background: isItemComplete ? '#10b981' : '#e2e8f0',
-                              color: isItemComplete ? 'white' : '#0f172a',
-                              transition: 'all 0.2s ease',
-                            }}
-                          >
-                            ✅ Completo
-                          </button>
-                          <button
-                            onClick={() => {
-                              setIncompleteFormOpen(prev => ({ ...prev, [itemKey]: !prev[itemKey] }));
-                              if (!incompleteData[itemKey]) {
-                                setIncompleteData(prev => ({ ...prev, [itemKey]: { missing: item.missing || 0, reason: item.reason || '' } }));
-                              }
-                            }}
-                            style={{
-                              padding: '0.5rem 0.9rem',
-                              borderRadius: '0.5rem',
-                              border: 'none',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              cursor: 'pointer',
-                              background: !isItemComplete ? '#f59e0b' : '#e2e8f0',
-                              color: !isItemComplete ? 'white' : '#0f172a',
-                              transition: 'all 0.2s ease',
-                            }}
-                          >
-                            ⏳ Incompleto
-                          </button>
-                        </div>
-                        
-                        {/* Formulario de incompleto */}
-                        {incompleteFormOpen[itemKey] && (
-                          <div style={{marginTop: '0.75rem', padding: '0.75rem', background: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #f59e0b'}}>
-                            <div style={{display: 'grid', gap: '0.5rem'}}>
-                              <div>
-                                <label style={{fontSize: '0.8rem', fontWeight: 600, color: '#92400e', marginBottom: '0.25rem', display: 'block'}}>
-                                  ¿Cuántos faltan?
-                                </label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={item.quantity}
-                                  value={incompleteData[itemKey]?.missing || 0}
-                                  onChange={(e) => setIncompleteData(prev => ({ 
-                                    ...prev, 
-                                    [itemKey]: { ...prev[itemKey], missing: Number(e.target.value) } 
-                                  }))}
-                                  style={{width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #d1d5db', fontSize: '0.9rem'}}
-                                />
-                              </div>
-                              <div>
-                                <label style={{fontSize: '0.8rem', fontWeight: 600, color: '#92400e', marginBottom: '0.25rem', display: 'block'}}>
-                                  Motivo (roto, dañado, etc.)
-                                </label>
-                                <select
-                                  value={incompleteData[itemKey]?.reason || ''}
-                                  onChange={(e) => setIncompleteData(prev => ({ 
-                                    ...prev, 
-                                    [itemKey]: { ...prev[itemKey], reason: e.target.value } 
-                                  }))}
-                                  style={{width: '100%', padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #d1d5db', fontSize: '0.9rem'}}
-                                >
-                                  <option value="">Seleccionar motivo...</option>
-                                  <option value="Faltante">Faltante</option>
-                                  <option value="Roto">Roto - Necesita reemplazo</option>
-                                  <option value="Dañado">Dañado - Necesita reparación</option>
-                                  <option value="Perdido">Perdido</option>
-                                  <option value="Otro">Otro</option>
-                                </select>
-                              </div>
-                              <button
-                                onClick={async () => {
-                                  const data = incompleteData[itemKey] || { missing: 0, reason: '' };
-                                  setHouseInventoryProgress(prev => ({ ...prev, [itemKey]: false }));
-                                  // Actualizar en base de datos
-                                  await (supabase as any).from('inventory').update({ 
-                                    complete: false, 
-                                    missing: data.missing, 
-                                    reason: data.reason 
-                                  }).eq('id', item.id);
-                                  // Actualizar el item local
-                                  setHouseInventory(prev => prev.map(i => i.id === item.id ? { ...i, missing: data.missing, reason: data.reason, complete: false } : i));
-                                  setIncompleteFormOpen(prev => ({ ...prev, [itemKey]: false }));
-                                }}
-                                style={{
-                                  marginTop: '0.5rem',
-                                  width: '100%',
-                                  padding: '0.6rem',
-                                  borderRadius: '0.5rem',
-                                  border: 'none',
-                                  fontWeight: 700,
-                                  fontSize: '0.85rem',
-                                  cursor: 'pointer',
-                                  background: '#dc2626',
-                                  color: 'white',
-                                }}
-                              >
-                                💾 Guardar como Incompleto
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Mostrar info de faltantes si existe */}
-                        {!isItemComplete && (item.missing > 0 || item.reason) && !incompleteFormOpen[itemKey] && (
-                          <div style={{marginTop: '0.5rem', padding: '0.5rem', background: '#fee2e2', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#991b1b'}}>
-                            {item.missing > 0 && <span>⚠️ Faltan: {item.missing} </span>}
-                            {item.reason && <span>| Motivo: {item.reason}</span>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
