@@ -4870,13 +4870,64 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <form onSubmit={async (e) => {
                           e.preventDefault();
                           const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+                          const normalizedItemName = newTemplateItem.item_name.trim();
+                          const parsedQuantity = Number.parseInt(newTemplateItem.quantity, 10);
+                          const safeQuantity = Number.isNaN(parsedQuantity) ? 1 : Math.max(parsedQuantity, 1);
+
+                          if (!normalizedItemName) {
+                            alert('Ingresa un nombre válido para el artículo.');
+                            return;
+                          }
+
+                          const syncItemToEmployeeInventory = async () => {
+                            if (!normalizedItemName) return;
+                            try {
+                              const { data: existingItems, error: existingError } = await (supabase as any)
+                                .from('inventory')
+                                .select('id, quantity')
+                                .eq('house', selectedHouse)
+                                .ilike('name', normalizedItemName)
+                                .limit(1);
+
+                              if (existingError) {
+                                console.error('❌ Error consultando inventario existente:', existingError);
+                                return;
+                              }
+
+                              if (existingItems?.[0]?.id) {
+                                await (supabase as any)
+                                  .from('inventory')
+                                  .update({
+                                    quantity: safeQuantity,
+                                    room: newTemplateItem.category,
+                                    updated_at: new Date().toISOString()
+                                  })
+                                  .eq('id', existingItems[0].id);
+                              } else {
+                                await (supabase as any)
+                                  .from('inventory')
+                                  .insert([{
+                                    name: normalizedItemName,
+                                    quantity: safeQuantity,
+                                    room: newTemplateItem.category,
+                                    complete: false,
+                                    missing: 0,
+                                    reason: null,
+                                    house: selectedHouse,
+                                    created_at: new Date().toISOString()
+                                  }]);
+                              }
+                            } catch (syncError) {
+                              console.error('❌ Error sincronizando item a inventory:', syncError);
+                            }
+                          };
                           
                           if (editingTemplateItemId) {
                             const editingItem = inventoryTemplate.find(i => i.id === editingTemplateItemId);
                             if (editingItem?._legacyTable) {
                               const updated = await realtimeService.updateInventoryTemplateItem(editingTemplateItemId, {
-                                item_name: newTemplateItem.item_name,
-                                quantity: parseInt(newTemplateItem.quantity),
+                                item_name: normalizedItemName,
+                                quantity: safeQuantity,
                                 category: newTemplateItem.category
                               });
                               if (updated) {
@@ -4884,8 +4935,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               }
                             } else {
                               const updated = await realtimeService.updateInventoryTemplate(editingTemplateItemId, {
-                                item_name: newTemplateItem.item_name,
-                                quantity: parseInt(newTemplateItem.quantity),
+                                item_name: normalizedItemName,
+                                quantity: safeQuantity,
                                 category: newTemplateItem.category
                               });
                               if (updated) {
@@ -4896,22 +4947,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           } else {
                             if (inventoryTemplateSource === 'inventory_template') {
                               const created = await realtimeService.createInventoryTemplateItem({
-                                item_name: newTemplateItem.item_name,
-                                quantity: parseInt(newTemplateItem.quantity),
+                                item_name: normalizedItemName,
+                                quantity: safeQuantity,
                                 category: newTemplateItem.category
                               }, selectedHouse);
                               if (created) {
                                 setInventoryTemplate(prev => [...prev, { ...created, _legacyTable: true }]);
+                                await syncItemToEmployeeInventory();
                               }
                             } else {
                               const created = await realtimeService.createInventoryTemplate({
                                 house: selectedHouse,
-                                item_name: newTemplateItem.item_name,
-                                quantity: parseInt(newTemplateItem.quantity),
+                                item_name: normalizedItemName,
+                                quantity: safeQuantity,
                                 category: newTemplateItem.category
                               });
                               if (created) {
                                 setInventoryTemplate(prev => [...prev, created]);
+                                await syncItemToEmployeeInventory();
                               }
                             }
                           }
