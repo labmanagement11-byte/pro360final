@@ -381,13 +381,8 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
         });
     }
 
-    const completedCount = current.filter(Boolean).length;
-    const isCompleted = totalSubtasks > 0 && completedCount === totalSubtasks;
-    await (supabase as any)
-      .from('calendar_assignments')
-      .update({ completed: isCompleted })
-      .eq('id', taskId);
-    setAssignedTasks(tasks => tasks.map(t => t.id === taskId ? { ...t, completed: isCompleted } : t));
+    // El estado final "Trabajo Completado" lo confirma admin/manager.
+    // Aquí solo guardamos progreso por subtarea para mantener evidencia en tiempo real.
   }
 
   // Manejar complete/incompleto de items de assignment_inventory (empleado toggle)
@@ -5073,22 +5068,98 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         </div>
                       </div>
                       
-                      {/* Botón para marcar como completado */}
-                      {progress === 100 && (
+                      {/* Botón para marcar como completado (solo admin/manager) */}
+                      {progress === 100 && (user.role === 'manager' || user.role === 'owner' || user.role === 'dueno') && (
                         <div className="completion-section">
                           <button 
                             className="btn-mark-completed"
                             onClick={async () => {
                               if (confirm(`¿Marcar esta asignación como completada?`)) {
-                                console.log('✅ Asignación completada:', selectedAssignmentForChecklist);
-                                // Aquí podrías agregar lógica adicional si es necesario
-                                setSelectedAssignmentForChecklist(null);
+                                try {
+                                  const assignmentToComplete = calendarAssignments.find((a: any) => a.id === selectedAssignmentForChecklist);
+                                  if (!assignmentToComplete) return;
+
+                                  const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
+                                  const completedAtCandidates = checklistItems
+                                    .filter((i: any) => i.completed && i.completed_at)
+                                    .map((i: any) => i.completed_at);
+                                  const completionMoment = completedAtCandidates.length > 0
+                                    ? completedAtCandidates.sort().slice(-1)[0]
+                                    : new Date().toISOString();
+
+                                  const { error } = await (supabase as any)
+                                    .from('calendar_assignments')
+                                    .update({
+                                      completed: true,
+                                      completed_by: assignmentToComplete.employee,
+                                      completed_at: completionMoment,
+                                      updated_at: new Date().toISOString(),
+                                    })
+                                    .eq('id', selectedAssignmentForChecklist);
+
+                                  if (error) {
+                                    console.error('❌ Error marcando trabajo completado:', error);
+                                    alert('No se pudo marcar el trabajo como completado.');
+                                    return;
+                                  }
+
+                                  setCalendarAssignments(prev => prev.map((a: any) =>
+                                    a.id === selectedAssignmentForChecklist
+                                      ? {
+                                          ...a,
+                                          completed: true,
+                                          completed_by: assignmentToComplete.employee,
+                                          completed_at: completionMoment,
+                                          updated_at: new Date().toISOString(),
+                                        }
+                                      : a
+                                  ));
+
+                                  addRealtimeNotification(
+                                    `Trabajo completado: ${assignmentToComplete.employee} (${assignmentToComplete.type})`,
+                                    'success'
+                                  );
+                                  setSelectedAssignmentForChecklist(null);
+                                } catch (err) {
+                                  console.error('❌ Error en Trabajo Completado:', err);
+                                  alert('Ocurrió un error al completar el trabajo.');
+                                }
                               }
                             }}
                           >
                             <span className="btn-icon">✨</span>
                             <span className="btn-text">Trabajo Completado</span>
                           </button>
+                        </div>
+                      )}
+
+                      {/* Tarjeta extra para admin/manager: Trabajos Completados */}
+                      {(user.role === 'manager' || user.role === 'owner' || user.role === 'dueno') && (
+                        <div style={{ marginBottom: '1.25rem', background: '#f8fafc', border: '1px solid #dbeafe', borderRadius: '0.9rem', padding: '1rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ margin: 0, color: '#1e40af', fontSize: '1rem' }}>✅ Trabajos Completados</h3>
+                            <span style={{ background: '#1e40af', color: 'white', borderRadius: '1rem', padding: '0.2rem 0.6rem', fontSize: '0.8rem', fontWeight: 700 }}>
+                              {calendarAssignments.filter((a: any) => a.house === assignment.house && a.completed && a.completed_at).length}
+                            </span>
+                          </div>
+                          {calendarAssignments.filter((a: any) => a.house === assignment.house && a.completed && a.completed_at).length === 0 ? (
+                            <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Aun no hay trabajos completados para esta casa.</p>
+                          ) : (
+                            <div style={{ display: 'grid', gap: '0.6rem' }}>
+                              {calendarAssignments
+                                .filter((a: any) => a.house === assignment.house && a.completed && a.completed_at)
+                                .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+                                .slice(0, 6)
+                                .map((job: any) => (
+                                  <div key={`done-${job.id}`} style={{ background: 'white', border: '1px solid #bfdbfe', borderRadius: '0.7rem', padding: '0.7rem 0.85rem' }}>
+                                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>{job.employee} - {job.type}</div>
+                                    <div style={{ color: '#475569', fontSize: '0.88rem' }}>
+                                      📅 {new Date(job.completed_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })} • 🕐 {new Date(job.completed_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
                         </div>
                       )}
                       
