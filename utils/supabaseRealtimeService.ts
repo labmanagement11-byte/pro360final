@@ -1186,6 +1186,16 @@ export async function getAssignmentInventory(assignmentId: string | number) {
     
     if (!normalizedId) {
       console.warn('⚠️ [Assignment Inventory] Assignment ID vacío');
+
+          // Si el ID es un número entero, assignment_inventory.calendar_assignment_id es UUID — saltar silenciosamente
+          if (/^\d+$/.test(id)) {
+            return [];
+          }
+
+        // Si el ID es un número entero, assignment_inventory.calendar_assignment_id es UUID — saltar silenciosamente
+        if (/^\d+$/.test(id)) {
+          return [];
+        }
       return [];
     }
 
@@ -1311,46 +1321,9 @@ export function subscribeToAssignmentInventory(assignmentId: string | number, ca
 }
 
 export async function resolveAssignmentIdFromTask(task: any) {
-  try {
-    console.log('🔍 [resolveAssignmentIdFromTask] Buscando con:', {
-      employee: task.employee,
-      house: task.house,
-      date: task.date,
-      time: task.time,
-      type: task.type
-    });
-
-    const supabase = getSupabaseClient();
-    const query = (supabase
-      .from('calendar_assignments') as any)
-      .select('id, calendar_assignment_uuid')
-      .eq('employee', task.employee)
-      .eq('house', task.house)
-      .eq('date', task.date)
-      .eq('time', task.time)
-      .eq('type', task.type)
-      .limit(1)
-      .maybeSingle();
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('❌ [resolveAssignmentIdFromTask] Error:', error);
-      return null;
-    }
-    
-    // Preferir calendar_assignment_uuid si existe, si no usar id
-    const resolvedId = data?.calendar_assignment_uuid || data?.id || null;
-    console.log('✅ [resolveAssignmentIdFromTask] Encontrado:', {
-      id: data?.id,
-      uuid: data?.calendar_assignment_uuid,
-      usando: resolvedId
-    });
-    return resolvedId;
-  } catch (error) {
-    console.error('❌ [resolveAssignmentIdFromTask] Exception:', error);
-    return null;
-  }
+  // calendar_assignments.id es entero — devolver directamente, no intentar buscar UUID inexistente
+  if (task?.id) return task.id;
+  return null;
 }
 
 // CRUD para inventory_template (manager edita el template)
