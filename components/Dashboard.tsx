@@ -2107,6 +2107,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       desc: 'Administra roles: dueño, manager, empleado.',
       show: user.role === 'owner',
     },
+    {
+      key: 'completedJobs',
+      title: '✅ Trabajos Completados',
+      desc: 'Historial de trabajos completados por empleados. Guardados por 1 año.',
+      show: user.role === 'owner' || user.role === 'manager' || user.role === 'dueno',
+    },
   ];
 
   // --- Shopping List State ---
@@ -2479,7 +2485,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 key={card.key}
                 className="dashboard-card"
                 onClick={() => {
-                  if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks', 'extraTasks'].includes(card.key)) {
+                  if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks', 'extraTasks', 'completedJobs'].includes(card.key)) {
                     setSelectedModalCard(card.key);
                   } else {
                     setView(card.key);
@@ -2936,6 +2942,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 {selectedModalCard === 'inventory' && '📦 Inventario'}
                 {selectedModalCard === 'tasks' && '📋 Asignar Tareas'}
                 {selectedModalCard === 'extraTasks' && '🟦 Tareas Extra'}
+                {selectedModalCard === 'completedJobs' && '✅ Trabajos Completados'}
               </h2>
               <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
             </div>
@@ -3234,6 +3241,88 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedModalCard === 'assignedTasks' && (
                 <AssignedTasksCard user={user} onNavigateToInventory={() => { setSelectedModalCard(null); setView('inventory'); }} />
               )}
+
+              {selectedModalCard === 'completedJobs' && (() => {
+                const oneYearAgo = new Date();
+                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+                const completedJobs = calendarAssignments
+                  .filter((a: any) => a.completed && a.completed_at && new Date(a.completed_at) >= oneYearAgo)
+                  .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime());
+                return (
+                  <div style={{ padding: '0.5rem 0' }}>
+                    {completedJobs.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
+                        <p style={{ margin: 0, fontWeight: 600 }}>No hay trabajos completados aún.</p>
+                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.88rem' }}>Aquí aparecerán los trabajos marcados como completados.</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        {completedJobs.map((job: any) => (
+                          <div key={`cj-${job.id}`} style={{
+                            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                            border: '1.5px solid #86efac',
+                            borderRadius: '1rem',
+                            padding: '1rem 1.1rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '0.75rem',
+                            boxShadow: '0 2px 8px rgba(34,197,94,0.08)'
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                <span style={{ fontSize: '1.1rem' }}>👤</span>
+                                <span style={{ fontWeight: 700, color: '#15803d', fontSize: '0.97rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                  {job.employee}
+                                </span>
+                                <span style={{
+                                  background: '#dcfce7',
+                                  color: '#166534',
+                                  border: '1px solid #86efac',
+                                  borderRadius: '0.5rem',
+                                  padding: '0.1rem 0.55rem',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 600
+                                }}>{job.type}</span>
+                              </div>
+                              <div style={{ color: '#475569', fontSize: '0.88rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                <span>🏠 {job.house}</span>
+                                <span>📅 {new Date(job.completed_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                <span>🕐 {new Date(job.completed_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              {job.completed_by && (
+                                <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.25rem' }}>Confirmado por: {job.completed_by}</div>
+                              )}
+                            </div>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`¿Eliminar el registro de trabajo completado de ${job.employee}?`)) return;
+                                if (!supabase) return;
+                                await (supabase as any).from('calendar_assignments').update({ completed: false, completed_by: null, completed_at: null }).eq('id', job.id);
+                                setCalendarAssignments(prev => prev.map((a: any) => a.id === job.id ? { ...a, completed: false, completed_by: null, completed_at: null } : a));
+                              }}
+                              style={{
+                                background: '#fee2e2',
+                                color: '#b91c1c',
+                                border: '1px solid #fecaca',
+                                borderRadius: '0.6rem',
+                                padding: '0.4rem 0.65rem',
+                                fontSize: '0.82rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >🗑️ Eliminar</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem', marginTop: '1.25rem' }}>Los registros se guardan por 1 año desde la fecha de completado.</p>
+                  </div>
+                );
+              })()}
               {selectedModalCard === 'shopping' && (
                 <>
                   {/* Formulario para agregar productos */}
