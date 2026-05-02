@@ -4688,7 +4688,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           }
 
                           if (editingInventoryIdx) {
-                            await (supabase as any)
+                            const { data: updatedItem } = await (supabase as any)
                               .from('inventory')
                               .update({
                                 name: normalizedName,
@@ -4696,9 +4696,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 location: normalizedRoom,
                                 updated_at: new Date().toISOString()
                               })
-                              .eq('id', editingInventoryIdx);
+                              .eq('id', editingInventoryIdx)
+                              .select()
+                              .single();
+                            if (updatedItem) {
+                              setInventoryList(prev => prev.map(i => i.id === editingInventoryIdx ? updatedItem : i));
+                            }
                           } else {
-                            await (supabase as any)
+                            const { data: newItem } = await (supabase as any)
                               .from('inventory')
                               .insert([{
                                 name: normalizedName,
@@ -4707,7 +4712,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 complete: false,
                                 house: selectedHouse,
                                 created_at: new Date().toISOString()
-                              }]);
+                              }])
+                              .select()
+                              .single();
+                            if (newItem) {
+                              setInventoryList(prev => [...prev, newItem]);
+                            }
                           }
 
                           setEditingInventoryIdx(null);
@@ -4819,6 +4829,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   onClick={async () => {
                                     if (!confirm(`¿Eliminar "${item.name}" del inventario?`)) return;
                                     await (supabase as any).from('inventory').delete().eq('id', item.id);
+                                    setInventoryList(prev => prev.filter(i => i.id !== item.id));
                                   }}
                                 >
                                   🗑️ Eliminar
