@@ -1240,6 +1240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     notes: '',
   });
   const [editingInventoryIdx, setEditingInventoryIdx] = useState<string | null>(null);
+  const [inventoryAreaCustom, setInventoryAreaCustom] = useState(false);
 
   // Estado para checklist sincronizado en tiempo real por asignación
   const [syncedChecklists, setSyncedChecklists] = useState<Map<string, any[]>>(new Map());
@@ -4721,6 +4722,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           }
 
                           setEditingInventoryIdx(null);
+                          setInventoryAreaCustom(false);
                           setNewInventoryItem({
                             name: '',
                             quantity: '',
@@ -4753,12 +4755,46 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             </div>
                             <div className="form-group">
                               <label>📍 Área</label>
-                              <input
-                                type="text"
-                                value={newInventoryItem.location}
-                                onChange={(e) => setNewInventoryItem({ ...newInventoryItem, location: e.target.value })}
-                                placeholder="Ej: Cocina"
-                              />
+                              {(() => {
+                                const predefinedAreas = ['Cocina', 'Sala', 'Baños', 'Habitación', 'Cuarto de lavado', 'Terraza'];
+                                const selectVal = inventoryAreaCustom ? 'Otras' : (predefinedAreas.includes(newInventoryItem.location) ? newInventoryItem.location : '');
+                                return (
+                                  <>
+                                    <select
+                                      value={selectVal}
+                                      onChange={(e) => {
+                                        if (e.target.value === 'Otras') {
+                                          setInventoryAreaCustom(true);
+                                          setNewInventoryItem({ ...newInventoryItem, location: '' });
+                                        } else {
+                                          setInventoryAreaCustom(false);
+                                          setNewInventoryItem({ ...newInventoryItem, location: e.target.value });
+                                        }
+                                      }}
+                                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.95rem' }}
+                                    >
+                                      <option value="">-- Seleccionar área --</option>
+                                      <option value="Cocina">🍳 Cocina</option>
+                                      <option value="Sala">🛋️ Sala</option>
+                                      <option value="Baños">🚿 Baños</option>
+                                      <option value="Habitación">🛏️ Habitación</option>
+                                      <option value="Cuarto de lavado">🧺 Cuarto de lavado</option>
+                                      <option value="Terraza">🌿 Terraza</option>
+                                      <option value="Otras">📦 Otras</option>
+                                    </select>
+                                    {inventoryAreaCustom && (
+                                      <input
+                                        type="text"
+                                        value={newInventoryItem.location}
+                                        onChange={(e) => setNewInventoryItem({ ...newInventoryItem, location: e.target.value })}
+                                        placeholder="Especificar área..."
+                                        autoFocus
+                                        style={{ marginTop: '0.4rem', width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ddd', fontSize: '0.95rem', boxSizing: 'border-box' }}
+                                      />
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '1rem' }}>
@@ -4771,6 +4807,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 className="dashboard-btn danger"
                                 onClick={() => {
                                   setEditingInventoryIdx(null);
+                                  setInventoryAreaCustom(false);
                                   setNewInventoryItem({
                                     name: '',
                                     quantity: '',
@@ -4809,6 +4846,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   type="button"
                                   onClick={() => {
                                     setEditingInventoryIdx(item.id);
+                                    const predefined = ['Cocina', 'Sala', 'Baños', 'Habitación', 'Cuarto de lavado', 'Terraza'];
+                                    const loc = item.location || '';
+                                    setInventoryAreaCustom(!predefined.includes(loc) && loc !== '');
                                     setNewInventoryItem({
                                       name: item.name || '',
                                       quantity: String(item.quantity || ''),
