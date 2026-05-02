@@ -3530,3 +3530,276 @@ body,
     font-size: 0.95rem;
   }
 }
+
+  /* ============================================
+     EMPLOYEE TASK CARDS - PRO UI
+     ============================================ */
+
+  .assigned-tasks-item-v2.assigned-tasks-item-pro {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    border: 2px solid #dbe7f3;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  }
+
+  .assigned-task-main-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .assigned-task-type-label {
+    font-size: 1.02rem;
+    font-weight: 800;
+    color: #0369a1;
+    margin-bottom: 0.3rem;
+    letter-spacing: 0.01em;
+  }
+
+  .assigned-task-date-label {
+    font-size: 0.95rem;
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  .assigned-task-actions-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+  }
+
+  .assigned-task-delete-btn {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .assigned-task-progress-wrap {
+    margin-top: 0.8rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .assigned-task-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.55rem;
+  }
+
+  .assigned-task-progress-title {
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .assigned-task-progress-value {
+    color: #0284c7;
+    font-size: 0.95rem;
+    font-weight: 800;
+  }
+
+  .assigned-task-zones-wrap {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .assigned-task-zones-title {
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+
+  .assigned-task-zones-grid {
+    display: grid;
+    gap: 1.2rem;
+  }
+
+  .assigned-task-zone-card {
+    background: #f8fbff;
+    padding: 1.2rem;
+    border-radius: 1rem;
+    border: 2px solid #dbeafe;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  }
+
+  .assigned-task-zone-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid #dbeafe;
+    gap: 0.75rem;
+  }
+
+  .assigned-task-zone-name {
+    font-weight: 800;
+    color: #1f2937;
+    font-size: 1.05rem;
+  }
+
+  .assigned-task-zone-count {
+    background: #0284c7;
+    color: #ffffff;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .assigned-task-subtasks-grid {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  .assigned-task-subtask-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    border: 2px solid #e5e7eb;
+    transition: all 0.25s ease;
+  }
+
+  .assigned-task-subtask-row.is-completed {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
+
+  .assigned-task-subtask-btn {
+    padding: 0.7rem 1.2rem;
+    border-radius: 0.6rem;
+    border: none;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 165px;
+    color: #ffffff;
+    transition: all 0.2s ease;
+  }
+
+  .assigned-task-subtask-btn.pending {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.28);
+  }
+
+  .assigned-task-subtask-btn.done {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.28);
+  }
+
+  .assigned-task-subtask-text {
+    flex: 1;
+    font-size: 1rem;
+    color: #1f2937;
+    line-height: 1.55;
+    font-weight: 500;
+  }
+
+  .assigned-task-subtask-text.is-completed {
+    color: #94a3b8;
+    text-decoration: line-through;
+  }
+
+  .assigned-task-finish-btn {
+    margin-top: 0.85rem;
+    width: 100%;
+    min-height: 46px;
+    border-radius: 0.7rem;
+    font-weight: 800;
+    font-size: 0.96rem;
+    letter-spacing: 0.01em;
+  }
+
+  @media (max-width: 768px) {
+    .assigned-tasks-item-v2.assigned-tasks-item-pro {
+      padding: 0.9rem;
+    }
+
+    .assigned-task-subtask-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+      padding: 0.9rem;
+    }
+
+    .assigned-task-subtask-btn {
+      width: 100%;
+      min-width: 0;
+      min-height: 44px;
+      font-size: 0.95rem;
+    }
+
+    .assigned-task-zone-name {
+      font-size: 1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .assigned-tasks-item-v2.assigned-tasks-item-pro {
+      border-radius: 0.9rem;
+      padding: 0.8rem;
+    }
+
+    .assigned-task-actions-box {
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .assigned-tasks-status-badge {
+      width: 100%;
+      justify-content: center;
+      font-size: 0.78rem;
+    }
+
+    .assigned-task-type-label {
+      font-size: 0.95rem;
+    }
+
+    .assigned-task-date-label {
+      font-size: 0.86rem;
+    }
+
+    .assigned-task-zones-title {
+      font-size: 1rem;
+    }
+
+    .assigned-task-zone-card {
+      padding: 0.9rem;
+      border-radius: 0.8rem;
+    }
+
+    .assigned-task-zone-head {
+      margin-bottom: 0.7rem;
+      padding-bottom: 0.7rem;
+    }
+
+    .assigned-task-zone-count {
+      font-size: 0.82rem;
+      padding: 0.35rem 0.65rem;
+    }
+
+    .assigned-task-subtask-text {
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .assigned-task-finish-btn {
+      min-height: 48px;
+      font-size: 0.92rem;
+    }
+  }
