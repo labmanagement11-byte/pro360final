@@ -4520,10 +4520,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div className="modal-body-empty"><p>📭 No hay items en el inventario de esta casa.</p></div>
                       ) : (
                         (() => {
-                          // Agrupar por room/category
+                          // Agrupar por location/category
                           const grouped = new Map<string, any[]>();
                           inventoryList.forEach(item => {
-                            const key = item.room || item.category || 'General';
+                            const key = item.location || item.category || 'General';
                             if (!grouped.has(key)) grouped.set(key, []);
                             grouped.get(key)!.push(item);
                           });
@@ -4541,7 +4541,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                         </div>
                                         <div className="subcard-content">
                                           <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
-                                          {item.room && <p><strong>📍 Área:</strong> {item.room}</p>}
+                                          {item.location && <p><strong>📍 Área:</strong> {item.location}</p>}
                                           <p><strong>📊 Estado:</strong> <span style={{color: item.complete ? '#10b981' : '#f59e0b', fontWeight:700}}>{item.complete ? 'Completo' : 'Pendiente'}</span></p>
                                         </div>
                                         <div className="subcard-actions">
@@ -4551,7 +4551,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                             onClick={async () => {
                                               const newVal = !item.complete;
                                               setInventoryList(prev => prev.map(i => i.id === item.id ? {...i, complete: newVal} : i));
-                                              await (supabase as any).from('inventory').update({ complete: newVal, missing: newVal ? 0 : (item.missing || 0) }).eq('id', item.id);
+                                              await (supabase as any).from('inventory').update({ complete: newVal }).eq('id', item.id);
                                             }}
                                           >
                                             {item.complete ? '✅ Marcar Incompleto' : '⏳ Marcar Completo'}
@@ -4622,7 +4622,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             {(() => {
                               const grouped = new Map<string, any[]>();
                               inventoryList.forEach((item: any) => {
-                                const key = item.room || item.category || 'General';
+                                const key = item.location || item.category || 'General';
                                 if (!grouped.has(key)) grouped.set(key, []);
                                 grouped.get(key)!.push(item);
                               });
@@ -4640,7 +4640,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                             </div>
                                             <div className="subcard-content">
                                               <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
-                                              {item.room && <p><strong>📍 Área:</strong> {item.room}</p>}
+                                              {item.location && <p><strong>📍 Área:</strong> {item.location}</p>}
                                               <p><strong>📊 Estado:</strong> <span style={{color: item.complete ? '#10b981' : '#f59e0b', fontWeight:700}}>{item.complete ? 'Completo' : 'Pendiente'}</span></p>
                                             </div>
                                           </div>
@@ -4656,8 +4656,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 if (!confirm('¿Reiniciar inventario? Todos los items volverán a estar pendientes.')) return;
                                 const ids = inventoryList.map(i => i.id).filter(Boolean);
                                 if (ids.length === 0) return;
-                                await (supabase as any).from('inventory').update({ complete: false, missing: 0, reason: null }).in('id', ids);
-                                setInventoryList(prev => prev.map(i => ({...i, complete: false, missing: 0, reason: null})));
+                                await (supabase as any).from('inventory').update({ complete: false }).in('id', ids);
+                                setInventoryList(prev => prev.map(i => ({...i, complete: false})));
                               }}
                               style={{marginTop:'0.75rem', width:'100%', padding:'0.75rem 1rem', background:'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color:'white', border:'none', borderRadius:'0.5rem', fontWeight:700, fontSize:'0.95rem', cursor:'pointer'}}
                             >
@@ -4693,7 +4693,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               .update({
                                 name: normalizedName,
                                 quantity: safeQuantity,
-                                room: normalizedRoom,
+                                location: normalizedRoom,
                                 updated_at: new Date().toISOString()
                               })
                               .eq('id', editingInventoryIdx);
@@ -4703,10 +4703,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               .insert([{
                                 name: normalizedName,
                                 quantity: safeQuantity,
-                                room: normalizedRoom,
+                                location: normalizedRoom,
                                 complete: false,
-                                missing: 0,
-                                reason: null,
                                 house: selectedHouse,
                                 created_at: new Date().toISOString()
                               }]);
@@ -4793,7 +4791,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               </div>
                               <div className="subcard-content">
                                 <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
-                                <p><strong>📍 Área:</strong> {item.room || 'General'}</p>
+                                <p><strong>📍 Área:</strong> {item.location || 'General'}</p>
                                 <p><strong>📊 Estado empleado:</strong> {item.complete ? 'Completo' : 'Pendiente'}</p>
                               </div>
                               <div className="subcard-actions">
@@ -4804,7 +4802,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                     setNewInventoryItem({
                                       name: item.name || '',
                                       quantity: String(item.quantity || ''),
-                                      location: item.room || '',
+                                      location: item.location || '',
                                       complete: !!item.complete,
                                       notes: item.notes || '',
                                     });
