@@ -5594,54 +5594,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     {employeeInventoryProgress.length > 0 && (
                       <button
                         onClick={async () => {
-                          const assignmentId = selectedEmployeeForProgress.assignment.id;
-                          console.log('🔄 [Reset] Assignment ID:', assignmentId);
+                          const houseName = selectedEmployeeForProgress.assignment.house || user.house;
+                          console.log('🔄 [Reset] House:', houseName);
                           console.log('📋 [Reset] Assignment:', selectedEmployeeForProgress.assignment);
-                          
-                          if (!assignmentId) {
-                            alert('No se pudo determinar la asignación');
-                            return;
-                          }
                           
                           if (confirm('¿Reiniciar el inventario para la próxima visita? Todos los items volverán a estar pendientes.')) {
                             try {
-                              console.log('🔄 Reiniciando inventario de asignación:', assignmentId);
-                              
-                              // Primero verificar cuántos items hay en assignment_inventory
-                              const { data: items, error: countError } = await (supabase as any)
-                                .from('assignment_inventory')
-                                .select('id, item_name, is_complete')
-                                .eq('calendar_assignment_id', assignmentId);
-                              
-                              console.log('📊 Items encontrados en assignment_inventory:', items?.length, items);
-                              
-                              if (countError) {
-                                console.error('❌ Error buscando items:', countError);
+                              console.log('🔄 Reiniciando inventario de casa:', houseName);
+
+                              const items = await realtimeService.getInventoryItems(houseName);
+                              const itemsToReset = (items || []).filter((it: any) => it.complete || it.is_complete);
+
+                              for (const item of itemsToReset) {
+                                await realtimeService.updateInventoryItem(String(item.id), { complete: false });
                               }
-                              
-                              // Ahora actualizar assignment_inventory
-                              const { data: updated, error } = await (supabase as any)
-                                .from('assignment_inventory')
-                                .update({ 
-                                  is_complete: false,
-                                  checked_by: null,
-                                  checked_at: null,
-                                  updated_at: new Date().toISOString()
-                                })
-                                .eq('calendar_assignment_id', assignmentId)
-                                .select();
-                              
-                              console.log('📝 Items actualizados:', updated?.length, updated);
-                              
-                              if (error) {
-                                console.error('❌ Error reiniciando inventario:', error);
-                                alert('Error al reiniciar el inventario: ' + error.message);
-                              } else {
-                                console.log('✅ Inventario reiniciado exitosamente. Items actualizados:', updated?.length || 0);
-                                // Actualizar estado local
-                                setEmployeeInventoryProgress(prev => prev.map(item => ({ ...item, is_complete: false, checked_by: null, checked_at: null })));
-                                alert(`✅ Inventario reiniciado. ${updated?.length || 0} items actualizados.`);
-                              }
+
+                              const refreshed = await realtimeService.getInventoryItems(houseName);
+                              setEmployeeInventoryProgress(refreshed || []);
+                              alert(`✅ Inventario reiniciado. ${itemsToReset.length} items actualizados.`);
                             } catch (err) {
                               console.error('❌ Error:', err);
                               alert('Error al reiniciar el inventario');
