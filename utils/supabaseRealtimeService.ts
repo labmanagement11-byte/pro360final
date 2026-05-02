@@ -1119,6 +1119,11 @@ export async function createAssignmentInventory(assignmentId: string | number, e
     return [];
   }
 
+  // assignment_inventory.calendar_assignment_id es UUID
+  if (/^\d+$/.test(id)) {
+    return [];
+  }
+
   // Eliminar inventario previo de la asignación (si existe)
   try {
     await (supabase
@@ -1186,16 +1191,11 @@ export async function getAssignmentInventory(assignmentId: string | number) {
     
     if (!normalizedId) {
       console.warn('⚠️ [Assignment Inventory] Assignment ID vacío');
+      return [];
+    }
 
-          // Si el ID es un número entero, assignment_inventory.calendar_assignment_id es UUID — saltar silenciosamente
-          if (/^\d+$/.test(id)) {
-            return [];
-          }
-
-        // Si el ID es un número entero, assignment_inventory.calendar_assignment_id es UUID — saltar silenciosamente
-        if (/^\d+$/.test(id)) {
-          return [];
-        }
+    // assignment_inventory.calendar_assignment_id es UUID
+    if (/^\d+$/.test(id)) {
       return [];
     }
 
