@@ -573,44 +573,22 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                   const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
                   
                   return (
-                    <div
-                      key={task.id}
-                      className="assigned-tasks-item-v2"
-                      style={{
-                        background: '#ffffff',
-                        border: '2px solid #dbe7f3',
-                        borderRadius: '1rem',
-                        padding: '1rem',
-                        boxShadow: '0 4px 14px rgba(15, 23, 42, 0.06)'
-                      }}
-                    >
+                    <div key={task.id} className="assigned-tasks-item-v2 assigned-tasks-item-pro">
                       <div className="assigned-tasks-item-header-v2">
-                        <div style={{flex: 1}}>
-                          <div style={{fontSize: '1rem', fontWeight: '700', color: '#0284c7', marginBottom: '0.3rem'}}>
+                        <div className="assigned-task-main-info">
+                          <div className="assigned-task-type-label">
                             {task.type === 'Limpieza profunda' ? '🧹 Profunda' : task.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
                           </div>
-                          <div style={{fontSize: '0.95rem', color: '#64748b'}}>
+                          <div className="assigned-task-date-label">
                             📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
                           </div>
                         </div>
-                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem'}}>
+                        <div className="assigned-task-actions-box">
                           <span className={`assigned-tasks-status-badge ${isCompleted ? 'status-done' : 'status-pending'}`}>
                             {isCompleted ? '✅ Hecho' : '⏳ Pendiente'}
                           </span>
                           {canManageAssignments && (
-                            <button
-                              onClick={() => handleDeleteAssignment(task)}
-                              style={{
-                                background: '#fee2e2',
-                                color: '#b91c1c',
-                                border: '1px solid #fecaca',
-                                borderRadius: '0.5rem',
-                                padding: '0.35rem 0.6rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                              }}
-                            >
+                            <button className="assigned-task-delete-btn" onClick={() => handleDeleteAssignment(task)}>
                               🗑️ Eliminar
                             </button>
                           )}
@@ -618,10 +596,10 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                       </div>
 
                       {/* Barra de progreso */}
-                      <div style={{marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0'}}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '600'}}>
-                          <span style={{color: '#0f172a'}}>Progreso</span>
-                          <span style={{color: '#0284c7'}}>{percent}%</span>
+                      <div className="assigned-task-progress-wrap">
+                        <div className="assigned-task-progress-head">
+                          <span className="assigned-task-progress-title">Progreso</span>
+                          <span className="assigned-task-progress-value">{percent}%</span>
                         </div>
                         <div className="progress-bar-modern-container">
                           <div className={`progress-bar-modern-fill ${isCompleted ? 'complete' : ''}`} style={{width: `${percent}%`}}></div>
@@ -630,9 +608,9 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
 
                       {/* Zonas/Subtareas para empleados */}
                       {!isManager && subtasksMap && (
-                        <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'}}>
-                          <div style={{fontWeight: '800', color: '#0f172a', marginBottom: '1rem', fontSize: '1.1rem'}}>📋 Zonas de Limpieza</div>
-                          <div style={{display: 'grid', gap: '1.2rem'}}>
+                        <div className="assigned-task-zones-wrap">
+                          <div className="assigned-task-zones-title">📋 Zonas de Limpieza</div>
+                          <div className="assigned-task-zones-grid">
                             {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => {
                               const zoneItemsCount = (subtasks as string[]).length;
                               const zoneCompletedCount = (subtasks as string[]).filter((_, idx) => {
@@ -640,38 +618,24 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                                 return progressArr[globalIdx];
                               }).length;
                               return (
-                                <div key={zona} style={{background: '#f8fbff', padding: '1.2rem', borderRadius: '1rem', border: '2px solid #dbeafe', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'}}>
-                                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem', paddingBottom: '0.9rem', borderBottom: '1px solid #dbeafe'}}>
-                                    <span style={{fontWeight: '800', color: '#1f2937', fontSize: '1.05rem'}}>{zona}</span>
-                                    <span style={{background: '#0284c7', color: 'white', padding: '0.4rem 0.8rem', borderRadius: '0.5rem', fontSize: '0.9rem', fontWeight: '700'}}>{zoneCompletedCount}/{zoneItemsCount}</span>
+                                <div key={zona} className="assigned-task-zone-card">
+                                  <div className="assigned-task-zone-head">
+                                    <span className="assigned-task-zone-name">{zona}</span>
+                                    <span className="assigned-task-zone-count">{zoneCompletedCount}/{zoneItemsCount}</span>
                                   </div>
-                                  <div style={{display: 'grid', gap: '0.8rem'}}>
+                                  <div className="assigned-task-subtasks-grid">
                                     {(subtasks as string[]).map((subtask, idx) => {
                                       const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                       const isCompleted = progressArr[globalIdx];
                                       return (
-                                        <div key={`${zona}-${idx}`} style={{display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#ffffff', borderRadius: '0.75rem', border: isCompleted ? '2px solid #10b981' : '2px solid #e5e7eb', transition: 'all 0.3s ease'}}>
+                                        <div key={`${zona}-${idx}`} className={`assigned-task-subtask-row ${isCompleted ? 'is-completed' : ''}`}>
                                           <button
+                                            className={`assigned-task-subtask-btn ${isCompleted ? 'done' : 'pending'}`}
                                             onClick={() => handleSubtaskToggle(task.id, globalIdx, !isCompleted, allSubtasks.length)}
-                                            style={{
-                                              padding: '0.7rem 1.2rem',
-                                              borderRadius: '0.6rem',
-                                              border: 'none',
-                                              fontWeight: '700',
-                                              fontSize: '0.95rem',
-                                              cursor: 'pointer',
-                                              whiteSpace: 'nowrap',
-                                              flexShrink: 0,
-                                              minWidth: '165px',
-                                              background: isCompleted ? '#10b981' : '#f59e0b',
-                                              color: 'white',
-                                              transition: 'all 0.3s ease',
-                                              boxShadow: isCompleted ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 2px 8px rgba(245, 158, 11, 0.2)',
-                                            }}
                                           >
                                             {isCompleted ? '✅ Completada' : '⏳ Completar'}
                                           </button>
-                                          <span style={{flex: 1, fontSize: '1rem', color: isCompleted ? '#94a3b8' : '#1f2937', textDecoration: isCompleted ? 'line-through' : 'none', lineHeight: '1.55', fontWeight: 500}}>
+                                          <span className={`assigned-task-subtask-text ${isCompleted ? 'is-completed' : ''}`}>
                                             {subtask}
                                           </span>
                                         </div>
@@ -770,17 +734,6 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
                         );
                       })()}
 
-                      {/* Botón de acción */}
-                      {!isManager && (
-                        <button
-                          className={`btn-mark-completed ${isCompleted ? 'completed' : ''}`}
-                          style={{marginTop: '0.75rem', width: '100%', padding: '0.75rem', borderRadius: '0.625rem', border: 'none', fontWeight: '600', cursor: isCompleted ? 'default' : 'pointer', fontSize: '0.9rem'}}
-                          onClick={() => markTaskComplete(task, !isCompleted)}
-                          disabled={isCompleted}
-                        >
-                          {isCompleted ? '✅ Completada' : '⏳ Marcar como completada'}
-                        </button>
-                      )}
                     </div>
                   );
                 })}
