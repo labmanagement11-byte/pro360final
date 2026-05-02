@@ -4500,28 +4500,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {/* ============ VISTA EMPLEADO: completo/incompleto ============ */}
                   {user.role === 'empleado' && (
                     <div>
-                      {/* Stats de progreso */}
-                      <div className="modal-stats" style={{marginBottom:'1.5rem'}}>
-                        <div className="stat-box">
-                          <p className="stat-box-number">{inventoryList.length}</p>
-                          <p className="stat-box-label">Total Items</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number" style={{color:'#10b981'}}>{inventoryList.filter(i => i.complete).length}</p>
-                          <p className="stat-box-label">Completos</p>
-                        </div>
-                        <div className="stat-box">
-                          <p className="stat-box-number" style={{color:'#f59e0b'}}>{inventoryList.filter(i => !i.complete).length}</p>
-                          <p className="stat-box-label">Pendientes</p>
-                        </div>
-                      </div>
+                      {/* Barra de progreso visual */}
+                      {(() => {
+                        const total = inventoryList.length;
+                        const done = inventoryList.filter(i => i.complete).length;
+                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                        return (
+                          <div style={{marginBottom: '1.5rem', background: '#f8fafc', borderRadius: '1rem', padding: '1.25rem 1.5rem', border: '1px solid #e2e8f0'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem'}}>
+                              <span style={{fontWeight: 700, color: '#0f172a', fontSize: '1rem'}}>📦 Progreso del Inventario</span>
+                              <span style={{fontWeight: 800, fontSize: '1.1rem', color: pct === 100 ? '#10b981' : '#2563eb'}}>{done}/{total} completos</span>
+                            </div>
+                            <div style={{background: '#e2e8f0', borderRadius: '1rem', height: '12px', overflow: 'hidden'}}>
+                              <div style={{height: '100%', borderRadius: '1rem', width: `${pct}%`, background: pct === 100 ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#2563eb,#0ea5e9)', transition: 'width 0.4s ease'}} />
+                            </div>
+                            <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontSize: '0.85rem'}}>
+                              <span style={{color: '#10b981', fontWeight: 600}}>✅ {done} completos</span>
+                              <span style={{color: '#f59e0b', fontWeight: 600}}>⏳ {total - done} pendientes</span>
+                              <span style={{color: pct === 100 ? '#10b981' : '#2563eb', fontWeight: 700}}>{pct}%</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {loadingInventory ? (
                         <div className="modal-body-empty"><p>Cargando inventario...</p></div>
                       ) : inventoryList.length === 0 ? (
                         <div className="modal-body-empty"><p>📭 No hay items en el inventario de esta casa.</p></div>
                       ) : (
                         (() => {
-                          // Agrupar por location/category
                           const grouped = new Map<string, any[]>();
                           inventoryList.forEach(item => {
                             const key = item.location || item.category || 'General';
@@ -4529,40 +4536,87 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             grouped.get(key)!.push(item);
                           });
                           return (
-                            <div>
-                              {Array.from(grouped.entries()).map(([group, groupItems]) => (
-                                <div key={group} style={{marginBottom:'2rem'}}>
-                                  <h3 style={{marginBottom:'1rem', color:'#2563eb'}}>{group} ({groupItems.length} items)</h3>
-                                  <div className="subcards-grid">
-                                    {groupItems.map((item: any) => (
-                                      <div key={item.id} className="subcard" style={{borderTop: item.complete ? '4px solid #10b981' : '4px solid #f59e0b'}}>
-                                        <div className="subcard-header">
-                                          <div className="subcard-icon">{item.complete ? '✅' : '📦'}</div>
-                                          <h3 style={{color: item.complete ? '#166534' : '#1f2937'}}>{item.name}</h3>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
+                              {Array.from(grouped.entries()).map(([group, groupItems]) => {
+                                const groupDone = groupItems.filter(i => i.complete).length;
+                                return (
+                                  <div key={group}>
+                                    {/* Header de grupo */}
+                                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', padding: '0.75rem 1rem', background: 'linear-gradient(135deg,#1e40af,#2563eb)', borderRadius: '0.75rem', color: 'white'}}>
+                                      <span style={{fontWeight: 800, fontSize: '1.05rem'}}>📍 {group}</span>
+                                      <span style={{background: groupDone === groupItems.length ? '#10b981' : 'rgba(255,255,255,0.25)', padding: '0.3rem 0.75rem', borderRadius: '1rem', fontSize: '0.9rem', fontWeight: 700}}>
+                                        {groupDone}/{groupItems.length}
+                                      </span>
+                                    </div>
+                                    {/* Tarjetas del grupo */}
+                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem'}}>
+                                      {groupItems.map((item: any) => (
+                                        <div key={item.id} style={{
+                                          background: item.complete ? 'linear-gradient(135deg,#f0fdf4,#dcfce7)' : 'linear-gradient(135deg,#fffbeb,#fef3c7)',
+                                          border: item.complete ? '2px solid #86efac' : '2px solid #fcd34d',
+                                          borderRadius: '1rem',
+                                          overflow: 'hidden',
+                                          boxShadow: item.complete ? '0 2px 8px rgba(16,185,129,0.15)' : '0 2px 8px rgba(245,158,11,0.15)',
+                                          transition: 'all 0.3s ease'
+                                        }}>
+                                          {/* Banda superior de estado */}
+                                          <div style={{background: item.complete ? '#10b981' : '#f59e0b', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                            <span style={{fontSize: '1.1rem'}}>{item.complete ? '✅' : '📦'}</span>
+                                            <span style={{color: 'white', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.05em', textTransform: 'uppercase'}}>
+                                              {item.complete ? 'Completo' : 'Pendiente'}
+                                            </span>
+                                          </div>
+                                          {/* Contenido */}
+                                          <div style={{padding: '1rem 1.25rem'}}>
+                                            <h3 style={{margin: '0 0 0.75rem', fontSize: '1.1rem', fontWeight: 800, color: item.complete ? '#166534' : '#92400e', lineHeight: '1.3'}}>
+                                              {item.name}
+                                            </h3>
+                                            <div style={{display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: item.notes ? '0.75rem' : '1rem'}}>
+                                              <span style={{background: item.complete ? '#dcfce7' : '#fef3c7', border: item.complete ? '1px solid #86efac' : '1px solid #fcd34d', borderRadius: '0.5rem', padding: '0.3rem 0.6rem', fontSize: '0.9rem', fontWeight: 600, color: item.complete ? '#166534' : '#92400e'}}>
+                                                🔢 Cantidad: {item.quantity}
+                                              </span>
+                                            </div>
+                                            {item.notes && (
+                                              <div style={{background: 'rgba(0,0,0,0.04)', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.85rem', color: '#4b5563', marginBottom: '1rem'}}>
+                                                📝 {item.notes}
+                                              </div>
+                                            )}
+                                            {/* Botón de toggle */}
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                const newVal = !item.complete;
+                                                setInventoryList(prev => prev.map(i => i.id === item.id ? {...i, complete: newVal} : i));
+                                                await (supabase as any).from('inventory').update({ complete: newVal, updated_at: new Date().toISOString() }).eq('id', item.id);
+                                              }}
+                                              style={{
+                                                width: '100%',
+                                                padding: '0.75rem 1rem',
+                                                background: item.complete ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#10b981,#059669)',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '0.75rem',
+                                                fontWeight: 800,
+                                                fontSize: '1rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.5rem',
+                                                boxShadow: item.complete ? '0 3px 8px rgba(239,68,68,0.35)' : '0 3px 8px rgba(16,185,129,0.35)',
+                                                transition: 'all 0.2s ease',
+                                                letterSpacing: '0.02em'
+                                              }}
+                                            >
+                                              {item.complete ? '↩ Marcar como Pendiente' : '✔ Marcar como Completo'}
+                                            </button>
+                                          </div>
                                         </div>
-                                        <div className="subcard-content">
-                                          <p><strong>🔢 Cantidad:</strong> {item.quantity}</p>
-                                          {item.location && <p><strong>📍 Área:</strong> {item.location}</p>}
-                                          <p><strong>📊 Estado:</strong> <span style={{color: item.complete ? '#10b981' : '#f59e0b', fontWeight:700}}>{item.complete ? 'Completo' : 'Pendiente'}</span></p>
-                                        </div>
-                                        <div className="subcard-actions">
-                                          <button
-                                            type="button"
-                                            style={{background: item.complete ? '#10b981' : '#f59e0b', color:'white', border:'none', borderRadius:'0.5rem', padding:'0.6rem 1rem', fontWeight:700, fontSize:'0.9rem', cursor:'pointer', width:'100%', transition:'all 0.2s ease'}}
-                                            onClick={async () => {
-                                              const newVal = !item.complete;
-                                              setInventoryList(prev => prev.map(i => i.id === item.id ? {...i, complete: newVal} : i));
-                                              await (supabase as any).from('inventory').update({ complete: newVal }).eq('id', item.id);
-                                            }}
-                                          >
-                                            {item.complete ? '✅ Marcar Incompleto' : '⏳ Marcar Completo'}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))}
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           );
                         })()
