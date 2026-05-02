@@ -282,52 +282,78 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
   // Para managers: progreso por tarea y usuario (assignment_id + user_id)
   const [subtaskProgress, setSubtaskProgress] = useState<{ [key: string]: boolean[] }>({});
 
-  // Cargar progreso de subtareas desde Supabase al iniciar
+  // Cargar progreso de subtareas desde calendar_assignments.notes (fallback robusto)
   useEffect(() => {
-    if (!user || !user.id || !user.house) return;
-    const isManager = user.role && user.role.toLowerCase().includes('manager');
-    const fetchProgress = async () => {
-      if (!supabase) return;
-      let query = (supabase as any)
-        .from('subtask_progress')
-        .select('assignment_id, user_id, subtasks_progress');
-      if (isManager) {
-        // Para managers: traer todos los progresos de la casa
-        query = query.eq('house_id', user.house_id || user.house);
-      } else {
-        // Para empleados: solo su propio progreso
-        query = query.eq('user_id', user.id);
-      }
-      const { data, error } = await query;
-      if (!error && data) {
-        const progressMap: { [key: string]: boolean[] } = {};
-        data.forEach((row: any) => {
-          const key = isManager ? `${row.assignment_id}_${row.user_id}` : row.assignment_id;
-          progressMap[key] = row.subtasks_progress;
-        });
-        setSubtaskProgress(progressMap);
-      }
-    };
-    fetchProgress();
+    if (!user || !user.house || !supabase) return;
 
-    // Suscripción realtime a cambios en subtask_progress
-    if (!supabase) return;
-    const channel = (supabase as any).channel('subtask_progress_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtask_progress' }, (payload: any) => {
-        if (!payload.new) return;
+    const isManager = user.role && (user.role.toLowerCase().includes('manager') || user.role === 'owner' || user.role === 'dueno');
+    const currentHouse = user.house || user.house_id;
+
+    const parseProgressFromNotes = (notes: any): boolean[] => {
+      if (!notes) return [];
+      if (typeof notes === 'string') {
+        try {
+          const parsed = JSON.parse(notes);
+          return Array.isArray(parsed?.subtasks_progress) ? parsed.subtasks_progress : [];
+        } catch {
+          return [];
+        }
+      }
+      return Array.isArray(notes?.subtasks_progress) ? notes.subtasks_progress : [];
+    };
+
+    const loadProgress = async () => {
+      let query = (supabase as any)
+        .from('calendar_assignments')
+        .select('id, house, employee, notes')
+        .eq('house', currentHouse)
+        .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
+
+      if (!isManager) {
+        query = query.eq('employee', user.username);
+      }
+
+      const { data, error } = await query;
+      if (error || !data) return;
+
+      const progressMap: { [key: string]: boolean[] } = {};
+      data.forEach((row: any) => {
+        const progressArr = parseProgressFromNotes(row.notes);
         if (isManager) {
-          if (payload.new.house_id === (user.house_id || user.house)) {
-            setSubtaskProgress(prev => ({ ...prev, [`${payload.new.assignment_id}_${payload.new.user_id}`]: payload.new.subtasks_progress }));
-          }
+          progressMap[`${row.id}_${row.employee}`] = progressArr;
         } else {
-          if (payload.new.user_id === user.id) {
-            setSubtaskProgress(prev => ({ ...prev, [payload.new.assignment_id]: payload.new.subtasks_progress }));
-          }
+          progressMap[String(row.id)] = progressArr;
+        }
+      });
+      setSubtaskProgress(progressMap);
+    };
+
+    loadProgress();
+
+    const channel = (supabase as any)
+      .channel(`calendar-assignment-progress-${String(currentHouse).replace(/\s+/g, '-')}-${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_assignments' }, (payload: any) => {
+        const changed = payload?.new || payload?.old;
+        if (!changed || changed.house !== currentHouse) return;
+
+        const progressArr = parseProgressFromNotes(payload?.new?.notes);
+        if (isManager) {
+          const employeeName = payload?.new?.employee || payload?.old?.employee;
+          if (!employeeName) return;
+          setSubtaskProgress(prev => ({ ...prev, [`${changed.id}_${employeeName}`]: progressArr }));
+        } else {
+          if ((payload?.new?.employee || payload?.old?.employee) !== user.username) return;
+          setSubtaskProgress(prev => ({ ...prev, [String(changed.id)]: progressArr }));
         }
       })
       .subscribe();
+
     return () => {
-      if (supabase) supabase.removeChannel(channel);
+      try {
+        (supabase as any).removeChannel(channel);
+      } catch {
+        // noop
+      }
     };
   }, [user]);
 
@@ -353,33 +379,43 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
       arr[idx] = checked;
       return { ...prev, [taskId]: arr };
     });
-    // Guardar progreso en Supabase
+    // Guardar progreso en Supabase (calendar_assignments.notes)
     const current = subtaskProgress[taskId] ? [...subtaskProgress[taskId]] : [];
     current[idx] = checked;
-    // Buscar si ya existe registro
     if (!supabase) return;
-    const { data: existing, error } = await (supabase as any)
-      .from('subtask_progress')
-      .select('id')
-      .eq('assignment_id', taskId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (existing && existing.id) {
-      await (supabase as any)
-        .from('subtask_progress')
-        .update({ subtasks_progress: current, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
-    } else {
-      await (supabase as any)
-        .from('subtask_progress')
-        .insert({
-          assignment_id: taskId,
-          user_id: user.id,
-          house_id: user.house_id || null,
-          subtasks_progress: current,
-          updated_at: new Date().toISOString(),
-        });
+
+    const now = new Date().toISOString();
+    const { data: assignmentRow } = await (supabase as any)
+      .from('calendar_assignments')
+      .select('notes')
+      .eq('id', taskId)
+      .single();
+
+    let notesObj: any = {};
+    const rawNotes = assignmentRow?.notes;
+    if (rawNotes) {
+      if (typeof rawNotes === 'string') {
+        try {
+          notesObj = JSON.parse(rawNotes);
+        } catch {
+          notesObj = { legacy_note: rawNotes };
+        }
+      } else {
+        notesObj = rawNotes;
+      }
     }
+
+    const nextNotes = JSON.stringify({
+      ...notesObj,
+      subtasks_progress: current,
+      progress_updated_by: user.username,
+      progress_updated_at: now,
+    });
+
+    await (supabase as any)
+      .from('calendar_assignments')
+      .update({ notes: nextNotes, updated_at: now })
+      .eq('id', taskId);
 
     // El estado final "Trabajo Completado" lo confirma admin/manager.
     // Aquí solo guardamos progreso por subtarea para mantener evidencia en tiempo real.
