@@ -183,9 +183,15 @@ const Tasks: React.FC<TasksProps> = ({ user, users, tasks: externalTasks, setTas
   };
 
   // Filtrar tareas según rol y casa
-  const visibleTasks = user.role === 'empleado'
-    ? tasks.filter(t => t.employee === user.username && t.house === user.house)
-    : tasks;
+  const visibleTasks = tasks.filter(t => {
+    if (user.role === 'empleado') {
+      return t.employee === user.username && t.house === user.house;
+    } else if (user.role === 'manager') {
+      return t.house === user.house;
+    } else {
+      return true; // owner ve todas
+    }
+  });
 
   return (
     <div>

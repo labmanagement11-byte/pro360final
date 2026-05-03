@@ -105,11 +105,12 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
       });
       
       // Query usando columnas correctas (house y employee como texto)
-      // Query SIN filtro de employee para ver si el problema es ese
+      const houseFilter = user.house || user.house_id;
+      console.log(`🏠 [Dashboard] Filtrando por casa: ${houseFilter} para ${user.username} (${user.role})`);
       const { data, error } = await (supabase as any)
         .from('calendar_assignments')
         .select('*')
-        .eq('house', user.house || user.house_id)
+        .eq('house', houseFilter)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
       
       if (error) {
@@ -1082,10 +1083,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
   const isJonathanUser = String((user as any)?.username || '').toLowerCase() === 'jonathan'
     || String((user as any)?.email || '').toLowerCase() === 'jonathan@360pro.com';
-  // Si el usuario es empleado o manager (no jonathan), forzar la casa asignada
-  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager' && !isJonathanUser);
+  // Si el usuario es empleado o manager, forzar la casa asignada
+  const isRestrictedUser = (user.role === 'empleado') || (user.role === 'manager');
+
+  const normalizeHouseName = (house?: string) =>
+    String(house || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const findHouseIdxByName = (houseName?: string) => {
+    if (!houseName) return -1;
+    return houses.findIndex(h => normalizeHouseName(h.name) === normalizeHouseName(houseName));
+  };
+
   const employeeHouseIdx = (isRestrictedUser && user.house)
-    ? houses.findIndex(h => h.name === user.house)
+    ? findHouseIdxByName(user.house)
     : -1;
 
   // LOG: Ver qué está pasando con la búsqueda de casa
@@ -1098,6 +1108,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
     return saved ? parseInt(saved, 10) : 0;
   });
+
+  useEffect(() => {
+    if (!isRestrictedUser || !user.house) return;
+    const idx = findHouseIdxByName(user.house);
+    if (idx >= 0 && idx !== selectedHouseIdx) {
+      console.log(`🔧 [Dashboard] Actualizando selectedHouseIdx para usuario restringido a índice ${idx} (${user.house})`);
+      setSelectedHouseIdx(idx);
+    }
+  }, [houses, user.house, isRestrictedUser, selectedHouseIdx]);
   
   // Guardar casa seleccionada en localStorage
   useEffect(() => {
@@ -2303,7 +2322,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     if (!houses.length || selectedHouseIdx === -1) return;
 
     const selectedHouse = houses[selectedHouseIdx];
-    const houseName = selectedHouse?.houseName || selectedHouse?.name;
+    const houseName = isRestrictedUser
+      ? user.house || selectedHouse?.houseName || selectedHouse?.name
+      : selectedHouse?.houseName || selectedHouse?.name;
     if (!houseName) return;
 
     const loadCalendarAssignments = async () => {

@@ -694,8 +694,8 @@ const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
       <h2 className="ultra-checklist-title">Checklist {user.house}</h2>
       {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
 
-      {/* Formulario para agregar/editar tareas solo para managers de HYNTIBA2 */}
-      {!loading && user.house === 'HYNTIBA2 APTO 406' && (user.role === 'manager' || user.role === 'owner') && (
+      {/* Formulario para agregar/editar tareas solo para managers */}
+      {!loading && (user.role === 'manager' || user.role === 'owner') && (
         <div style={{background:'#f0f9ff',padding:'15px',borderRadius:'8px',marginBottom:'15px',border:'1px solid #bfdbfe'}}>
           <h3 style={{marginTop:0,color:'#1e40af'}}>➕ Agregar Nueva Tarea</h3>
           <form onSubmit={handleAddTask} style={{display:'grid',gap:'10px'}}>
