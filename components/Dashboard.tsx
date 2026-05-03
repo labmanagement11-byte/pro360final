@@ -9,11 +9,12 @@ import './RealtimeNotification.css';
 import Tasks from './Tasks';
 
 // Tarjeta personalizada para tareas asignadas
-const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resolveAssignmentIdForTask }: { 
+const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resolveAssignmentIdForTask, assignmentIdMap }: { 
   user: any; 
   onNavigateToInventory?: () => void;
   onTaskCompleted?: (taskId: string, assignmentId: string) => void;
   resolveAssignmentIdForTask: (task: any) => Promise<string | null>;
+  assignmentIdMap: Record<string, string>;
 }) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3329,6 +3330,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     ));
                   }}
                   resolveAssignmentIdForTask={resolveAssignmentIdForTask}
+                  assignmentIdMap={assignmentIdMap}
                 />
               )}
 
