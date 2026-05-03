@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Users.css';
 import type { User } from './Dashboard';
 import * as realtimeService from '../utils/supabaseRealtimeService';
+import { supabase } from '../utils/supabaseClient';
 
 interface UsersProps {
   user: User;
@@ -19,11 +20,37 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
   const [house, setHouse] = useState('');
-  const [editIdx, setEditIdx] = useState(-1);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
   const [editData, setEditData] = useState({ username: '', password: '', role: 'empleado', house: '' });
   const [users, setUsers] = useState<User[]>([]);
   const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const callAdminUsersApi = async (method: 'POST' | 'PATCH' | 'DELETE', payload: Record<string, any>) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    if (!token) {
+      throw new Error('No hay sesión activa para ejecutar acción de administrador');
+    }
+
+    const response = await fetch('/api/admin/users', {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-dashboard-user-role': String(user?.role || ''),
+        'x-dashboard-user-name': String(user?.username || '')
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error || 'Error en API de usuarios');
+    }
+    return json;
+  };
 
   // Cargar usuarios y casas desde Supabase si es jonathan
   useEffect(() => {
@@ -101,11 +128,21 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     if (username && role && house) {
       try {
         if (user?.role === 'owner') {
-          // Usar Supabase para owner
-          const newUser = await realtimeService.createUser({ username, password: password || '', role, house });
-          // Agregar el usuario al estado local inmediatamente
-          if (newUser) {
-            setUsers(prev => [...prev, newUser]);
+          const email = username.trim().toLowerCase();
+          const inferredUsername = email.includes('@') ? email.split('@')[0] : email;
+          const result = await callAdminUsersApi('POST', {
+            email,
+            password: password || '',
+            username: inferredUsername,
+            role,
+            house
+          });
+
+          if (result?.user) {
+            setUsers(prev => {
+              const next = prev.filter(u => String(u.id) !== String(result.user.id));
+              return [...next, result.user];
+            });
           }
         } else if (addUser) {
           // Fallback para owner
@@ -124,24 +161,33 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
   const handleEditUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (editData.username && editData.role) {
+    if (editData.username && editData.role && editUserId) {
       try {
+        const idx = users.findIndex(u => String(u.id) === String(editUserId));
+        const targetUser = idx >= 0 ? users[idx] : null;
+        if (!targetUser) {
+          throw new Error('Usuario a editar no encontrado');
+        }
+
         if (user?.role === 'owner') {
-          // Usar Supabase para owner
-          const editedUser = users[editIdx];
-          if (editedUser?.id) {
-            await realtimeService.updateUser(String(editedUser.id), {
+          if (targetUser?.id) {
+            const result = await callAdminUsersApi('PATCH', {
+              id: String(targetUser.id),
               username: editData.username,
               password: editData.password || '',
               role: editData.role,
               house: editData.house
             });
+
+            if (result?.user) {
+              setUsers(prev => prev.map((u) => (String(u.id) === String(editUserId) ? result.user : u)));
+            }
           }
         } else if (editUser) {
           // Fallback para owner
-          await editUser(editIdx, { ...editData, password: editData.password || '' });
+          await editUser(idx, { ...editData, password: editData.password || '' });
         }
-        setEditIdx(-1);
+        setEditUserId(null);
         setEditData({ username: '', password: '', role: 'empleado', house: '' });
       } catch (error) {
         console.error('Error editing user:', error);
@@ -150,13 +196,18 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     }
   };
 
-  const handleDeleteUser = async (idx: number) => {
+  const handleDeleteUser = async (userId: string) => {
     try {
+      const idx = users.findIndex(u => String(u.id) === String(userId));
+      const targetUser = idx >= 0 ? users[idx] : null;
+      if (!targetUser) {
+        throw new Error('Usuario a eliminar no encontrado');
+      }
+
       if (user?.role === 'owner') {
-        // Usar Supabase para owner
-        const userToDelete = users[idx];
-        if (userToDelete?.id) {
-          await realtimeService.deleteUser(String(userToDelete.id));
+        if (targetUser?.id) {
+          await callAdminUsersApi('DELETE', { id: String(targetUser.id) });
+          setUsers(prev => prev.filter((u) => String(u.id) !== String(userId)));
         }
       } else if (deleteUser) {
         // Fallback para owner
@@ -223,8 +274,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
               return true;
             })
             .map((u, idx) => (
-            <li key={idx}>
-              {editIdx === idx ? (
+            <li key={u.id || idx}>
+              {editUserId === String(u.id) ? (
                 <form onSubmit={handleEditUser} className="users-edit-form">
                   <input
                     type="text"
@@ -252,7 +303,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                     })}
                   </select>
                   <button type="submit">Guardar</button>
-                  <button type="button" onClick={() => setEditIdx(-1)}>Cancelar</button>
+                  <button type="button" onClick={() => setEditUserId(null)}>Cancelar</button>
                 </form>
               ) : (
                 <>
@@ -262,10 +313,10 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                   {u.role !== 'dueno' && (
                     <>
                       <button onClick={() => {
-                        setEditIdx(idx);
+                        setEditUserId(String(u.id));
                         setEditData({ username: u.username, password: u.password || '', role: u.role, house: u.house || '' });
                       }}>Editar</button>
-                      <button onClick={() => handleDeleteUser(idx)} className="users-delete-btn">Eliminar</button>
+                      <button onClick={() => handleDeleteUser(String(u.id))} className="users-delete-btn">Eliminar</button>
                     </>
                   )}
                 </>
