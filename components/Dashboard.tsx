@@ -261,25 +261,6 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted }: {
     };
   }, [assignedTasks, user]);
 
-  const markTaskComplete = async (task: any, completed: boolean) => {
-    const assignmentId = await resolveAssignmentIdForTask(task);
-    if (!assignmentId) return;
-
-    const now = new Date().toISOString();
-    const updateData: any = { completed };
-    if (completed) {
-      updateData.completed_at = now;
-      updateData.completed_by = user.username;
-    }
-
-    // @ts-ignore
-    await supabase.from('calendar_assignments').update(updateData).eq('id', assignmentId);
-
-    // Actualizar tanto assignedTasks como calendarAssignments
-    setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : t));
-    setCalendarAssignments(assignments => assignments.map(a => a.id === assignmentId ? { ...a, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : a));
-  };
-
   // Mapas de subtareas por tipo
   // La definición completa de LIMPIEZA_REGULAR está más abajo, se usará esa para todas las subtareas.
   const LIMPIEZA_PROFUNDA = {
@@ -1144,6 +1125,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
     return saved ? parseInt(saved, 10) : 0;
   });
+
+  const markTaskComplete = async (task: any, completed: boolean) => {
+    const assignmentId = await resolveAssignmentIdForTask(task);
+    if (!assignmentId) return;
+
+    const now = new Date().toISOString();
+    const updateData: any = { completed };
+    if (completed) {
+      updateData.completed_at = now;
+      updateData.completed_by = user.username;
+    }
+
+    // @ts-ignore
+    await supabase.from('calendar_assignments').update(updateData).eq('id', assignmentId);
+
+    // Actualizar tanto assignedTasks como calendarAssignments
+    setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : t));
+    setCalendarAssignments(assignments => assignments.map(a => a.id === assignmentId ? { ...a, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : a));
+  };
 
   useEffect(() => {
     if (!isRestrictedUser || !user.house) return;
