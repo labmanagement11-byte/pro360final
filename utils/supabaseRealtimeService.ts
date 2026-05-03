@@ -2090,7 +2090,9 @@ export async function getChecklistTemplates(house: string, taskType?: string) {
     const { data, error } = await query.order('order_num', { ascending: true });
     
     if (error) {
-      console.error('❌ Error obteniendo templates de checklist:', error);
+      if ((error as any).code !== 'PGRST205') {
+        console.error('❌ Error obteniendo templates de checklist:', error);
+      }
       return [];
     }
     
@@ -2113,7 +2115,10 @@ export async function getChecklistTemplatesWithError(house: string, taskType?: s
     const { data, error } = await query.order('order_num', { ascending: true });
 
     if (error) {
-      console.error('❌ Error obteniendo templates de checklist:', error);
+      // PGRST205 = table not found; silently return so Dashboard falls back to legacy table
+      if ((error as any).code !== 'PGRST205') {
+        console.error('❌ Error obteniendo templates de checklist:', error);
+      }
       return { data: [], error };
     }
 
@@ -2170,7 +2175,9 @@ export async function createChecklistTemplate(template: {
       .select();
     
     if (error) {
-      console.error('❌ Error creando template de checklist:', error);
+      if ((error as any).code !== 'PGRST205') {
+        console.error('❌ Error creando template de checklist:', error);
+      }
       return null;
     }
     
@@ -2197,7 +2204,9 @@ export async function createChecklistTemplatesBulk(templates: Array<{
       .select();
 
     if (error) {
-      console.error('❌ Error creando templates de checklist (bulk):', error);
+      if ((error as any).code !== 'PGRST205') {
+        console.error('❌ Error creando templates de checklist (bulk):', error);
+      }
       return [];
     }
 
