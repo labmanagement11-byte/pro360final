@@ -8,18 +8,19 @@ type ProfileRow = {
   house: string | null;
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !serviceKey) {
-  throw new Error('Missing Supabase env variables for admin users API');
+function getAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Missing Supabase env variables for admin users API');
+  }
+  return createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
 }
 
-const admin = createClient(supabaseUrl, serviceKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
-});
-
 async function requireOwner(request: NextRequest) {
+  const admin = getAdmin();
   const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
   if ('error' in auth) return auth.error;
 
   try {
+    const admin = getAdmin();
     const { data: profilesData, error: profilesError } = await admin
       .from('profiles')
       .select('id, username, role, house')
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest) {
   if ('error' in auth) return auth.error;
 
   try {
+    const admin = getAdmin();
     const body = await request.json();
     const email = String(body?.email || '').trim().toLowerCase();
     const password = String(body?.password || '').trim();
@@ -161,6 +164,7 @@ export async function PATCH(request: NextRequest) {
   if ('error' in auth) return auth.error;
 
   try {
+    const admin = getAdmin();
     const body = await request.json();
     const id = String(body?.id || '').trim();
     const username = String(body?.username || '').trim();
@@ -234,6 +238,7 @@ export async function DELETE(request: NextRequest) {
   if ('error' in auth) return auth.error;
 
   try {
+    const admin = getAdmin();
     const body = await request.json();
     const id = String(body?.id || '').trim();
     if (!id) {
