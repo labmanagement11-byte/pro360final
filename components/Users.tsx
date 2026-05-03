@@ -27,6 +27,9 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [loading, setLoading] = useState(false);
 
   const callAdminUsersApi = async (method: 'POST' | 'PATCH' | 'DELETE', payload: Record<string, any>) => {
+    if (!supabase) {
+      throw new Error('Supabase client no disponible');
+    }
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
 
