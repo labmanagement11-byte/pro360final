@@ -4877,8 +4877,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               title="Seleccionar empleado"
                             >
                               <option value="">Seleccionar empleado...</option>
-                              {users && users.length > 0 ? (
-                                users.filter(u => u.role === 'empleado' || u.role === 'manager').map((u, idx) => (
+                              {assignableEmployees.length > 0 ? (
+                                assignableEmployees.map((u, idx) => (
                                   <option key={u.id || idx} value={u.username}>{u.username}</option>
                                 ))
                               ) : (
