@@ -1144,8 +1144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // @ts-ignore
     await supabase.from('calendar_assignments').update(updateData).eq('id', assignmentId);
 
-    // Actualizar tanto assignedTasks como calendarAssignments
-    setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : t));
+    // Actualizar calendarAssignments - AssignedTasksCard se actualizará a través de la sincronización realtime
     setCalendarAssignments(assignments => assignments.map(a => a.id === assignmentId ? { ...a, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : a));
   };
 
