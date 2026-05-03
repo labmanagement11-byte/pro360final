@@ -145,6 +145,12 @@
   font-weight: 600;
 }
 
+.users-email {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 .users-list li:hover {
   border-color: #0284c7;
   box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);

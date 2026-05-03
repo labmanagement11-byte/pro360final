@@ -66,6 +66,44 @@ async function requireOwner(request: NextRequest) {
   return { error: NextResponse.json({ error: 'Unauthorized: owner session required' }, { status: 401 }) };
 }
 
+export async function GET(request: NextRequest) {
+  const auth = await requireOwner(request);
+  if ('error' in auth) return auth.error;
+
+  try {
+    const { data: profilesData, error: profilesError } = await admin
+      .from('profiles')
+      .select('id, username, role, house')
+      .order('username', { ascending: true });
+
+    if (profilesError) {
+      return NextResponse.json({ error: profilesError.message }, { status: 400 });
+    }
+
+    const { data: authUsersData, error: authUsersError } = await admin.auth.admin.listUsers({ perPage: 1000 });
+
+    const emailMap: Record<string, string> = {};
+    if (!authUsersError && authUsersData?.users) {
+      for (const authUser of authUsersData.users) {
+        emailMap[authUser.id] = authUser.email || '';
+      }
+    }
+
+    const users = (profilesData || []).map((p: any) => ({
+      id: p.id,
+      username: p.username,
+      role: p.role,
+      house: p.house,
+      email: emailMap[p.id] || '',
+      password: ''
+    }));
+
+    return NextResponse.json({ ok: true, users });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Unexpected error' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const auth = await requireOwner(request);
   if ('error' in auth) return auth.error;
@@ -129,6 +167,7 @@ export async function PATCH(request: NextRequest) {
     const role = String(body?.role || '').trim();
     const house = String(body?.house || '').trim();
     const password = String(body?.password || '').trim();
+    const email = String(body?.email || '').trim().toLowerCase();
 
     if (!id || !username || !role || !house) {
       return NextResponse.json({ error: 'Missing required fields: id, username, role, house' }, { status: 400 });
@@ -157,6 +196,13 @@ export async function PATCH(request: NextRequest) {
       const pwdUpdate = await admin.auth.admin.updateUserById(id, { password });
       if (pwdUpdate.error) {
         return NextResponse.json({ error: `Profile updated, but password failed: ${pwdUpdate.error.message}` }, { status: 400 });
+      }
+    }
+
+    if (email) {
+      const emailUpdate = await admin.auth.admin.updateUserById(id, { email });
+      if (emailUpdate.error) {
+        return NextResponse.json({ error: `Profile updated, but email failed: ${emailUpdate.error.message}` }, { status: 400 });
       }
     }
 

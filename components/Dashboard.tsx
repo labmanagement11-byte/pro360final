@@ -927,6 +927,7 @@ export interface User {
   username: string;
   password: string;
   house?: string; // Casa asignada (opcional para compatibilidad)
+  email?: string; // Email de autenticación (opcional)
 }
 
 declare global {

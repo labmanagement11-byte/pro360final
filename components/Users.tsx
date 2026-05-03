@@ -21,7 +21,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [role, setRole] = useState('empleado');
   const [house, setHouse] = useState('');
   const [editUserId, setEditUserId] = useState<string | null>(null);
-  const [editData, setEditData] = useState({ username: '', password: '', role: 'empleado', house: '' });
+  const [editData, setEditData] = useState({ username: '', email: '', password: '', role: 'empleado', house: '' });
   const [users, setUsers] = useState<User[]>([]);
   const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         'x-dashboard-user-role': String(user?.role || ''),
         'x-dashboard-user-name': String(user?.username || '')
       },
-      body: JSON.stringify(payload)
+      ...(method !== 'GET' ? { body: JSON.stringify(payload) } : {})
     });
 
     const json = await response.json();
@@ -58,10 +58,20 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       try {
         setLoading(true);
         
-        // Si es owner, cargar desde Supabase
+        // Si es owner, cargar desde API (incluye email)
         if (user?.role === 'owner') {
-          const fetchedUsers = await realtimeService.getUsers();
-          setUsers(fetchedUsers || []);
+          try {
+            const apiResult = await callAdminUsersApi('GET' as any, {});
+            if (apiResult?.users) {
+              setUsers(apiResult.users);
+            } else {
+              const fetchedUsers = await realtimeService.getUsers();
+              setUsers(fetchedUsers || []);
+            }
+          } catch {
+            const fetchedUsers = await realtimeService.getUsers();
+            setUsers(fetchedUsers || []);
+          }
           
           // Usar casas del props si están disponibles, sino cargar desde Supabase
           if (propHouses && propHouses.length > 0) {
@@ -88,8 +98,19 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     // Suscribirse a cambios en tiempo real para owners
     if (user?.role === 'owner') {
-      const channelUsers = realtimeService.subscribeToUsers((updatedUsers) => {
-        setUsers(updatedUsers || []);
+      const channelUsers = realtimeService.subscribeToUsers(async () => {
+        // Reload via API to keep email data fresh
+        try {
+          const apiResult = await callAdminUsersApi('GET' as any, {});
+          if (apiResult?.users) setUsers(apiResult.users);
+          else {
+            const fetchedUsers = await realtimeService.getUsers();
+            setUsers(fetchedUsers || []);
+          }
+        } catch {
+          const fetchedUsers = await realtimeService.getUsers();
+          setUsers(fetchedUsers || []);
+        }
       });
       const channelHouses = realtimeService.subscribeToHouses((updatedHouses) => {
         setHouses(updatedHouses || []);
@@ -174,6 +195,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             const result = await callAdminUsersApi('PATCH', {
               id: String(targetUser.id),
               username: editData.username,
+              email: editData.email || '',
               password: editData.password || '',
               role: editData.role,
               house: editData.house
@@ -188,7 +210,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           await editUser(idx, { ...editData, password: editData.password || '' });
         }
         setEditUserId(null);
-        setEditData({ username: '', password: '', role: 'empleado', house: '' });
+        setEditData({ username: '', email: '', password: '', role: 'empleado', house: '' });
       } catch (error) {
         console.error('Error editing user:', error);
         alert('Error al editar usuario');
@@ -282,8 +304,15 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                     value={editData.username}
                     onChange={e => setEditData({ ...editData, username: e.target.value })}
                     required
-                    placeholder="Correo del usuario"
-                    title="Correo del usuario"
+                    placeholder="Nombre del usuario"
+                    title="Nombre del usuario"
+                  />
+                  <input
+                    type="email"
+                    value={editData.email}
+                    onChange={e => setEditData({ ...editData, email: e.target.value })}
+                    placeholder="Email"
+                    title="Email de acceso"
                   />
                   <input
                     type="password"
@@ -308,13 +337,14 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
               ) : (
                 <>
                   <span>{u.username}</span>
+                  {(u as any).email && <span className="users-email">{(u as any).email}</span>}
                   <strong>{u.role}</strong>
                   <span className="users-house">{u.house}</span>
                   {u.role !== 'dueno' && (
                     <>
                       <button onClick={() => {
                         setEditUserId(String(u.id));
-                        setEditData({ username: u.username, password: u.password || '', role: u.role, house: u.house || '' });
+                        setEditData({ username: u.username, email: (u as any).email || '', password: '', role: u.role, house: u.house || '' });
                       }}>Editar</button>
                       <button onClick={() => handleDeleteUser(String(u.id))} className="users-delete-btn">Eliminar</button>
                     </>
