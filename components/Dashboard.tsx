@@ -1134,6 +1134,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
   // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
   const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
+  const selectedHouseName = houses[allowedHouseIdx]?.name || user.house || '';
+  const assignableEmployees = users
+    .filter(u => u.role === 'empleado')
+    .filter(u => {
+      // Manager: solo empleados de su casa asignada
+      if (user.role === 'manager') {
+        return String(u.house || '').trim() === String(user.house || '').trim();
+      }
+
+      // Owner/Dueño: empleados de la casa actualmente seleccionada
+      if (user.role === 'owner' || user.role === 'dueno') {
+        return !selectedHouseName || String(u.house || '').trim() === String(selectedHouseName).trim();
+      }
+
+      return String(u.house || '').trim() === String(user.house || '').trim();
+    });
 
   // Suscripción en tiempo real para el progreso del empleado (manager view)
   useEffect(() => {
@@ -3066,8 +3082,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               title="Seleccionar empleado"
                             >
                               <option value="">Seleccionar empleado...</option>
-                              {users && users.length > 0 ? (
-                                users.filter(u => u.role === 'empleado' || u.role === 'manager').map((u, idx) => (
+                              {assignableEmployees.length > 0 ? (
+                                assignableEmployees.map((u, idx) => (
                                   <option key={u.id || idx} value={u.username}>{u.username} ({u.role})</option>
                                 ))
                               ) : (
