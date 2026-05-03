@@ -940,15 +940,39 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, deleteUser, setUser, onLogout }) => {
+  // Estado para mapear IDs de tareas a IDs de asignaciones
+  const [assignmentIdMap, setAssignmentIdMap] = useState<Record<string, string>>({});
+
+  const resolveAssignmentIdForTask = async (task: any) => {
+    // Si ya tiene calendar_assignment_uuid, usar ese directamente
+    if (task?.calendar_assignment_uuid) {
+      return task.calendar_assignment_uuid;
+    }
+
+    const rawId = String(task?.id ?? '').trim();
+    if (!rawId) return null;
+
+    if (assignmentIdMap[rawId]) return assignmentIdMap[rawId];
+
+    if (/^\d+$/.test(rawId)) {
+      const resolved = await realtimeService.resolveAssignmentIdFromTask(task);
+      if (resolved) {
+        const resolvedId = String(resolved);
+        setAssignmentIdMap(prev => ({ ...prev, [rawId]: resolvedId }));
+        return resolvedId;
+      }
+    }
+
+    setAssignmentIdMap(prev => ({ ...prev, [rawId]: rawId }));
+    return rawId;
+  };
+
       // Estado para edición de recordatorio
       const [editIdx, setEditIdx] = useState(-1);
 
       // Declarar calendarAssignments y tasksList justo después de la declaración del componente
       const [calendarAssignments, setCalendarAssignments] = useState<any[]>([]);
       const [tasksList, setTasksList] = useState<any[]>([]);
-
-      // Estado para mapear IDs de tareas a IDs de asignaciones
-      const [assignmentIdMap, setAssignmentIdMap] = useState<Record<string, string>>({});
 
       // Debug global: mostrar datos principales en la pantalla
       useEffect(() => {
@@ -1121,30 +1145,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Actualizar tanto assignedTasks como calendarAssignments
     setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : t));
     setCalendarAssignments(assignments => assignments.map(a => a.id === assignmentId ? { ...a, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : a));
-  };
-
-  const resolveAssignmentIdForTask = async (task: any) => {
-    // Si ya tiene calendar_assignment_uuid, usar ese directamente
-    if (task?.calendar_assignment_uuid) {
-      return task.calendar_assignment_uuid;
-    }
-
-    const rawId = String(task?.id ?? '').trim();
-    if (!rawId) return null;
-
-    if (assignmentIdMap[rawId]) return assignmentIdMap[rawId];
-
-    if (/^\d+$/.test(rawId)) {
-      const resolved = await realtimeService.resolveAssignmentIdFromTask(task);
-      if (resolved) {
-        const resolvedId = String(resolved);
-        setAssignmentIdMap(prev => ({ ...prev, [rawId]: resolvedId }));
-        return resolvedId;
-      }
-    }
-
-    setAssignmentIdMap(prev => ({ ...prev, [rawId]: rawId }));
-    return rawId;
   };
 
   useEffect(() => {
