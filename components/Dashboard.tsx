@@ -9,7 +9,11 @@ import './RealtimeNotification.css';
 import Tasks from './Tasks';
 
 // Tarjeta personalizada para tareas asignadas
-const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavigateToInventory?: () => void }) => {
+const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted }: { 
+  user: any; 
+  onNavigateToInventory?: () => void;
+  onTaskCompleted?: (taskId: string, assignmentId: string) => void;
+}) => {
   const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [inventoryByAssignment, setInventoryByAssignment] = useState<Record<string, any[]>>({});
@@ -260,9 +264,20 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
   const markTaskComplete = async (task: any, completed: boolean) => {
     const assignmentId = await resolveAssignmentIdForTask(task);
     if (!assignmentId) return;
+
+    const now = new Date().toISOString();
+    const updateData: any = { completed };
+    if (completed) {
+      updateData.completed_at = now;
+      updateData.completed_by = user.username;
+    }
+
     // @ts-ignore
-    await supabase.from('calendar_assignments').update({ completed }).eq('id', assignmentId);
-    setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed } : t));
+    await supabase.from('calendar_assignments').update(updateData).eq('id', assignmentId);
+
+    // Actualizar tanto assignedTasks como calendarAssignments
+    setAssignedTasks(tasks => tasks.map(t => t.id === task.id ? { ...t, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : t));
+    setCalendarAssignments(assignments => assignments.map(a => a.id === assignmentId ? { ...a, completed, completed_at: completed ? now : null, completed_by: completed ? user.username : null } : a));
   };
 
   // Mapas de subtareas por tipo
@@ -413,10 +428,31 @@ const AssignedTasksCard = ({ user, onNavigateToInventory }: { user: any; onNavig
       progress_updated_at: now,
     });
 
+    // Verificar si todas las subtareas están completadas
+    const allSubtasksCompleted = current.length === totalSubtasks && current.every(Boolean);
+
+    const updateData: any = {
+      notes: nextNotes,
+      updated_at: now
+    };
+
+    // Si todas las subtareas están completadas, marcar la tarea como completada
+    if (allSubtasksCompleted) {
+      updateData.completed = true;
+      updateData.completed_at = now;
+      updateData.completed_by = user.username;
+      console.log(`✅ [SubtaskToggle] Todas las subtareas completadas para tarea ${taskId}, marcando como completada por ${user.username}`);
+    }
+
     await (supabase as any)
       .from('calendar_assignments')
-      .update({ notes: nextNotes, updated_at: now })
+      .update(updateData)
       .eq('id', taskId);
+
+    // Actualizar el estado local si se completó la tarea
+    if (allSubtasksCompleted) {
+      setAssignedTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: true, completed_at: now, completed_by: user.username } : t));
+    }
 
     // El estado final "Trabajo Completado" lo confirma admin/manager.
     // Aquí solo guardamos progreso por subtarea para mantener evidencia en tiempo real.
@@ -3277,7 +3313,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'assignedTasks' && (
-                <AssignedTasksCard user={user} onNavigateToInventory={() => { setSelectedModalCard(null); setView('inventory'); }} />
+                <AssignedTasksCard 
+                  user={user} 
+                  onNavigateToInventory={() => { setSelectedModalCard(null); setView('inventory'); }}
+                  onTaskCompleted={(taskId, assignmentId) => {
+                    // Actualizar calendarAssignments cuando una tarea se completa desde AssignedTasksCard
+                    const now = new Date().toISOString();
+                    setCalendarAssignments(prev => prev.map(a => 
+                      a.id === assignmentId 
+                        ? { ...a, completed: true, completed_at: now, completed_by: user.username } 
+                        : a
+                    ));
+                  }}
+                />
               )}
 
               {selectedModalCard === 'completedJobs' && (() => {
@@ -5092,7 +5140,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <button
                                 className="dashboard-btn main"
                                 onClick={async () => {
-                                  await realtimeService.updateTask(task.id, { completed: true });
+                                  const assignmentId = await resolveAssignmentIdForTask(task);
+                                  if (!assignmentId) return;
+                                  
+                                  const now = new Date().toISOString();
+                                  const { error } = await (supabase as any)
+                                    .from('calendar_assignments')
+                                    .update({
+                                      completed: true,
+                                      completed_at: now,
+                                      completed_by: user.username,
+                                      updated_at: now
+                                    })
+                                    .eq('id', assignmentId);
+                                  
+                                  if (error) {
+                                    console.error('❌ Error marcando tarea completada:', error);
+                                    return;
+                                  }
+                                  
+                                  // Actualizar estado local
+                                  setAssignedTasks(prev => prev.map(t => 
+                                    t.id === task.id 
+                                      ? { ...t, completed: true, completed_at: now, completed_by: user.username } 
+                                      : t
+                                  ));
+                                  
+                                  // Notificar al componente padre
+                                  if (onTaskCompleted) {
+                                    onTaskCompleted(task.id, assignmentId);
+                                  }
+                                  
+                                  console.log(`✅ [AssignedTasksCard] Tarea ${task.id} marcada como completada por ${user.username}`);
                                 }}
                               >
                                 ✅ Marcar Completada
