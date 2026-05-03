@@ -26,7 +26,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const callAdminUsersApi = async (method: 'POST' | 'PATCH' | 'DELETE', payload: Record<string, any>) => {
+  const callAdminUsersApi = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', payload: Record<string, any>) => {
     if (!supabase) {
       throw new Error('Supabase client no disponible');
     }
@@ -64,7 +64,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         // Si es owner, cargar desde API (incluye email)
         if (user?.role === 'owner') {
           try {
-            const apiResult = await callAdminUsersApi('GET' as any, {});
+            const apiResult = await callAdminUsersApi('GET', {});
             if (apiResult?.users) {
               setUsers(apiResult.users);
             } else {
@@ -104,7 +104,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       const channelUsers = realtimeService.subscribeToUsers(async () => {
         // Reload via API to keep email data fresh
         try {
-          const apiResult = await callAdminUsersApi('GET' as any, {});
+          const apiResult = await callAdminUsersApi('GET', {});
           if (apiResult?.users) setUsers(apiResult.users);
           else {
             const fetchedUsers = await realtimeService.getUsers();
