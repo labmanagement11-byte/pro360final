@@ -3825,14 +3825,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   </div>
 
                   {/* Sección: Tareas Asignadas por Tipo - MEJORADO */}
-                  {calendarAssignments && calendarAssignments.length > 0 && (
+                  {calendarAssignments && calendarAssignments.filter(a => !a.completed).length > 0 && (
                     <div className="assigned-tasks-section-v2">
                       <div className="assigned-tasks-header-v2">
                         <div className="assigned-tasks-title-group">
                           <h3 className="assigned-tasks-title-v2">📋 Tareas Asignadas</h3>
                           <p className="assigned-tasks-subtitle">Resumen de actividades por tipo</p>
                         </div>
-                        <span className="assigned-tasks-badge-v2">{calendarAssignments.length}</span>
+                        <span className="assigned-tasks-badge-v2">{calendarAssignments.filter(a => !a.completed).length}</span>
                       </div>
                       
                       {(() => {
@@ -3843,7 +3843,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           'Mantenimiento': {icon: '🔧', color: '#0891b2', borderColor: '#67e8f9'}
                         };
                         
-                        calendarAssignments.forEach(assignment => {
+                        calendarAssignments.filter(a => !a.completed).forEach(assignment => {
                           const type = assignment.type || 'Limpieza regular';
                           if (!byType.has(type)) byType.set(type, []);
                           byType.get(type)!.push(assignment);
