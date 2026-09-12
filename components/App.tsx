@@ -71,8 +71,11 @@ const App = () => {
       alert('No se puede editar: falta id');
       return;
     }
-    // @ts-expect-error Supabase users table is outside the generated Database type.
-    const { data, error } = await supabase.from('users').update(user as any).eq('id', userToEdit.id).select();
+    const { data, error } = await (supabase as any)
+      .from('profiles')
+      .update({ username: user.username, role: user.role, house: user.house })
+      .eq('id', userToEdit.id)
+      .select();
     if (!error && data && data.length > 0) {
       setUsers(prev => prev.map((u, i) => i === idx ? data[0] : u));
     } else if (error) {
@@ -91,7 +94,7 @@ const App = () => {
       alert('No se puede eliminar: falta id');
       return;
     }
-    const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+    const { error } = await (supabase as any).from('profiles').delete().eq('id', userToDelete.id);
     if (!error) {
       setUsers(prev => prev.filter((_, i) => i !== idx));
     } else {
@@ -105,8 +108,10 @@ const App = () => {
       alert('Supabase no está configurado. Contacta al administrador.');
       return;
     }
-    // @ts-expect-error Supabase users table is outside the generated Database type.
-    const { data, error } = await supabase.from('users').insert([user as any]).select();
+    const { data, error } = await (supabase as any)
+      .from('profiles')
+      .insert([{ username: user.username, role: user.role, house: user.house }])
+      .select();
     if (!error && data && data.length > 0) {
       setUsers(prev => [...prev, data[0]]);
     } else if (error) {
