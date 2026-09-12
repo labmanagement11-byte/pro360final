@@ -58,7 +58,7 @@ const App = () => {
     return () => {
       if (supabase) supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, []);
 
   // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {
@@ -71,7 +71,7 @@ const App = () => {
       alert('No se puede editar: falta id');
       return;
     }
-    // @ts-expect-error
+    // @ts-expect-error Supabase users table is outside the generated Database type.
     const { data, error } = await supabase.from('users').update(user as any).eq('id', userToEdit.id).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => prev.map((u, i) => i === idx ? data[0] : u));
@@ -105,7 +105,7 @@ const App = () => {
       alert('Supabase no está configurado. Contacta al administrador.');
       return;
     }
-    // @ts-expect-error
+    // @ts-expect-error Supabase users table is outside the generated Database type.
     const { data, error } = await supabase.from('users').insert([user as any]).select();
     if (!error && data && data.length > 0) {
       setUsers(prev => [...prev, data[0]]);

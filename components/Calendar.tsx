@@ -4,8 +4,6 @@ import { supabase } from '../utils/supabaseClient';
 import * as realtimeService from '../utils/supabaseRealtimeService';
 import Checklist from './Checklist';
 
-const CALENDAR_KEY = 'dashboard_calendar'; // legacy, no longer used
-
 const defaultTypes = [
   'Limpieza profunda',
   'Limpieza regular',

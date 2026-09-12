@@ -1,69 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getSupabaseClient, checklistTable } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
-import type { Database } from '../utils/supabaseClient';
-
-const cleaningTasks = [
-  'Barrer y trapear toda la casa.',
-  'Quitar el polvo de todas las superficies y decoración usando un trapo húmedo.',
-  'Limpiar los televisores cuidadosamente sin dejar marcas en la pantalla.',
-  'Revisar zócalos y esquinas para asegurarse de que estén limpios.',
-  'Limpiar telaraña.',
-  'Limpiar todas las superficies de la sala.',
-  'Mover los cojines del sofá y verificar que no haya suciedad ni hormigas debajo.',
-  'Organizar cojines y dejar la sala ordenada.',
-  'Limpiar mesa, sillas y superficies del comedor.',
-  'Asegurarse de que el área del comedor quede limpia y ordenada.',
-  'Limpiar superficies, gabinetes por fuera y por dentro de la cocina.',
-  'Verificar que los gabinetes estén limpios, organizados y funcionales.',
-  'Limpiar la cafetera y su filtro.',
-  'Verificar que el dispensador de jabón de loza esté lleno.',
-  'Dejar toallas de cocina limpias y disponibles para los visitantes.',
-  'Limpiar microondas por dentro y por fuera.',
-  'Limpiar el filtro de agua.',
-  'Limpiar la nevera por dentro y por fuera (no dejar alimentos).',
-  'Lavar las canecas de basura y colocar bolsas nuevas.',
-  'Limpiar ducha (pisos y paredes) de los baños.',
-  'Limpiar divisiones de vidrio y asegurarse de que no queden marcas.',
-  'Limpiar espejo, sanitario y lavamanos con Clorox.',
-  'Lavar las canecas de basura y colocar bolsas nuevas en los baños.',
-  'Verificar disponibilidad de toallas: máximo 10 toallas blancas de cuerpo en toda la casa, máximo 4 toallas de mano en total (1 por baño).',
-  'Dejar un rollo de papel higiénico nuevo instalado en cada baño.',
-  'Dejar un rollo extra en el cuarto de lavado.',
-  'Lavar y volver a colocar los tapetes de baño.',
-  'Revisar que no haya objetos dentro de los cajones de las habitaciones.',
-  'Lavar sábanas y hacer las camas correctamente.',
-  'Limpiar el polvo de todas las superficies de las habitaciones.',
-  'Lavar los tapetes de la habitación y volver a colocarlos limpios.',
-  'Limpiar el filtro de la lavadora en cada lavada.',
-  'Limpiar el gabinete debajo del lavadero.',
-  'Dejar ganchos de ropa disponibles.',
-  'Dejar toallas disponibles para la piscina.',
-  'Barrer y trapear el área de BBQ.',
-  'Limpiar mesa y superficies del área de BBQ.',
-  'Limpiar la mini nevera y no dejar ningún alimento dentro.',
-  'Limpiar la parrilla con el cepillo (no usar agua).',
-  'Retirar las cenizas del carbón.',
-  'Dejar toda el área de BBQ limpia y ordenada.',
-  'Barrer y trapear el área de piscina.',
-  'Organizar los muebles alrededor de la piscina.',
-  'Limpiar el piso de la terraza.',
-  'Limpiar superficies de la terraza.',
-  'Organizar los cojines de la sala exterior.'
-];
-
-const maintenanceTasks = [
-  'Mantener la piscina limpia y en funcionamiento.',
-  'Revisar constantemente el cuarto de máquinas para verificar su funcionamiento y detectar posibles filtraciones de agua.',
-  'Chequear que el generador eléctrico funcione correctamente y tenga diesel suficiente.',
-  'Encender la planta eléctrica al menos 2 veces al mes durante mínimo media hora.',
-  'Cortar el césped cada mes y medio a dos meses, y limpiar restos de césped.',
-  'Mantenimiento de palmeras: remover hojas secas.',
-  'Mantener la matera de la terraza libre de maleza y deshierbar regularmente.',
-  'Regar las plantas vivas según necesidad.'
-];
-
-
 const CHECKLIST_KEY = 'dashboard_checklist'; // legacy, no longer usado
 
 // Definir tipo para los items del checklist
@@ -81,14 +18,11 @@ interface ChecklistItem {
 // Recibe también la lista de usuarios para asignar tareas
 interface ChecklistProps {
   user: User;
-  users?: User[];
   assignmentId?: number | string;
 }
-const Checklist = ({ user, users = [], assignmentId }: ChecklistProps) => {
+const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     // Estado para formulario de tarea manual
     const [taskForm, setTaskForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
-    const [editIdx, setEditIdx] = useState<number | null>(null);
-    const [editForm, setEditForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
     const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
     const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
     const [loading, setLoading] = useState(true);
