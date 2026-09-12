@@ -26,7 +26,6 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
     const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [assignmentType, setAssignmentType] = useState<string | null>(null);
     // Nuevo: tipo de asignación activa para el empleado
     const [activeAssignmentType, setActiveAssignmentType] = useState<string | null>(null);
     // Confirmación visual al completar tarea
@@ -78,11 +77,10 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       // Separar limpieza y mantenimiento por tipo/zona
       setCleaning(items.filter((i: any) => i.task && (!i.zone || !i.zone.toLowerCase().includes('mantenimiento'))));
       setMaintenance(items.filter((i: any) => i.task && i.zone && i.zone.toLowerCase().includes('mantenimiento')));
-      setAssignmentType(items.length > 0 && items[0].assignment_type ? items[0].assignment_type : null);
       setLoading(false);
       return;
     }
-    let selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
+    const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
     // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
     if (selectedHouse === 'HYNTIBA2 APTO 406') {
       const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
@@ -210,14 +208,6 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     };
   }, [user, assignmentId]);
 
-  // Asignar tarea a usuario (manager/owner)
-  const handleAssign = async (taskId: number, assignedTo: string) => {
-    setLoading(true);
-    await (checklistTable() as any).update({ assigned_to: assignedTo }).eq('id', taskId);
-    // Ya no es necesario refrescar manualmente, el realtime lo hará
-    setLoading(false);
-  };
-
   // Agrupar tareas de limpieza por zona
   const cleaningZones = [
     { key: 'habitaciones', label: 'Habitaciones' },
@@ -278,27 +268,6 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
         console.log('✅ Tarea agregada:', taskForm.item);
       } else {
         console.error('Error agregando tarea:', error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Eliminar tarea (solo HYNTIBA2)
-  const handleDeleteTask = async (taskId: number) => {
-    if (!confirm('¿Eliminar esta tarea?')) return;
-    
-    try {
-      setLoading(true);
-      const { error } = await (checklistTable() as any)
-        .delete()
-        .eq('id', taskId);
-      
-      if (!error) {
-        setCleaning(cleaning.filter(t => t.id !== taskId));
-        console.log('✅ Tarea eliminada');
-      } else {
-        console.error('Error eliminando tarea:', error);
       }
     } finally {
       setLoading(false);
@@ -562,7 +531,7 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       // 1. Marcar la asignación como completada
       await supabase
         .from('calendar_assignments')
-        // @ts-ignore
+        // @ts-expect-error Supabase schema is broader than the generated client type.
         .update({ completed: true })
         .eq('id', assignmentId);
 
