@@ -23,7 +23,21 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       if (saved) {
         const user = JSON.parse(saved);
         onLogin(user);
+        return;
       }
+
+      // Dev helper: auto-login usando ?devUser=jonathan en localhost (solo entorno local)
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const devUser = params.get('devUser');
+        if (devUser === 'jonathan' && window.location.hostname.includes('localhost')) {
+          const devUserObj: User = { username: 'jonathan', password: '', role: 'owner', house: 'EPIC D1' };
+          console.log('🔁 [Login] Dev auto-login for', devUser);
+          localStorage.setItem(SESSION_KEY, JSON.stringify(devUserObj));
+          onLogin(devUserObj);
+          return;
+        }
+      } catch (e) { /* ignore */ }
     }
   }, [onLogin]);
 

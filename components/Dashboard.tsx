@@ -5165,16 +5165,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   }
                                   
                                   // Actualizar estado local
-                                  setAssignedTasks(prev => prev.map(t => 
+                                  setCalendarAssignments(prev => prev.map(t => 
                                     t.id === task.id 
                                       ? { ...t, completed: true, completed_at: now, completed_by: user.username } 
                                       : t
                                   ));
-                                  
-                                  // Notificar al componente padre
-                                  if (onTaskCompleted) {
-                                    onTaskCompleted(task.id, assignmentId);
-                                  }
                                   
                                   console.log(`✅ [AssignedTasksCard] Tarea ${task.id} marcada como completada por ${user.username}`);
                                 }}
