@@ -20,6 +20,23 @@ const App = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [theme, setTheme] = useState('light');
 
+  // Cargar usuarios desde Supabase
+  const fetchUsers = async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (data) {
+      setUsers(data.map((p: any) => ({
+        id: p.id,
+        username: p.username,
+        password: '',
+        role: p.role,
+        house: p.house || 'EPIC D1',
+      })));
+    } else if (error) {
+      console.error('❌ Error al cargar usuarios:', error);
+    }
+  };
+
   // Suscripción a cambios en tiempo real de profiles
   useEffect(() => {
     if (!supabase) return;
@@ -42,23 +59,6 @@ const App = () => {
       if (supabase) supabase.removeChannel(channel);
     };
   }, [supabase]);
-
-  // Cargar usuarios desde Supabase
-  const fetchUsers = async () => {
-    if (!supabase) return;
-    const { data, error } = await supabase.from('profiles').select('*');
-    if (data) {
-      setUsers(data.map((p: any) => ({
-        id: p.id,
-        username: p.username,
-        password: '',
-        role: p.role,
-        house: p.house || 'EPIC D1',
-      })));
-    } else if (error) {
-      console.error('❌ Error al cargar usuarios:', error);
-    }
-  };
 
   // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {

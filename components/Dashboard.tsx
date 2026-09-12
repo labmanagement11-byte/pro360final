@@ -4205,7 +4205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       {checklistTemplatesError}
                       {String(checklistTemplatesError).includes('checklist_templates') && (
                         <div style={{marginTop: '0.5rem', color: '#b91c1c'}}>
-                          Ejecuta el SQL en "create-checklist-templates-table.sql" para crear la tabla en Supabase.
+                          Ejecuta el SQL en &quot;create-checklist-templates-table.sql&quot; para crear la tabla en Supabase.
                         </div>
                       )}
                     </div>
