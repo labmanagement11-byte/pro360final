@@ -1,316 +1,368 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
-import { FaBoxOpen, FaChair, FaBed, FaBath, FaUtensils, FaCouch, FaSwimmer, FaBroom, FaTshirt, FaQuestion } from 'react-icons/fa';
+import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
+import './Inventory.css';
 
-const ROOMS = [
-  'Cocina', 'Terraza', 'Piscina', 'BBQ', 'Pasillo', 'Baños', 'Habitación 1', 'Habitación 2', 'Habitación 3', 'Lavandería'
+const AREAS = [
+  'Cocina', 'Comedor', 'Sala', 'Habitaciones', 'Baños', 'Lavandería',
+  'Terraza', 'Piscina', 'BBQ', 'Área de limpieza', 'Bodega', 'General', 'Otros',
 ];
-const INVENTORY_KEY = 'dashboard_inventory'; // legacy, no longer used
 
-const roomIcons: { [key: string]: React.ReactElement } = {
-  'Cocina': <FaUtensils style={{color:'#3182ce'}} />,
-  'Terraza': <FaChair style={{color:'#fbbf24'}} />,
-  'Piscina': <FaSwimmer style={{color:'#38bdf8'}} />,
-  'BBQ': <FaUtensils style={{color:'#f87171'}} />,
-  'Pasillo': <FaBroom style={{color:'#a3e635'}} />,
-  'Baños': <FaBath style={{color:'#818cf8'}} />,
-  'Habitación 1': <FaBed style={{color:'#f472b6'}} />,
-  'Habitación 2': <FaBed style={{color:'#f472b6'}} />,
-  'Habitación 3': <FaBed style={{color:'#f472b6'}} />,
-  'Lavandería': <FaTshirt style={{color:'#38bdf8'}} />,
-};
+const ISSUES = [
+  { value: 'roto', label: 'Roto' },
+  { value: 'danado', label: 'Dañado' },
+  { value: 'perdido', label: 'Perdido' },
+];
 
 interface InventoryItem {
-  id?: number; // ID de Supabase (opcional)
+  id: string;
   name: string;
-  room: string;
   quantity: number;
+  location?: string | null;
+  notes?: string | null;
+  house?: string | null;
   complete?: boolean;
-  missing?: number;
-  reason?: string;
+  issue_type?: string | null;
+  missing_qty?: number | null;
+  checked_by?: string | null;
+  checked_at?: string | null;
 }
 
 interface User {
   username: string;
   role: string;
+  house?: string;
 }
 
 interface InventoryProps {
   user: User;
   houseName?: string;
-  inventory?: InventoryItem[];
-  setInventory?: (inventory: InventoryItem[]) => void;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ user, houseName = 'HYNTIBA2 APTO 406', inventory: externalInventory, setInventory: setExternalInventory }) => {
-    const [form, setForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
-    const [editForm, setEditForm] = useState({ name: '', room: ROOMS[0], quantity: 1 });
-    const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [items, setItemsState] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
-  useEffect(() => {
-    if (houseName === 'HYNTIBA2 APTO 406') {
-      localStorage.setItem('plantilla_inventario_hyntiba2', JSON.stringify(items));
-    }
-  }, [items, houseName]);
-  // Para HYNTIBA2, no hay inventario predefinido, solo gestión manual
-  // Formulario para agregar/editar items
-  // ...existing code...
+function isOwnerRole(role?: string) {
+  const value = String(role || '').toLowerCase();
+  return value === 'owner' || value === 'dueno' || value === 'manager';
+}
 
-  // Cargar inventario desde Supabase
-  const fetchInventory = async () => {
-        // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
-        if (houseName === 'HYNTIBA2 APTO 406') {
-          const { data, error } = await supabase!.from('inventory').select('*').eq('house', houseName);
-          if ((!error && data && data.length === 0)) {
-            const plantilla = localStorage.getItem('plantilla_inventario_hyntiba2');
-            if (plantilla) {
-              setItemsState(JSON.parse(plantilla));
-              setLoading(false);
-              return;
-            }
-          }
-        }
+function issueLabel(value?: string | null) {
+  if (value === 'roto') return 'Roto';
+  if (value === 'danado') return 'Dañado';
+  if (value === 'perdido') return 'Perdido';
+  return '';
+}
+
+const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
+  const house = houseName && houseName !== 'all' ? houseName : (user.house && user.house !== 'all' ? user.house : 'EPIC D1');
+  const owner = isOwnerRole(user.role);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [form, setForm] = useState({ name: '', quantity: 1, location: AREAS[0], notes: '' });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [issueFor, setIssueFor] = useState<string | null>(null);
+  const [issueForm, setIssueForm] = useState({ issue_type: 'perdido', missing_qty: 1, notes: '' });
+  const [activeAssignment, setActiveAssignment] = useState<any>(null);
+
+  const loadItems = async () => {
+    if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase!
+    const { data, error } = await (supabase as any)
       .from('inventory')
       .select('*')
-      .eq('house', houseName);
-    if (!error && data) {
-      setItemsState(data);
+      .eq('house', house)
+      .order('location', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) {
+      setItems([]);
+      setNotice(error.message || 'No se pudo cargar el inventario');
     } else {
-      setItemsState([]);
+      setItems((data || []) as InventoryItem[]);
     }
     setLoading(false);
   };
 
-  // Cargar inventario al montar y suscribirse a cambios en tiempo real
   useEffect(() => {
-    fetchInventory();
-
+    loadItems();
     if (!supabase) return;
-
-    // Suscripción realtime a cambios en inventory - canal único por casa y timestamp
-    console.log('📡 [Inventory] Suscribiendo a realtime para:', houseName);
-    const channelName = `inventory-changes-${houseName}-${Date.now()}`;
     const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `house=eq.${houseName}` }, (payload: any) => {
-        console.log('📦 [Inventory Realtime] Cambio detectado:', payload);
-        fetchInventory();
+      .channel(`inventory-live-${house}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory',
+        filter: `house=eq.${house}`,
+      }, () => {
+        loadItems();
       })
-      .subscribe((status: string) => {
-        console.log('📡 [Inventory] Estado de suscripción:', status);
-      });
-
+      .subscribe();
     return () => {
-      console.log('📡 [Inventory] Desuscribiendo de:', channelName);
       channel.unsubscribe();
     };
-  }, [houseName]);
+  }, [house]);
 
-  // Sync with external inventory if provided
-  // No externalInventory ni setInventory: todo es cloud
+  useEffect(() => {
+    const loadAssignment = async () => {
+      if (!supabase || !owner) return;
+      const { data } = await (supabase as any)
+        .from('calendar_assignments')
+        .select('*')
+        .eq('house', house)
+        .eq('completed', false)
+        .order('date', { ascending: false })
+        .limit(1);
+      setActiveAssignment(data && data[0] ? data[0] : null);
+    };
+    loadAssignment();
+    if (!supabase) return;
+    const channel = supabase
+      .channel(`inventory-assignments-${house}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_assignments' }, () => {
+        loadAssignment();
+      })
+      .subscribe();
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [house, owner]);
 
-  // No localStorage: todo es cloud
+  const grouped = useMemo(() => {
+    const map = new Map<string, InventoryItem[]>();
+    items.forEach((item) => {
+      const key = String(item.location || 'General').trim() || 'General';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    });
+    return Array.from(map.entries());
+  }, [items]);
 
-  // Agregar item a Supabase
-  const addItem = async (e: React.FormEvent<HTMLFormElement>) => {
+  const doneCount = items.filter((item) => item.complete).length;
+  const issueCount = items.filter((item) => !item.complete && item.issue_type).length;
+  const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
+
+  const flash = (text: string) => {
+    setNotice(text);
+    setTimeout(() => setNotice(''), 1800);
+  };
+
+  const saveItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newItem = { ...form, complete: false, missing: 0, house: houseName };
-    // @ts-expect-error
-    const { data, error } = await supabase!.from('inventory').insert([newItem]).select();
-    if (!error && data && data.length > 0) {
-      setItemsState([...items, data[0]]);
-      setForm({ name: '', room: ROOMS[0], quantity: 1 });
+    if (!supabase) return;
+    const payload = {
+      name: form.name.trim(),
+      quantity: Number(form.quantity) || 1,
+      location: form.location || 'General',
+      notes: form.notes.trim() || null,
+      house,
+      complete: false,
+      issue_type: null,
+      missing_qty: 0,
+    };
+    if (!payload.name) return;
+    if (editId) {
+      const { error } = await (supabase as any).from('inventory').update({
+        name: payload.name,
+        quantity: payload.quantity,
+        location: payload.location,
+        notes: payload.notes,
+        updated_at: new Date().toISOString(),
+      }).eq('id', editId);
+      if (error) return flash(error.message);
+      setEditId(null);
+      flash('Artículo actualizado');
+    } else {
+      const { error } = await (supabase as any).from('inventory').insert([payload]);
+      if (error) return flash(error.message.includes('duplicate') || error.code === '23505' ? 'Ese artículo ya está en esta zona' : error.message);
+      flash('Artículo guardado');
     }
+    setForm({ name: '', quantity: 1, location: form.location, notes: '' });
   };
 
-  // Editar item en Supabase
-  const saveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (editIdx === null) return;
-    const itemToEdit = items[editIdx];
-    const updatedItem = { ...itemToEdit, ...editForm };
-      const { data, error } = await supabase!
-        .from('inventory')
-        // @ts-expect-error
-        .update({ missing: value })
-        // @ts-expect-error
-        .eq('id', itemToEdit.id)
-        .select();
-    if (!error && data && data.length > 0) {
-      setItemsState(items.map((it, idx) => idx === editIdx ? data[0] : it));
-      setEditIdx(null);
-      setEditForm({ name: '', room: ROOMS[0], quantity: 1 });
-    }
+  const deleteItem = async (item: InventoryItem) => {
+    if (!supabase || !confirm(`¿Eliminar ${item.name}?`)) return;
+    await (supabase as any).from('inventory').delete().eq('id', item.id);
   };
 
-  // Eliminar item en Supabase
-  const deleteItem = async (idx: number) => {
-    const item = items[idx];
-    if (!item || !item.id) return;
-    const { error } = await supabase!.from('inventory').delete().eq('id', item.id);
-    if (!error) {
-      setItemsState(items.filter((_, i) => i !== idx));
-    }
+  const markComplete = async (item: InventoryItem) => {
+    if (!supabase) return;
+    await (supabase as any).from('inventory').update({
+      complete: true,
+      issue_type: null,
+      missing_qty: 0,
+      checked_by: user.username,
+      checked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', item.id);
+    setIssueFor(null);
   };
 
-  // Marcar como completo/incompleto y reportar faltantes (empleado)
-  const toggleComplete = async (idx: number) => {
-    const item = items[idx];
-    if (!item || !item.id) return;
-    const { data, error } = await supabase!
-      .from('inventory')
-      // @ts-expect-error
-      .update({ complete: !item.complete })
-      .eq('id', item.id)
-      .select();
-    if (!error && data && data.length > 0) {
-      setItemsState(items.map((it, i) => i === idx ? data[0] : it));
-    }
-  };
-  const setMissing = async (idx: number, value: number) => {
-    const item = items[idx];
-    if (!item || !item.id) return;
-    const { data, error } = await supabase!
-      .from('inventory')
-      // @ts-expect-error
-      .update({ missing: value })
-      .eq('id', item.id)
-      .select();
-    if (!error && data && data.length > 0) {
-      setItemsState(items.map((it, i) => i === idx ? data[0] : it));
-    }
+  const markIssue = async (item: InventoryItem) => {
+    if (!supabase) return;
+    await (supabase as any).from('inventory').update({
+      complete: false,
+      issue_type: issueForm.issue_type,
+      missing_qty: Number(issueForm.missing_qty) || 0,
+      notes: issueForm.notes.trim() || item.notes,
+      checked_by: user.username,
+      checked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', item.id);
+    setIssueFor(null);
+    flash('Reporte guardado');
   };
 
-  // Set reason for incomplete item
-  const setReason = async (idx: number, value: string) => {
-    const item = items[idx];
-    if (!item || !item.id) return;
-    const { data, error } = await supabase!
-      .from('inventory')
-      // @ts-expect-error
-      .update({ reason: value })
-      .eq('id', item.id)
-      .select();
-    if (!error && data && data.length > 0) {
-      setItemsState(items.map((it, i) => i === idx ? data[0] : it));
+  const finishJob = async () => {
+    if (!activeAssignment?.id) {
+      flash('No hay un trabajo activo para cerrar');
+      return;
     }
+    if (!confirm('¿Marcar este trabajo como terminado? Se irá a Completados y el inventario se reinicia, pero los objetos se quedan.')) return;
+    const ok = await archiveCalendarAssignment(activeAssignment, user.username);
+    if (!ok) return flash('No se pudo terminar el trabajo');
+    setActiveAssignment(null);
+    flash('Trabajo terminado. Inventario listo para la próxima limpieza');
   };
-
-  // Reiniciar inventario (manager/owner)
-  const resetInventory = async () => {
-    // Actualizar todos los items en Supabase
-    const ids = items.map(it => it.id);
-    const { data, error } = await supabase!
-      .from('inventory')
-      // @ts-expect-error
-      .update({ complete: false, missing: 0 })
-      .in('id', ids);
-    if (!error) {
-      setItemsState(items.map(it => ({ ...it, complete: false, missing: 0 })));
-    }
-  };
-
-  // Agrupar por habitación
-  // ...existing code...
-
-  // Agrupar por habitación
-  const grouped = ROOMS.map(room => ({
-    room,
-    items: items.filter(it => it.room === room)
-  })).filter(g => g.items.length > 0);
 
   return (
-    <div className="inventory-list ultra-checklist">
-      <h2 className="ultra-checklist-title">Inventario {houseName}</h2>
-      {loading && <p className="ultra-task-text" style={{textAlign:'center'}}>Cargando inventario...</p>}
-      {/* Formulario para agregar/editar items solo para managers de HYNTIBA2 */}
-      {!loading && houseName === 'HYNTIBA2 APTO 406' && (user.role === 'owner' || user.role === 'manager') && (
-        <form
-          onSubmit={async e => {
-            e.preventDefault();
-            if (editIdx !== null) {
-              // Editar item existente
-              const itemToEdit = items[editIdx];
-              const { data, error } = await (supabase!.from('inventory') as any).update({ name: editForm.name, room: editForm.room, quantity: editForm.quantity }).eq('id', itemToEdit.id).select();
-              if (!error && data && data.length > 0) {
-                setItemsState(items.map((it, idx) => idx === editIdx ? data[0] : it));
-                setEditIdx(null);
-                setEditForm({ name: '', room: ROOMS[0], quantity: 1 });
-              }
-            } else {
-              // Agregar nuevo item
-              const { data, error } = await (supabase!.from('inventory') as any).insert([{ name: form.name, room: form.room, quantity: form.quantity, house: houseName, complete: false, missing: 0 }]).select();
-              if (!error && data && data.length > 0) {
-                setItemsState([...items, data[0]]);
-                setForm({ name: '', room: ROOMS[0], quantity: 1 });
-              }
-            }
-          }}
-          className="ultra-form-row" style={{marginBottom:'1.5rem', display:'flex', flexWrap:'wrap', gap:'0.7rem', alignItems:'center', justifyContent:'center'}}
-        >
-          <input id="inv-item-name" type="text" placeholder="Artículo" value={editIdx !== null ? editForm.name : form.name} onChange={e => editIdx !== null ? setEditForm({ ...editForm, name: e.target.value }) : setForm({ ...form, name: e.target.value })} required title="Nombre del artículo" className="ultra-task-text" style={{minWidth:'120px'}} />
-          <select id="inv-room-select" value={editIdx !== null ? editForm.room : form.room} onChange={e => editIdx !== null ? setEditForm({ ...editForm, room: e.target.value }) : setForm({ ...form, room: e.target.value })} title="Selecciona la habitación" className="ultra-task-text">
-            {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
+    <div className="inv-page">
+      <h2 className="inv-title">Inventario {house}</h2>
+      <p className="inv-live">En tiempo real</p>
+      {notice && <p className="inv-live">{notice}</p>}
+
+      <div className="inv-progress">
+        <div className="inv-progress-top">
+          <strong>Revisión de la casa</strong>
+          <span>{doneCount}/{items.length} completos</span>
+        </div>
+        <div className="inv-bar">
+          <span style={{ width: `${pct}%`, background: pct === 100 ? '#16a34a' : '#2563eb' }} />
+        </div>
+        <div className="inv-progress-meta">
+          <span style={{ color: '#16a34a' }}>{doneCount} ok</span>
+          <span style={{ color: '#dc2626' }}>{issueCount} con reporte</span>
+          <span style={{ color: '#d97706' }}>{items.length - doneCount - issueCount} pendientes</span>
+        </div>
+      </div>
+
+      {owner && (
+        <form className="inv-form" onSubmit={saveItem}>
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Artículo"
+            required
+          />
+          <input
+            type="number"
+            min={1}
+            value={form.quantity}
+            onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
+            title="Cantidad"
+          />
+          <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} title="Zona">
+            {AREAS.map((area) => <option key={area} value={area}>{area}</option>)}
           </select>
-          <input id="inv-qty" type="number" min={1} value={editIdx !== null ? editForm.quantity : form.quantity} onChange={e => editIdx !== null ? setEditForm({ ...editForm, quantity: Number(e.target.value) }) : setForm({ ...form, quantity: Number(e.target.value) })} required title="Cantidad del artículo" className="ultra-task-text" style={{width:'70px'}} />
-          <button type="submit" className="ultra-reset-btn" style={{padding:'0.5rem 1.2rem', fontSize:'1rem'}}>{editIdx !== null ? 'Guardar' : 'Agregar'}</button>
-          {editIdx !== null && <button type="button" className="ultra-reset-btn" style={{background:'#aaa',color:'#fff',padding:'0.5rem 1.2rem', fontSize:'1rem'}} onClick={() => { setEditIdx(null); setEditForm({ name: '', room: ROOMS[0], quantity: 1 }); }}>Cancelar</button>}
+          <input
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Nota opcional"
+          />
+          <button className="inv-btn main" type="submit">{editId ? 'Guardar' : 'Agregar'}</button>
         </form>
       )}
-      {!loading && grouped.length === 0 && <p className="ultra-task-text" style={{textAlign:'center'}}>No hay artículos en el inventario.</p>}
-      <div className="ultra-tasks-grid">
-        {grouped.map(g => (
-          <div key={g.room} className="ultra-task-card" style={{flexDirection:'column', alignItems:'flex-start', minHeight:'unset'}}>
-            <div style={{display:'flex',alignItems:'center',marginBottom:'0.7rem'}}>
-              <span className="ultra-task-icon">{roomIcons[g.room] || <FaQuestion />}</span>
-              <span className="ultra-section-title" style={{margin:0}}>{g.room}</span>
+
+      {owner && activeAssignment && (
+        <div style={{ marginBottom: '1rem' }}>
+          <button className="inv-btn ok" type="button" onClick={finishJob}>
+            Terminar trabajo de {activeAssignment.employee}
+          </button>
+        </div>
+      )}
+
+      {loading && <p className="inv-empty">Cargando inventario...</p>}
+      {!loading && items.length === 0 && <p className="inv-empty">Aún no hay objetos guardados en esta casa.</p>}
+
+      {!loading && grouped.map(([zone, zoneItems]) => {
+        const zoneDone = zoneItems.filter((item) => item.complete).length;
+        return (
+          <section key={zone} className="inv-zone">
+            <div className="inv-zone-head">
+              <span>{zone}</span>
+              <span>{zoneDone}/{zoneItems.length}</span>
             </div>
-            <div style={{width:'100%'}}>
-              {g.items.map((it, idx) => (
-                <div key={idx} className={`ultra-task-card${it.complete ? ' done' : ''}`} style={{marginBottom:'0.5rem',background:'#fff',color:'#23272f',padding:'0.7rem 1rem',boxShadow:'0 1px 6px #0001',display:'flex',alignItems:'center',gap:'0.7rem'}}>
-                  <span className="ultra-task-icon">📦</span>
-                  <span className="ultra-task-text" style={{flex:1}}>{it.name} <span style={{opacity:0.7}}>({it.quantity})</span></span>
-                  {(user.role === 'owner' || user.role === 'manager') && houseName === 'HYNTIBA2 APTO 406' && (
-                    <>
-                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
-                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>
-                    </>
-                  )}
-                  {(user.role === 'owner' || user.role === 'manager') && houseName !== 'HYNTIBA2 APTO 406' && (
-                    <>
-                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',marginRight:'0.3rem',background:'#2563eb',color:'#fff'}} onClick={() => { setEditIdx(items.indexOf(it)); setEditForm({ name: it.name, room: it.room, quantity: it.quantity }); }}>Editar</button>
-                      <button className="ultra-reset-btn" style={{padding:'0.2rem 0.8rem',fontSize:'0.95rem',background:'#e11d48',color:'#fff'}} onClick={() => deleteItem(items.indexOf(it))}>Eliminar</button>
-                    </>
-                  )}
-                  {user.role === 'empleado' && (
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                      <label className="ultra-checkbox" style={{margin:0}}>
-                        <input type="checkbox" checked={!!it.complete} onChange={() => toggleComplete(items.indexOf(it))} />
-                        <span style={{marginLeft:'0.2rem'}}>Completo</span>
-                      </label>
-                      <input type="number" min={0} max={it.quantity} value={it.missing || 0} onChange={e => setMissing(items.indexOf(it), Number(e.target.value))} className="ultra-task-text" style={{width:'55px',fontSize:'0.95rem'}} title="Cantidad faltante" />
-                      {!it.complete && (
-                        <input type="text" placeholder="Motivo si no completo" value={it.reason || ''} onChange={e => setReason(items.indexOf(it), e.target.value)} className="ultra-task-text" style={{fontSize:'0.95rem',width:'120px'}} title="Motivo de no completar" />
+            <div className="inv-grid">
+              {zoneItems.map((item) => {
+                const hasIssue = !item.complete && !!item.issue_type;
+                const klass = item.complete ? 'ok' : hasIssue ? 'issue' : '';
+                return (
+                  <article key={item.id} className={`inv-card ${klass}`}>
+                    <div className={`inv-card-band ${klass || 'wait'}`}>
+                      {item.complete ? 'Completo' : hasIssue ? issueLabel(item.issue_type) : 'Pendiente'}
+                    </div>
+                    <div className="inv-card-body">
+                      <h3>{item.name}</h3>
+                      <div className="inv-meta">
+                        Cantidad: {item.quantity}
+                        {item.notes ? ` · ${item.notes}` : ''}
+                        {hasIssue && item.missing_qty ? ` · Faltan ${item.missing_qty}` : ''}
+                        {item.checked_by ? ` · ${item.checked_by}` : ''}
+                      </div>
+                      <div className="inv-actions">
+                        <button className="inv-btn ok" type="button" onClick={() => markComplete(item)}>Completo</button>
+                        <button className="inv-btn warn" type="button" onClick={() => {
+                          setIssueFor(item.id);
+                          setIssueForm({
+                            issue_type: item.issue_type || 'perdido',
+                            missing_qty: item.missing_qty || 1,
+                            notes: '',
+                          });
+                        }}>Incompleto</button>
+                        {owner && (
+                          <>
+                            <button className="inv-btn ghost" type="button" onClick={() => {
+                              setEditId(item.id);
+                              setForm({
+                                name: item.name,
+                                quantity: item.quantity || 1,
+                                location: item.location || 'General',
+                                notes: item.notes || '',
+                              });
+                            }}>Editar</button>
+                            <button className="inv-btn danger" type="button" onClick={() => deleteItem(item)}>Borrar</button>
+                          </>
+                        )}
+                      </div>
+                      {issueFor === item.id && (
+                        <div className="inv-issue-box">
+                          <select
+                            value={issueForm.issue_type}
+                            onChange={(e) => setIssueForm({ ...issueForm, issue_type: e.target.value })}
+                            title="Motivo"
+                          >
+                            {ISSUES.map((issue) => <option key={issue.value} value={issue.value}>{issue.label}</option>)}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            value={issueForm.missing_qty}
+                            onChange={(e) => setIssueForm({ ...issueForm, missing_qty: Number(e.target.value) })}
+                            placeholder="Cantidad afectada"
+                          />
+                          <input
+                            value={issueForm.notes}
+                            onChange={(e) => setIssueForm({ ...issueForm, notes: e.target.value })}
+                            placeholder="Detalle (opcional)"
+                          />
+                          <button className="inv-btn warn" type="button" onClick={() => markIssue(item)}>Guardar reporte</button>
+                        </div>
                       )}
                     </div>
-                  )}
-                  {(user.role === 'owner' || user.role === 'manager') && (it.missing ?? 0) > 0 && (
-                    <span className="ultra-task-text" style={{color:'#e11d48',marginLeft:'0.7rem'}}>Reportado: Faltan {it.missing ?? 0}</span>
-                  )}
-                </div>
-              ))}
+                  </article>
+                );
+              })}
             </div>
-          </div>
-        ))}
-      </div>
-      {!loading && (user.role === 'owner' || user.role === 'manager') && grouped.length > 0 && (
-        <button onClick={resetInventory} className="ultra-reset-btn" style={{marginTop:'2rem'}}>Reiniciar Inventario</button>
-      )}
+          </section>
+        );
+      })}
     </div>
   );
 };

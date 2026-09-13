@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase, checklistTable } from '../utils/supabaseClient';
+import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
+import Inventory from './Inventory';
 import type { User } from './Dashboard';
 import './Checklist.css';
 
@@ -80,6 +82,7 @@ const Checklist = ({ user }: ChecklistProps) => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'regular' | 'deep' | 'maint' | 'all'>('regular');
   const [assignmentType, setAssignmentType] = useState<string | null>(null);
+  const [activeAssignment, setActiveAssignment] = useState<any>(null);
   const [notice, setNotice] = useState('');
 
   const loadItems = async () => {
@@ -101,19 +104,37 @@ const Checklist = ({ user }: ChecklistProps) => {
   useEffect(() => {
     const loadAssignment = async () => {
       if (!supabase) return;
-      if (user.role !== 'empleado') return;
-      const { data } = await (supabase as any)
+      let query = (supabase as any)
         .from('calendar_assignments')
-        .select('type')
-        .eq('employee', user.username)
+        .select('*')
         .eq('house', selectedHouse)
-        .order('date', { ascending: false })
-        .limit(1);
-      const type = data && data[0] ? String(data[0].type || '') : '';
+        .eq('completed', false)
+        .order('date', { ascending: false });
+      if (user.role === 'empleado') {
+        query = query.eq('employee', user.username);
+      }
+      const { data } = await query.limit(1);
+      const current = data && data[0] ? data[0] : null;
+      setActiveAssignment(current);
+      const type = current ? String(current.type || '') : '';
       setAssignmentType(type || null);
-      setFilter(assignmentKind(type));
+      if (type) setFilter(assignmentKind(type));
     };
     loadAssignment();
+    if (!supabase) return;
+    const channel = supabase
+      .channel(`assignments-live-${selectedHouse}-${user.username}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'calendar_assignments',
+      }, () => {
+        loadAssignment();
+      })
+      .subscribe();
+    return () => {
+      channel.unsubscribe();
+    };
   }, [user.username, user.role, selectedHouse]);
 
   useEffect(() => {
@@ -211,6 +232,22 @@ const Checklist = ({ user }: ChecklistProps) => {
       .in('id', ids);
   };
 
+  const archiveVisibleWork = async () => {
+    if (!activeAssignment?.id) {
+      setNotice('No hay una asignación activa para archivar');
+      return;
+    }
+    const ok = await archiveCalendarAssignment(activeAssignment, user.username);
+    if (!ok) {
+      setNotice('No se pudo pasar el trabajo a completados');
+      return;
+    }
+    await resetVisible();
+    setActiveAssignment(null);
+    setNotice('Trabajo pasado a completados');
+    setTimeout(() => setNotice(''), 1800);
+  };
+
   return (
     <div className="checklist-list ultra-checklist">
       <h2 className="ultra-checklist-title">Checklist {selectedHouse}</h2>
@@ -229,11 +266,15 @@ const Checklist = ({ user }: ChecklistProps) => {
 
       {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
 
-      {!loading && grouped.length === 0 && (
+      {!loading && !owner && !activeAssignment && (
+        <p className="checklist-empty">No tienes tareas asignadas. Los trabajos terminados quedan en Completados.</p>
+      )}
+
+      {!loading && grouped.length === 0 && (owner || activeAssignment) && (
         <p className="checklist-empty">No hay tareas para esta casa todavía.</p>
       )}
 
-      {!loading && grouped.map(([room, roomItems]) => {
+      {!loading && (owner || activeAssignment) && grouped.map(([room, roomItems]) => {
         const roomDone = roomItems.filter((item) => item.complete).length;
         return (
           <section key={room} className="checklist-zone ultra-checklist-section">
@@ -269,8 +310,15 @@ const Checklist = ({ user }: ChecklistProps) => {
       })}
 
       {owner && visibleItems.length > 0 && (
-        <button onClick={resetVisible} className="ultra-reset-btn">Reiniciar checklist</button>
+        <div className="checklist-filter">
+          {activeAssignment && doneCount === visibleItems.length && (
+            <button onClick={archiveVisibleWork} className="ultra-reset-btn">Pasar a trabajos completados</button>
+          )}
+          <button onClick={resetVisible} className="ultra-reset-btn">Reiniciar checklist</button>
+        </div>
       )}
+
+      <Inventory user={user} houseName={selectedHouse} />
     </div>
   );
 };
