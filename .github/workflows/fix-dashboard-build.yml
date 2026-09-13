@@ -1,0 +1,30 @@
+name: Fix dashboard inventory build
+
+on:
+  push:
+    branches:
+      - fix/dashboard-inventory-build
+    paths:
+      - scripts/fix-dashboard-build.py
+      - .github/workflows/fix-dashboard-build.yml
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Dashboard
+        run: python3 scripts/fix-dashboard-build.py
+      - name: Commit Dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/Dashboard.tsx
+          if git diff --cached --quiet; then
+            echo "no change"
+            exit 0
+          fi
+          git commit -m "Quita props viejas del inventario en el dashboard"
+          git push
