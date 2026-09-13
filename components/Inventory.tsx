@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
 import './Inventory.css';
@@ -63,7 +63,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
   const [issueForm, setIssueForm] = useState({ issue_type: 'perdido', missing_qty: 1, notes: '' });
   const [activeAssignment, setActiveAssignment] = useState<any>(null);
 
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
     const { data, error } = await (supabase as any)
@@ -79,7 +79,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
       setItems((data || []) as InventoryItem[]);
     }
     setLoading(false);
-  };
+  }, [house]);
 
   useEffect(() => {
     loadItems();
@@ -98,7 +98,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
     return () => {
       channel.unsubscribe();
     };
-  }, [house]);
+  }, [house, loadItems]);
 
   useEffect(() => {
     const loadAssignment = async () => {
