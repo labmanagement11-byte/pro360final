@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
@@ -22,17 +21,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       const saved = localStorage.getItem(SESSION_KEY);
       if (saved) {
         const user = JSON.parse(saved);
+        if (user.role === 'owner' || user.role === 'dueno') {
+          user.role = 'owner';
+          user.house = 'all';
+          localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        }
         onLogin(user);
         return;
       }
 
-      // Dev helper: auto-login usando ?devUser=jonathan en localhost (solo entorno local)
       try {
         const params = new URLSearchParams(window.location.search);
         const devUser = params.get('devUser');
         if (devUser === 'jonathan' && window.location.hostname.includes('localhost')) {
-          const devUserObj: User = { username: 'jonathan', password: '', role: 'owner', house: 'EPIC D1' };
-          console.log('🔁 [Login] Dev auto-login for', devUser);
+          const devUserObj: User = { username: 'jonathan', password: '', role: 'owner', house: 'all' };
           localStorage.setItem(SESSION_KEY, JSON.stringify(devUserObj));
           onLogin(devUserObj);
           return;
@@ -55,7 +57,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       return;
     }
     
-    // Limpiar sesión anterior corrupta
     if (typeof window !== 'undefined') {
       localStorage.removeItem(SESSION_KEY);
     }
@@ -67,114 +68,76 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
 
     try {
-
-      // Login con Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password: normalizedPassword,
       });
 
       if (authError || !authData.user) {
-        console.error('❌ [Login] Error en autenticación:', authError);
         setError('Email o contraseña incorrectos');
         setLoading(false);
         return;
       }
 
-      console.log('✅ [Login] Autenticación exitosa, User ID:', authData.user.id);
-      
-      // Esperar un momento para que Supabase actualice la sesión
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Buscar perfil robustamente en varias fuentes (users, profiles)
       const localPart = normalizedEmail.split('@')[0].toLowerCase();
       const userId = authData.user.id;
       let record: any = null;
 
-      console.log('🔍 [Login] Buscando perfil para:', { userId, email: normalizedEmail, localPart });
-
-      // 1) PRIMERO: Buscar en profiles por ID de usuario (más confiable)
       try {
         const { data: profileById, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (profileError) {
-          console.log('⚠️ [Login] Error buscando en profiles por ID:', profileError.message);
-        }
         if (profileById) {
           record = profileById;
-          console.log('✅ [Login] Perfil encontrado por ID en profiles:', record);
         }
-      } catch (e: any) {
-        console.log('⚠️ [Login] Excepción buscando en profiles por ID:', e.message);
-      }
+      } catch (e: any) { /* ignore */ }
 
-      // 2) Si no existe, buscar en tabla users por ID
       if (!record) {
         try {
           const { data: userById } = await supabase.from('users').select('*').eq('id', userId).single();
-          if (userById) {
-            record = userById;
-            console.log('✅ [Login] Perfil encontrado por ID en users');
-          }
+          if (userById) record = userById;
         } catch (e) { /* ignored */ }
       }
 
-      // 3) Si no existe, buscar en profiles por username
       if (!record) {
         try {
           const { data: p } = await supabase.from('profiles').select('*').ilike('username', localPart).single();
-          if (p) {
-            record = p;
-            console.log('✅ [Login] Perfil encontrado por username en profiles');
-          }
+          if (p) record = p;
         } catch (e) { /* ignored */ }
       }
 
-      // 4) Si no existe, buscar en tabla users por username
       if (!record) {
         try {
           const { data: u } = await supabase.from('users').select('*').ilike('username', localPart).single();
-          if (u) {
-            record = u;
-            console.log('✅ [Login] Perfil encontrado por username en users');
-          }
+          if (u) record = u;
         } catch (e) { /* ignored */ }
       }
 
-      // 5) Si no existe, buscar en app_users por username
       if (!record) {
         try {
           const { data: appUser } = await supabase.from('app_users').select('*').ilike('username', localPart).single();
           if (appUser) {
-            // Mapear house_name a house para compatibilidad
             const appUserData = appUser as any;
             record = { ...appUserData, house: appUserData.house_name };
-            console.log('✅ [Login] Perfil encontrado en app_users:', record);
           }
         } catch (e) { /* ignored */ }
       }
 
       if (!record) {
-        console.error('❌ [Login] No se encontró perfil para:', { userId, email: normalizedEmail, localPart });
-        console.error('❌ [Login] Intentó buscar en profiles y users sin éxito');
         setError('Usuario no encontrado en base de datos. Por favor contacte al administrador.');
         setLoading(false);
         return;
       }
 
-      console.log('✅ [Login] Perfil obtenido:', { 
-        username: record.username, 
-        role: record.role, 
-        house: record.house 
-      });
-
-      // Normalizar rol 'dueno' a 'owner' para compatibilidad con el código existente
       let userRole = record.role || record.rol || (record.user_metadata && record.user_metadata.role) || 'empleado';
       if (userRole === 'dueno') {
         userRole = 'owner';
       }
 
-      // Obtener house del campo correcto según la tabla
-      const userHouse = record.house || record.house_name || record.property_id || 'EPIC D1';
+      let userHouse = record.house || record.house_name || record.property_id || 'EPIC D1';
+      if (userRole === 'owner') {
+        userHouse = 'all';
+      }
 
       const user: User = {
         username: record.username || record.full_name || localPart,
@@ -182,8 +145,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         role: userRole,
         house: userHouse,
       };
-
-      console.log('✅ [Login] Usuario cargado desde tabla users:', user);
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));

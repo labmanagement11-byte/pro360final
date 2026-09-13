@@ -55,13 +55,10 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     return json;
   };
 
-  // Cargar usuarios y casas desde Supabase si es jonathan
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        
-        // Si es owner, cargar desde API (incluye email)
         if (user?.role === 'owner') {
           try {
             const apiResult = await callAdminUsersApi('GET', {});
@@ -75,8 +72,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             const fetchedUsers = await realtimeService.getUsers();
             setUsers(fetchedUsers || []);
           }
-          
-          // Usar casas del props si están disponibles, sino cargar desde Supabase
           if (propHouses && propHouses.length > 0) {
             setHouses(propHouses);
           } else {
@@ -84,7 +79,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             setHouses(fetchedHouses || []);
           }
         } else {
-          // Si no es jonathan, usar props
           setUsers(propUsers || []);
           setHouses(propHouses || []);
         }
@@ -99,10 +93,8 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     loadData();
 
-    // Suscribirse a cambios en tiempo real para owners
     if (user?.role === 'owner') {
       const channelUsers = realtimeService.subscribeToUsers(async () => {
-        // Reload via API to keep email data fresh
         try {
           const apiResult = await callAdminUsersApi('GET', {});
           if (apiResult?.users) setUsers(apiResult.users);
@@ -169,7 +161,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             });
           }
         } else if (addUser) {
-          // Fallback para owner
           await addUser({ username, password: password || '', role, house });
         }
         setUsername('');
@@ -209,7 +200,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             }
           }
         } else if (editUser) {
-          // Fallback para owner
           await editUser(idx, { ...editData, password: editData.password || '' });
         }
         setEditUserId(null);
@@ -235,7 +225,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           setUsers(prev => prev.filter((u) => String(u.id) !== String(userId)));
         }
       } else if (deleteUser) {
-        // Fallback para owner
         await deleteUser(idx);
       }
     } catch (error) {
@@ -282,21 +271,16 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         {users && users.length > 0 ? (
           users
             .filter(u => {
-              // Owner (incluyendo Jonathan) ve todos los usuarios
-              if (user?.role === 'owner') {
-                // Si hay casa seleccionada, filtrar por ella
+              if (user?.role === 'owner' || user?.role === 'dueno') {
                 if (selectedHouse) {
                   return u.house === selectedHouse;
                 }
-                // Si no hay casa seleccionada, mostrar todos
                 return true;
               }
-              // Managers solo ven usuarios de su propia casa
-              if (user?.role === 'manager' && user.house) {
+              if (user?.house) {
                 return u.house === user.house;
               }
-              // Por defecto, mostrar todos
-              return true;
+              return false;
             })
             .map((u, idx) => (
             <li key={u.id || idx}>

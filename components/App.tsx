@@ -7,6 +7,13 @@ import { supabase } from '../utils/supabaseClient';
 
 
 const SESSION_KEY = 'dashboard_session_user';
+
+function canSeeAllHouses(user: User | null) {
+  if (!user) return false;
+  const role = String(user.role || '').toLowerCase();
+  return role === 'owner' || role === 'dueno' || user.house === 'all';
+}
+
 const App = () => {
   const [userState, setUserState] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
@@ -15,12 +22,10 @@ const App = () => {
     }
     return null;
   });
-  // Wrapper para compatibilidad exacta de tipos
   const setUser = (user: User | null) => setUserState(user);
   const [users, setUsers] = useState<User[]>([]);
   const [theme, setTheme] = useState('light');
 
-  // Cargar usuarios desde Supabase
   const fetchUsers = async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles').select('*');
@@ -33,34 +38,25 @@ const App = () => {
         house: p.house || 'EPIC D1',
       })));
     } else if (error) {
-      console.error('❌ Error al cargar usuarios:', error);
+      console.error('Error al cargar usuarios:', error);
     }
   };
 
-  // Suscripción a cambios en tiempo real de profiles
   useEffect(() => {
     if (!supabase) return;
-
     const channel = supabase
       .channel('profiles-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: any) => {
-        console.log('🔄 Cambio en profiles detectado:', payload);
-        // Refrescar lista de usuarios/perfiles si es necesario
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-          console.log('🔄 Recargando usuarios desde Supabase...');
           fetchUsers();
         }
       })
-      .subscribe((status: string) => {
-        console.log('📡 Estado de suscripción a profiles:', status);
-      });
-
+      .subscribe();
     return () => {
       if (supabase) supabase.removeChannel(channel);
     };
   }, []);
 
-  // Editar usuario en Supabase
   const editUser = async (idx: number, user: User) => {
     if (!supabase) {
       alert('Supabase no está configurado. Contacta al administrador.');
@@ -83,7 +79,6 @@ const App = () => {
     }
   };
 
-  // Eliminar usuario en Supabase
   const deleteUser = async (idx: number) => {
     if (!supabase) {
       alert('Supabase no está configurado. Contacta al administrador.');
@@ -102,7 +97,6 @@ const App = () => {
     }
   };
 
-  // Función para agregar usuario a Supabase y refrescar lista
   const addUser = async (user: User) => {
     if (!supabase) {
       alert('Supabase no está configurado. Contacta al administrador.');
@@ -123,7 +117,6 @@ const App = () => {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Auto-login from session
   useEffect(() => {
     if (!userState && typeof window !== 'undefined') {
       const saved = localStorage.getItem(SESSION_KEY);
@@ -133,21 +126,14 @@ const App = () => {
     }
   }, [userState]);
 
-
-  // Cargar usuarios (profiles) al iniciar la app
   useEffect(() => {
     fetchUsers();
-    
-    // Sincronizar usuarios cada 5 segundos para asegurar que no estén desincronizados
     const interval = setInterval(() => {
-      console.log('🔄 Sincronizando usuarios...');
       fetchUsers();
     }, 5000);
-    
     return () => clearInterval(interval);
   }, []);
 
-  // Logout con Supabase Auth
   const handleLogout = async () => {
     if (supabase) {
       await supabase.auth.signOut();
@@ -167,9 +153,12 @@ const App = () => {
     return <div style={{ padding: 40, textAlign: 'center' }}>Cargando...</div>;
   }
 
+  const visibleUsers = canSeeAllHouses(userState)
+    ? users
+    : users.filter(u => u.house && userState?.house && u.house === userState.house);
+
   return (
     <div>
-      {/* Logo eliminado, restaurado a versión previa */}
       <div className="theme-switcher">
         <button
           className={`theme-btn${theme === 'dark' ? ' dark' : ''}`}
@@ -187,7 +176,7 @@ const App = () => {
       ) : (
         <Dashboard
           user={userState}
-          users={users}
+          users={visibleUsers}
           addUser={addUser}
           editUser={editUser}
           deleteUser={deleteUser}
