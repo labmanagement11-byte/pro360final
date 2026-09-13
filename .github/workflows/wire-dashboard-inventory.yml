@@ -1,0 +1,30 @@
+name: Wire dashboard inventory
+
+on:
+  push:
+    branches:
+      - feat/dashboard-inventario-card
+    paths:
+      - scripts/wire-dashboard-inventory.py
+      - .github/workflows/wire-dashboard-inventory.yml
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Dashboard
+        run: python3 scripts/wire-dashboard-inventory.py
+      - name: Commit Dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/Dashboard.tsx
+          if git diff --cached --quiet; then
+            echo "no change"
+            exit 0
+          fi
+          git commit -m "Conecta la tarjeta Inventario del dashboard al componente nuevo"
+          git push
