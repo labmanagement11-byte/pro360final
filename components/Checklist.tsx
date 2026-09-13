@@ -87,6 +87,8 @@ const Checklist = ({ user }: ChecklistProps) => {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'regular' | 'deep' | 'maint' | 'all'>('regular');
+  const [statusFilter, setStatusFilter] = useState<'pendiente' | 'hecho' | 'todo'>('pendiente');
+  const [openRoom, setOpenRoom] = useState<string | null>(null);
   const [assignmentType, setAssignmentType] = useState<string | null>(null);
   const [activeAssignment, setActiveAssignment] = useState<any>(null);
   const [notice, setNotice] = useState('');
@@ -164,13 +166,21 @@ const Checklist = ({ user }: ChecklistProps) => {
     };
   }, [selectedHouse, loadItems]);
 
-  const visibleItems = useMemo(() => {
+  const kindItems = useMemo(() => {
     const kind = owner ? filter : (assignmentType ? assignmentKind(assignmentType) : filter);
     return items.filter((item) => {
       if (kind === 'all') return true;
       return roomKind(item.room) === kind;
     });
   }, [items, filter, owner, assignmentType]);
+
+  const visibleItems = useMemo(() => {
+    return kindItems.filter((item) => {
+      if (statusFilter === 'pendiente') return !item.complete;
+      if (statusFilter === 'hecho') return !!item.complete;
+      return true;
+    });
+  }, [kindItems, statusFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, ChecklistItem[]>();
@@ -186,7 +196,18 @@ const Checklist = ({ user }: ChecklistProps) => {
     });
   }, [visibleItems]);
 
-  const doneCount = visibleItems.filter((item) => item.complete).length;
+  useEffect(() => {
+    if (!grouped.length) {
+      setOpenRoom(null);
+      return;
+    }
+    if (!openRoom || !grouped.some(([room]) => room === openRoom)) {
+      setOpenRoom(grouped[0][0]);
+    }
+  }, [grouped, openRoom]);
+
+  const doneCount = kindItems.filter((item) => item.complete).length;
+  const pendingCount = kindItems.length - doneCount;
 
   const toggleItem = async (item: ChecklistItem) => {
     if (!item.id) return;
@@ -227,7 +248,7 @@ const Checklist = ({ user }: ChecklistProps) => {
   };
 
   const resetVisible = async () => {
-    const ids = visibleItems.map((item) => item.id);
+    const ids = kindItems.map((item) => item.id);
     if (!ids.length) return;
     setItems((prev) => prev.map((row) => ids.includes(row.id)
       ? { ...row, complete: false, completed_by: null, completed_at: null }
@@ -256,9 +277,14 @@ const Checklist = ({ user }: ChecklistProps) => {
 
   return (
     <div className="checklist-list ultra-checklist">
-      <h2 className="ultra-checklist-title">Checklist {selectedHouse}</h2>
-      <p className="checklist-live">En tiempo real</p>
-      <p className="checklist-progress">{doneCount} de {visibleItems.length} tareas completadas</p>
+      <header className="cl-head">
+        <div>
+          <h2 className="ultra-checklist-title">Checklist</h2>
+          <p className="cl-sub">{selectedHouse}</p>
+        </div>
+        <span className="checklist-live">En vivo</span>
+      </header>
+      <p className="checklist-progress">{doneCount} de {kindItems.length} hechas</p>
       {notice && <div className="checklist-live">{notice}</div>}
 
       {owner && (
@@ -266,9 +292,15 @@ const Checklist = ({ user }: ChecklistProps) => {
           <button className={filter === 'regular' ? 'active' : ''} onClick={() => setFilter('regular')}>Limpieza</button>
           <button className={filter === 'deep' ? 'active' : ''} onClick={() => setFilter('deep')}>Profunda</button>
           <button className={filter === 'maint' ? 'active' : ''} onClick={() => setFilter('maint')}>Mantenimiento</button>
-          <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Todo</button>
+          <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tipo: todo</button>
         </div>
       )}
+
+      <div className="cl-tabs">
+        <button type="button" className={statusFilter === 'pendiente' ? 'on' : ''} onClick={() => setStatusFilter('pendiente')}>Por hacer {pendingCount}</button>
+        <button type="button" className={statusFilter === 'hecho' ? 'on' : ''} onClick={() => setStatusFilter('hecho')}>Hechas {doneCount}</button>
+        <button type="button" className={statusFilter === 'todo' ? 'on' : ''} onClick={() => setStatusFilter('todo')}>Todo</button>
+      </div>
 
       {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
 
@@ -277,47 +309,62 @@ const Checklist = ({ user }: ChecklistProps) => {
       )}
 
       {!loading && grouped.length === 0 && (owner || activeAssignment) && (
-        <p className="checklist-empty">No hay tareas para esta casa todavía.</p>
+        <p className="checklist-empty">
+          {kindItems.length === 0
+            ? 'No hay tareas para esta casa todavía.'
+            : statusFilter === 'pendiente'
+              ? 'Nada pendiente en este checklist.'
+              : 'No hay tareas en esta vista.'}
+        </p>
       )}
 
       {!loading && (owner || activeAssignment) && grouped.map(([room, roomItems]) => {
         const roomDone = roomItems.filter((item) => item.complete).length;
+        const open = openRoom === room;
         return (
-          <section key={room} className="checklist-zone ultra-checklist-section">
-            <h3 className="checklist-zone-title ultra-section-title">
+          <section key={room} className={`checklist-zone ultra-checklist-section${open ? ' open' : ''}`}>
+            <button
+              type="button"
+              className="cl-zone-btn"
+              onClick={() => setOpenRoom(open ? null : room)}
+              aria-expanded={open}
+            >
               <span>{room}</span>
-              <span className="checklist-zone-count">{roomDone}/{roomItems.length}</span>
-            </h3>
-            <div className="ultra-tasks-grid">
-              {roomItems.map((item) => (
-                <div key={item.id} className={`ultra-task-card${item.complete ? ' done' : ''}`}>
-                  <label className="ultra-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={!!item.complete}
-                      onChange={() => toggleItem(item)}
-                      title={item.item}
-                    />
-                    <span className="ultra-task-icon">{item.complete ? '✔️' : '🧹'}</span>
-                    <span className="ultra-task-text">
-                      {item.item}
-                      {item.complete && (
-                        <span className="checklist-done-meta">
-                          Completado{item.completed_by ? ` por ${item.completed_by}` : ''}{item.completed_at ? ` · ${formatWhen(item.completed_at)}` : ''}
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                </div>
-              ))}
-            </div>
+              <span className="checklist-zone-count">
+                {statusFilter === 'pendiente' ? `${roomItems.length} por hacer` : `${roomDone}/${roomItems.length}`}
+              </span>
+            </button>
+            {open && (
+              <div className="ultra-tasks-grid cl-list">
+                {roomItems.map((item) => (
+                  <div key={item.id} className={`ultra-task-card${item.complete ? ' done' : ''}`}>
+                    <label className="ultra-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={!!item.complete}
+                        onChange={() => toggleItem(item)}
+                        title={item.item}
+                      />
+                      <span className="ultra-task-text">
+                        {item.item}
+                        {item.complete && (
+                          <span className="checklist-done-meta">
+                            Completado{item.completed_by ? ` por ${item.completed_by}` : ''}{item.completed_at ? ` · ${formatWhen(item.completed_at)}` : ''}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         );
       })}
 
-      {owner && visibleItems.length > 0 && (
+      {owner && kindItems.length > 0 && (
         <div className="checklist-filter">
-          {activeAssignment && doneCount === visibleItems.length && (
+          {activeAssignment && doneCount === kindItems.length && (
             <button onClick={archiveVisibleWork} className="ultra-reset-btn">Pasar a trabajos completados</button>
           )}
           <button onClick={resetVisible} className="ultra-reset-btn">Reiniciar checklist</button>
