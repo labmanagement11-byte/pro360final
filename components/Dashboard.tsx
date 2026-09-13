@@ -663,7 +663,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                                     onClick={() => setOpenAssignedZone(open ? null : zoneKey)}
                                   >
                                     <span className="assigned-task-zone-name">{zona}</span>
-                                    <span className={assignedView === 'pendiente' ? `${visibleSubs.length} por hacer` : `${zoneCompletedCount}/${zoneItemsCount}`}</span>
+                                    <span className="assigned-task-zone-count">{assignedView === 'pendiente' ? (String(visibleSubs.length) + ' por hacer') : (String(zoneCompletedCount) + '/' + String(zoneItemsCount))}</span>
                                   </button>
                                   {open && (
                                   <div className="assigned-task-subtasks-grid">
