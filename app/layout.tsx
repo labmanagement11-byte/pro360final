@@ -16,7 +16,9 @@ export const metadata: Metadata = {
   title: "Limpieza 360Pro - Gestión de Propiedades",
   description: "Aplicación profesional para la gestión de limpiezas y mantenimiento de propiedades",
   icons: {
-    icon: '/limpieza360pro-logo.png',
+    icon: [{ url: "/limpieza360pro-logo.png", type: "image/png" }],
+    apple: "/limpieza360pro-logo.png",
+    shortcut: "/limpieza360pro-logo.png",
   },
 };
 
