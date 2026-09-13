@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase, checklistTable } from '../utils/supabaseClient';
 import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
+import Inventory from './Inventory';
 import type { User } from './Dashboard';
 import './Checklist.css';
 
@@ -316,6 +317,8 @@ const Checklist = ({ user }: ChecklistProps) => {
           <button onClick={resetVisible} className="ultra-reset-btn">Reiniciar checklist</button>
         </div>
       )}
+
+      <Inventory user={user} houseName={selectedHouse} />
     </div>
   );
 };
