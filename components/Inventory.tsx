@@ -63,9 +63,9 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
   const [issueForm, setIssueForm] = useState({ issue_type: 'perdido', missing_qty: 1, notes: '' });
   const [activeAssignment, setActiveAssignment] = useState<any>(null);
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(async (silent = false) => {
     if (!supabase) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const { data, error } = await (supabase as any)
       .from('inventory')
       .select('*')
@@ -78,7 +78,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
     } else {
       setItems((data || []) as InventoryItem[]);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [house]);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
         table: 'inventory',
         filter: `house=eq.${house}`,
       }, () => {
-        loadItems();
+        loadItems(true);
       })
       .subscribe();
     return () => {
@@ -175,11 +175,14 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
       flash('Artículo guardado');
     }
     setForm({ name: '', quantity: 1, location: form.location, notes: '' });
+    await loadItems(true);
   };
 
   const deleteItem = async (item: InventoryItem) => {
     if (!supabase || !confirm(`¿Eliminar ${item.name}?`)) return;
-    await (supabase as any).from('inventory').delete().eq('id', item.id);
+    const { error } = await (supabase as any).from('inventory').delete().eq('id', item.id);
+    if (error) return flash(error.message);
+    setItems((prev) => prev.filter((row) => row.id !== item.id));
   };
 
   const markComplete = async (item: InventoryItem) => {
@@ -193,6 +196,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
       updated_at: new Date().toISOString(),
     }).eq('id', item.id);
     setIssueFor(null);
+    await loadItems(true);
   };
 
   const markIssue = async (item: InventoryItem) => {
@@ -208,6 +212,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
     }).eq('id', item.id);
     setIssueFor(null);
     flash('Reporte guardado');
+    await loadItems(true);
   };
 
   const finishJob = async () => {
@@ -220,6 +225,7 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
     if (!ok) return flash('No se pudo terminar el trabajo');
     setActiveAssignment(null);
     flash('Trabajo terminado. Inventario listo para la próxima limpieza');
+    await loadItems(true);
   };
 
   return (
