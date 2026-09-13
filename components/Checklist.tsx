@@ -1,9 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase, checklistTable } from '../utils/supabaseClient';
 import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
 import Inventory from './Inventory';
-import type { User } from './Dashboard';
 import './Checklist.css';
+
+interface User {
+  username: string;
+  role: string;
+  house?: string;
+  password?: string;
+}
 
 interface ChecklistItem {
   id: number;
@@ -85,7 +91,7 @@ const Checklist = ({ user }: ChecklistProps) => {
   const [activeAssignment, setActiveAssignment] = useState<any>(null);
   const [notice, setNotice] = useState('');
 
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     setLoading(true);
     const { data, error } = await (checklistTable() as any)
       .select('*')
@@ -99,7 +105,7 @@ const Checklist = ({ user }: ChecklistProps) => {
       setItems((data || []) as ChecklistItem[]);
     }
     setLoading(false);
-  };
+  }, [selectedHouse]);
 
   useEffect(() => {
     const loadAssignment = async () => {
@@ -156,7 +162,7 @@ const Checklist = ({ user }: ChecklistProps) => {
     return () => {
       channel.unsubscribe();
     };
-  }, [selectedHouse]);
+  }, [selectedHouse, loadItems]);
 
   const visibleItems = useMemo(() => {
     const kind = owner ? filter : (assignmentType ? assignmentKind(assignmentType) : filter);
