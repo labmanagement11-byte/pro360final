@@ -1,701 +1,279 @@
-import React, { useState, useEffect } from 'react';
-import { supabase, getSupabaseClient, checklistTable } from '../utils/supabaseClient';
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase, checklistTable } from '../utils/supabaseClient';
 import type { User } from './Dashboard';
-const CHECKLIST_KEY = 'dashboard_checklist'; // legacy, no longer usado
+import './Checklist.css';
 
-// Definir tipo para los items del checklist
 interface ChecklistItem {
   id: number;
   house: string;
   item: string;
   complete: boolean;
-  room?: string;
+  room?: string | null;
   assigned_to?: string | null;
-  due_date?: string | null;
-  created_at?: string;
+  completed_by?: string | null;
+  completed_at?: string | null;
 }
 
-// Recibe también la lista de usuarios para asignar tareas
 interface ChecklistProps {
   user: User;
   assignmentId?: number | string;
 }
+
+const ROOM_ORDER = [
+  'LIMPIEZA GENERAL',
+  'HABITACIONES',
+  'SALA',
+  'COMEDOR',
+  'COCINA',
+  'BAÑOS',
+  'ZONA DE LAVADO',
+  'TERRAZA',
+  'ÁREA DE BBQ',
+  'ÁREA DE PISCINA',
+  'LIMPIEZA PROFUNDA',
+  'ÁREAS VERDES',
+  'PISCINA Y AGUA',
+  'RUTINA DE MANTENIMIENTO',
+  'SISTEMAS ELÉCTRICOS',
+];
+
+const REGULAR_ROOMS = new Set([
+  'LIMPIEZA GENERAL', 'HABITACIONES', 'SALA', 'COMEDOR', 'COCINA',
+  'BAÑOS', 'ZONA DE LAVADO', 'TERRAZA', 'ÁREA DE BBQ', 'ÁREA DE PISCINA',
+]);
+const DEEP_ROOMS = new Set(['LIMPIEZA PROFUNDA']);
+const MAINT_ROOMS = new Set(['ÁREAS VERDES', 'PISCINA Y AGUA', 'RUTINA DE MANTENIMIENTO', 'SISTEMAS ELÉCTRICOS']);
+
+function isOwnerRole(role?: string) {
+  const value = String(role || '').toLowerCase();
+  return value === 'owner' || value === 'dueno' || value === 'manager';
+}
+
+function houseForUser(user: User) {
+  if (!user.house || user.house === 'all') return 'EPIC D1';
+  return user.house;
+}
+
+function roomKind(room?: string | null): 'regular' | 'deep' | 'maint' {
+  const name = String(room || '').trim().toUpperCase();
+  if (DEEP_ROOMS.has(name) || name.includes('PROFUNDA')) return 'deep';
+  if (MAINT_ROOMS.has(name) || name.includes('MANTEN')) return 'maint';
+  return 'regular';
+}
+
+function assignmentKind(type?: string | null): 'regular' | 'deep' | 'maint' {
+  const value = String(type || '').toLowerCase();
+  if (value.includes('manten')) return 'maint';
+  if (value.includes('profund')) return 'deep';
+  return 'regular';
+}
+
+function formatWhen(value?: string | null) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
 const Checklist = ({ user, assignmentId }: ChecklistProps) => {
-    // Estado para formulario de tarea manual
-    const [taskForm, setTaskForm] = useState({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
-    const [cleaning, setCleaning] = useState<ChecklistItem[]>([]);
-    const [maintenance, setMaintenance] = useState<ChecklistItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    // Nuevo: tipo de asignación activa para el empleado
-    const [activeAssignmentType, setActiveAssignmentType] = useState<string | null>(null);
-    // Confirmación visual al completar tarea
-    const [showCompleteMsg, setShowCompleteMsg] = useState(false);
-    // Confirmación visual para manager
-    const [showManagerConfirmMsg, setShowManagerConfirmMsg] = useState(false);
+  const selectedHouse = houseForUser(user);
+  const owner = isOwnerRole(user.role);
+  const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'regular' | 'deep' | 'maint' | 'all'>('regular');
+  const [assignmentType, setAssignmentType] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
 
-    // Guardar plantilla predefinida al agregar/editar/eliminar (solo HYNTIBA2)
-    useEffect(() => {
-      if (user.house === 'HYNTIBA2 APTO 406') {
-        const plantilla = { cleaning, maintenance };
-        localStorage.setItem('plantilla_checklist_hyntiba2', JSON.stringify(plantilla));
-      }
-    }, [cleaning, maintenance, user.house]);
-
-    // Si es empleado, buscar su asignación activa y guardar el tipo (limpieza regular, profunda, mantenimiento)
-    useEffect(() => {
-      const fetchAssignmentType = async () => {
-        if (user.role !== 'empleado') return;
-        // Buscar la asignación activa más reciente para el usuario en la casa actual
-        const { data, error } = await (supabase as any)
-          .from('calendar_assignments')
-          .select('type')
-          .eq('employee', user.username)
-          .eq('house', user.house)
-          .order('date', { ascending: false })
-          .limit(1);
-        if (!error && data && data.length > 0) {
-          setActiveAssignmentType(data[0].type);
-        } else {
-          setActiveAssignmentType(null);
-        }
-      };
-      fetchAssignmentType();
-    }, [user.username, user.house, user.role]);
-
-  // Cargar checklist por assignmentId si está presente, si no, por casa/usuario
-  const fetchChecklist = async () => {
-    if (assignmentId) {
-      setLoading(true);
-      // Usar servicio realtime para obtener checklist específico
-      const { getCleaningChecklistItems } = await import('../utils/supabaseRealtimeService');
-      let items = await getCleaningChecklistItems(String(assignmentId));
-      // Normalizar: priorizar 'completed' (campo moderno) sobre 'complete' (legacy)
-      items = items.map((i: any) => ({
-        ...i,
-        complete: typeof i.completed === 'boolean' ? i.completed : (typeof i.complete === 'boolean' ? i.complete : false)
-      }));
-      // Separar limpieza y mantenimiento por tipo/zona
-      setCleaning(items.filter((i: any) => i.task && (!i.zone || !i.zone.toLowerCase().includes('mantenimiento'))));
-      setMaintenance(items.filter((i: any) => i.task && i.zone && i.zone.toLowerCase().includes('mantenimiento')));
-      setLoading(false);
-      return;
-    }
-    const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
-    // Si hay plantilla local y no hay datos en Supabase, cargar plantilla
-    if (selectedHouse === 'HYNTIBA2 APTO 406') {
-      const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
-      if ((!error && data && data.length === 0)) {
-        const plantilla = localStorage.getItem('plantilla_checklist_hyntiba2');
-        if (plantilla) {
-          const { cleaning: plantillaCleaning, maintenance: plantillaMaintenance } = JSON.parse(plantilla);
-          setCleaning(plantillaCleaning || []);
-          setMaintenance(plantillaMaintenance || []);
-          setLoading(false);
-          return;
-        }
-      }
-    }
+  const loadItems = async () => {
     setLoading(true);
-    if (selectedHouse === 'HYNTIBA2 APTO 406') {
-      // Para HYNTIBA2, solo mostrar lo que esté en la base (sin predefinidos)
-      const { data, error } = await checklistTable().select('*').eq('house', selectedHouse);
-      const items = data as ChecklistItem[];
-      if (!error && items) {
-        setCleaning(items.filter(i => !i.room || i.room === '' || i.room === 'LIMPIEZA'));
-        setMaintenance(items.filter(i => i.room && i.room !== '' && i.room !== 'LIMPIEZA'));
-      } else {
-        setCleaning([]);
-        setMaintenance([]);
-      }
-      setLoading(false);
-      return;
-    }
-    // Para otras casas, mantener lógica anterior
-    console.log('📋 [Checklist] Cargando checklist para casa:', selectedHouse, 'usuario:', user.username);
-    let query = checklistTable().select('*').eq('house', selectedHouse);
-    if (user.role === 'empleado') {
-      query = query.in('assigned_to', [user.username, null]);
-    }
-    const { data, error } = await query;
-    if (!error && data) {
-      const items = data as ChecklistItem[];
-      const maintenanceRooms = ['PISCINA Y AGUA', 'SISTEMAS ELÉCTRICOS', 'ÁREAS VERDES'];
-      const deepCleaningRooms = ['LIMPIEZA PROFUNDA'];
-      setCleaning(items.filter(i => 
-        !maintenanceRooms.includes(i.room || '') && !deepCleaningRooms.includes(i.room || '')
-      ));
-      setMaintenance(items.filter(i => 
-        maintenanceRooms.includes(i.room || '') || deepCleaningRooms.includes(i.room || '')
-      ));
-      console.log('✅ [Checklist] Cargados:', items.length, 'items para', selectedHouse, 
-        '(Limpieza:', items.filter(i => !maintenanceRooms.includes(i.room || '') && !deepCleaningRooms.includes(i.room || '')).length,
-        'Mantenimiento:', items.filter(i => maintenanceRooms.includes(i.room || '') || deepCleaningRooms.includes(i.room || '')).length + ')');
+    const { data, error } = await checklistTable()
+      .select('id, house, item, complete, room, assigned_to, completed_by, completed_at')
+      .eq('house', selectedHouse)
+      .order('id', { ascending: true });
+
+    if (error) {
+      console.error('Error cargando checklist:', error);
+      setItems([]);
     } else {
-      setCleaning([]);
-      setMaintenance([]);
-      console.error('❌ [Checklist] Error cargando:', error);
+      setItems((data || []) as ChecklistItem[]);
     }
     setLoading(false);
   };
 
-  // Cargar checklist al montar y suscribirse a cambios en tiempo real
   useEffect(() => {
-    fetchChecklist();
+    const loadAssignment = async () => {
+      if (!supabase) return;
+      if (user.role !== 'empleado') return;
+      const { data } = await supabase
+        .from('calendar_assignments')
+        .select('type')
+        .eq('employee', user.username)
+        .eq('house', selectedHouse)
+        .order('date', { ascending: false })
+        .limit(1);
+      const type = data && data[0] ? String((data[0] as { type?: string }).type || '') : '';
+      setAssignmentType(type || null);
+      setFilter(assignmentKind(type));
+    };
+    loadAssignment();
+  }, [user.username, user.role, selectedHouse]);
 
+  useEffect(() => {
+    loadItems();
     if (!supabase) return;
 
-    // Si hay assignmentId, suscribirse a cambios de esa asignación
-    if (assignmentId) {
-      console.log('📡 [Checklist] Suscribiéndose a cambios para assignment:', assignmentId);
-      
-      // Obtener el UUID del localStorage para filtrar por UUID también
-      const assignmentUUID = typeof window !== 'undefined' 
-        ? localStorage.getItem(`assignment_${assignmentId}_uuid`) 
-        : null;
-      
-      const channel = supabase
-        .channel(`checklist-changes-assignment-${assignmentId}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'cleaning_checklist'
-        }, (payload: any) => {
-          // Filtrar localmente por assignment ID (bigint) o UUID
-          const isRelevant = 
-            payload.new?.calendar_assignment_id_bigint === parseInt(String(assignmentId)) ||
-            payload.old?.calendar_assignment_id_bigint === parseInt(String(assignmentId)) ||
-            (assignmentUUID && (
-              payload.new?.calendar_assignment_id === assignmentUUID ||
-              payload.old?.calendar_assignment_id === assignmentUUID
-            ));
-          
-          if (isRelevant) {
-            console.log('⚡ [Checklist] Cambio realtime relevante:', payload.eventType);
-            fetchChecklist();
-          }
-        })
-        .subscribe((status) => {
-          console.log('📡 [Checklist] Estado de suscripción assignment:', status);
-        });
-      return () => {
-        channel.unsubscribe();
-      };
-    }
-
-    // Si no, mantener suscripción por casa (flujo anterior)
-    const selectedHouse = user.house === 'all' ? 'EPIC D1' : (user.house || 'EPIC D1');
     const channel = supabase
-      .channel(`checklist-changes-${selectedHouse}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .channel(`checklist-live-${selectedHouse}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'checklist',
-        filter: `house=eq.${selectedHouse}`
-      }, (payload: any) => {
-        console.log('⚡ [Checklist] Cambio en tiempo real recibido:', {
-          event: payload.eventType,
-          item: payload.new?.item || payload.old?.item,
-          house: payload.new?.house || payload.old?.house,
-          usuario: user.username
-        });
-        fetchChecklist();
+        filter: `house=eq.${selectedHouse}`,
+      }, () => {
+        loadItems();
       })
-      .subscribe((status) => {
-        console.log('📡 [Checklist] Estado de suscripción:', status);
-      });
+      .subscribe();
+
     return () => {
       channel.unsubscribe();
     };
-  }, [user, assignmentId]);
+  }, [selectedHouse, assignmentId]);
 
-  // Agrupar tareas de limpieza por zona
-  const cleaningZones = [
-    { key: 'habitaciones', label: 'Habitaciones' },
-    { key: 'cocina', label: 'Cocina' },
-    { key: 'banos', label: 'Baños' },
-    { key: 'sala', label: 'Sala' },
-    { key: 'comedor', label: 'Comedor' },
-    { key: 'terraza', label: 'Terraza' },
-    { key: 'bbq', label: 'Área BBQ' },
-    { key: 'piscina', label: 'Piscina' },
-    { key: 'lavanderia', label: 'Lavandería' },
-    { key: 'otros', label: 'Otros' },
-  ];
-
-  // Mapear cada tarea a una zona (esto puede mejorarse si tienes el campo room en la base de datos)
-  const getZone = (item: string) => {
-    if (/habita/i.test(item) || /cama/i.test(item) || /tapete/i.test(item) || /cajon/i.test(item)) return 'habitaciones';
-    if (/cocina|microondas|nevera|filtro de agua|gabinete|cafetera|jab[oó]n|toalla de cocina/i.test(item)) return 'cocina';
-    if (/ba.n|sanitario|lavamanos|papel hig[ií]enico|toalla de mano|ducha|espejo|tapete de ba.n/i.test(item)) return 'banos';
-    if (/sala|coj[ií]n/i.test(item)) return 'sala';
-    if (/comedor/i.test(item)) return 'comedor';
-    if (/terraza/i.test(item)) return 'terraza';
-    if (/bbq|parrilla|carb[oó]n|mini nevera/i.test(item)) return 'bbq';
-    if (/piscina/i.test(item)) return 'piscina';
-    if (/lavadora|lavadero|ganchos|cuarto de lavado/i.test(item)) return 'lavanderia';
-    return 'otros';
-  };
-
-  const cleaningByZone: Record<string, typeof cleaning> = {};
-  cleaningZones.forEach(z => { cleaningByZone[z.key] = []; });
-  cleaning.forEach(i => {
-    const zone = getZone(i.item);
-    cleaningByZone[zone].push(i);
-  });
-
-  // Agregar nueva tarea (solo HYNTIBA2)
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskForm.item.trim()) return;
-    
-    try {
-      setLoading(true);
-      const newTask = {
-        house: 'HYNTIBA2 APTO 406',
-        item: taskForm.item,
-        room: taskForm.room || 'LIMPIEZA',
-        assigned_to: taskForm.assigned_to || null,
-        complete: false
-      };
-      
-      const { data, error } = await (checklistTable() as any)
-        .insert([newTask])
-        .select();
-      
-      if (!error && data) {
-        setCleaning([...cleaning, data[0]]);
-        setTaskForm({ item: '', room: '', assigned_to: '', tipo: 'LIMPIEZA' });
-        console.log('✅ Tarea agregada:', taskForm.item);
-      } else {
-        console.error('Error agregando tarea:', error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Marcar/desmarcar ítem de limpieza
-  const toggleCleaning = async (idx: number) => {
-    const item = cleaning[idx];
-    if (!item || !item.id) return;
-    
-    const isChecked = !item.complete;
-    console.log('✏️ [Checklist] Actualizando item:', {
-      idx,
-      id: item.id,
-      item: item.item,
-      currentComplete: item.complete,
-      newComplete: isChecked,
-      usuario: user.username,
-      assignmentId,
-      hasAssignmentId: !!assignmentId
+  const visibleItems = useMemo(() => {
+    const kind = owner ? filter : (assignmentType ? assignmentKind(assignmentType) : filter);
+    return items.filter((item) => {
+      if (kind === 'all') return true;
+      return roomKind(item.room) === kind;
     });
-    
-    const supabase = getSupabaseClient();
-    
-    try {
-      // Si hay assignmentId, actualizar tabla moderna (cleaning_checklist)
-      if (assignmentId) {
-        console.log('📝 [Checklist] Actualizando cleaning_checklist...');
-        const { data, error } = await (supabase
-          .from('cleaning_checklist') as any)
-          .update({ 
-            completed: isChecked,
-            completed_by: isChecked ? user.username : null,
-            completed_at: isChecked ? new Date().toISOString() : null
-          })
-          .eq('id', item.id)
-          .select();
-        
-        console.log('📥 [Checklist] Respuesta de update:', { 
-          error: error?.message, 
-          dataLength: data?.length,
-          data 
-        });
-        
-        if (!error && data && data.length > 0) {
-          // Actualizar estado local
-          const updatedItem = {
-            ...data[0],
-            complete: data[0].completed
-          };
-          console.log('🔄 [Checklist] Actualizando estado local:', updatedItem);
-          setCleaning(cleaning.map((i, iidx) => iidx === idx ? updatedItem : i));
-          setShowCompleteMsg(true);
-          setTimeout(() => setShowCompleteMsg(false), 1500);
-          console.log('✅ [Checklist] Item actualizado en cleaning_checklist');
-        } else {
-          console.error('❌ [Checklist] Error actualizando:', error?.message);
-        }
-      } else {
-        console.log('📝 [Checklist] No hay assignmentId, usando tabla legacy...');
-        // Fallback: actualizar tabla legacy
-        const { data, error } = await (checklistTable() as any)
-          .update({ complete: isChecked })
-          .eq('id', item.id)
-          .select();
-        
-        console.log('📥 [Checklist] Respuesta de update legacy:', { 
-          error: error?.message, 
-          dataLength: data?.length 
-        });
-        
-        if (!error && data && data.length > 0) {
-          setCleaning(cleaning.map((i, iidx) => iidx === idx ? data[0] : i));
-          setShowCompleteMsg(true);
-          setTimeout(() => setShowCompleteMsg(false), 1500);
-        } else {
-          console.error('❌ [Checklist] Error actualizando:', error);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Exception actualizando item:', error);
-    }
-  };
-  // Marcar/desmarcar ítem de mantenimiento
-  const toggleMaintenance = async (idx: number) => {
-    const item = maintenance[idx];
-    if (!item || !item.id) return;
-    
-    const isChecked = !item.complete;
-    console.log('✏️ [Checklist] Actualizando mantenimiento:', {
-      idx,
-      id: item.id,
-      item: item.item,
-      currentComplete: item.complete,
-      newComplete: isChecked,
-      usuario: user.username,
-      assignmentId,
-      hasAssignmentId: !!assignmentId
+  }, [items, filter, owner, assignmentType]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, ChecklistItem[]>();
+    visibleItems.forEach((item) => {
+      const room = String(item.room || 'OTROS').trim() || 'OTROS';
+      if (!map.has(room)) map.set(room, []);
+      map.get(room)!.push(item);
     });
-    
-    const supabase = getSupabaseClient();
-    
-    try {
-      // Si hay assignmentId, actualizar tabla moderna (cleaning_checklist)
-      if (assignmentId) {
-        console.log('📝 [Checklist] Actualizando cleaning_checklist para mantenimiento...');
-        const { data, error } = await (supabase
-          .from('cleaning_checklist') as any)
-          .update({ 
-            completed: isChecked,
-            completed_by: isChecked ? user.username : null,
-            completed_at: isChecked ? new Date().toISOString() : null
-          })
-          .eq('id', item.id)
-          .select();
-        
-        console.log('📥 [Checklist] Respuesta de update:', { 
-          error: error?.message, 
-          dataLength: data?.length,
-          data 
-        });
-        
-        if (!error && data && data.length > 0) {
-          // Actualizar estado local
-          const updatedItem = {
-            ...data[0],
-            complete: data[0].completed
-          };
-          console.log('🔄 [Checklist] Actualizando estado local mantenimiento:', updatedItem);
-          setMaintenance(maintenance.map((i, iidx) => iidx === idx ? updatedItem : i));
-          setShowCompleteMsg(true);
-          setTimeout(() => setShowCompleteMsg(false), 1500);
-          console.log('✅ [Checklist] Item de mantenimiento actualizado en cleaning_checklist');
-        } else {
-          console.error('❌ [Checklist] Error actualizando:', error?.message);
-        }
-      } else {
-        console.log('📝 [Checklist] No hay assignmentId, usando tabla legacy...');
-        // Fallback: actualizar tabla legacy
-        const { data, error } = await (checklistTable() as any)
-          .update({ complete: isChecked })
-          .eq('id', item.id)
-          .select();
-        
-        console.log('📥 [Checklist] Respuesta de update legacy:', { 
-          error: error?.message, 
-          dataLength: data?.length 
-        });
-        
-        if (!error && data && data.length > 0) {
-          setMaintenance(maintenance.map((i, iidx) => iidx === idx ? data[0] : i));
-          setShowCompleteMsg(true);
-          setTimeout(() => setShowCompleteMsg(false), 1500);
-        } else {
-          console.error('❌ [Checklist] Error actualizando mantenimiento:', error);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Exception actualizando item:', error);
-    }
-  };
+    return Array.from(map.entries()).sort((a, b) => {
+      const ai = ROOM_ORDER.indexOf(a[0].toUpperCase());
+      const bi = ROOM_ORDER.indexOf(b[0].toUpperCase());
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }, [visibleItems]);
 
-  // Reiniciar checklist (manager/owner)
-  const resetChecklist = async () => {
-    try {
-      setLoading(true);
-      const supabase = getSupabaseClient();
-      
-      // Para HYNTIBA2: usar tabla legacy, para otros: tabla moderna
-      const isHyntiba = user.house === 'HYNTIBA2 APTO 406';
-      
-      if (isHyntiba) {
-        // HYNTIBA2 usa tabla legacy 'checklist'
-        console.log('🔄 [HYNTIBA2] Reiniciando items de tabla legacy...');
-        
-        // Reiniciar todos los items de HYNTIBA2 en la tabla legacy
-        const { error } = await (checklistTable() as any)
-          .update({ complete: false })
-          .eq('house', 'HYNTIBA2 APTO 406');
-        
-        console.log('🔄 [HYNTIBA2] Reset completado:', error ? `Error: ${error}` : 'OK');
-      } else if (assignmentId) {
-        // Para otras casas: tabla moderna cleaning_checklist
-        // Primero obtener la asignación para tener datos del employee y house
-        const { data: assignment } = await (supabase
-          .from('calendar_assignments') as any)
-          .select('employee, house')
-          .eq('id', assignmentId)
-          .single();
-        
-        // UPDATE 1: Reiniciar por ID de asignación (si está disponible)
-        const updateByAssignmentId = await (supabase
-          .from('cleaning_checklist') as any)
-          .update({ completed: false, completed_by: null, completed_at: null })
-          .eq('calendar_assignment_id_bigint', assignmentId);
-        
-        console.log('🔄 Reset por assignment ID:', assignmentId, 'Resultado:', updateByAssignmentId);
-        
-        // UPDATE 2: Reiniciar por employee + house (para items orfanos)
-        if (assignment) {
-          const updateByEmployeeHouse = await (supabase
-            .from('cleaning_checklist') as any)
-            .update({ completed: false, completed_by: null, completed_at: null })
-            .eq('employee', assignment.employee)
-            .eq('house', assignment.house);
-          
-          console.log('🔄 Reset por employee+house (orfanos):', assignment.employee, assignment.house, 'Resultado:', updateByEmployeeHouse);
-        }
-        
-        // UPDATE 3: Reiniciar por house solamente (fallback adicional)
-        const updateByHouseOnly = await (supabase
-          .from('cleaning_checklist') as any)
-          .update({ completed: false, completed_by: null, completed_at: null })
-          .eq('house', user.house);
-        
-        console.log('🔄 Reset por house solamente:', user.house, 'Resultado:', updateByHouseOnly);
-      }
-      
-      // Limpiar el estado local primero para mostrar indicador de carga
-      setCleaning(cleaning.map(i => ({ ...i, complete: false })));
-      setMaintenance(maintenance.map(i => ({ ...i, complete: false })));
-      
-      // Limpiar localStorage para evitar datos cacheados
-      if (user.house === 'HYNTIBA2 APTO 406') {
-        localStorage.removeItem('plantilla_checklist_hyntiba2');
-      }
-      localStorage.removeItem('dashboard_checklist');
-      localStorage.removeItem(CHECKLIST_KEY);
-      
-      // Pequeño delay para asegurar que la BD haya actualizado
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Recargar los datos desde la base de datos
-      await fetchChecklist();
-      console.log('✅ Checklist reiniciado correctamente');
-    } catch (error) {
-      console.error('Error al reiniciar checklist:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const doneCount = visibleItems.filter((item) => item.complete).length;
 
-  // Confirmar checklist completo (manager)
-  const confirmAllCompleted = async () => {
-    // Marcar la asignación como completada y reiniciar checklist e inventario
-    if (!assignmentId) return;
-    try {
-      setLoading(true);
-      const supabase = getSupabaseClient();
-      
-      const isHyntiba = user.house === 'HYNTIBA2 APTO 406';
-      
-      // 0. Obtener datos de la asignación
-      const { data: assignment } = await (supabase
-        .from('calendar_assignments') as any)
-        .select('employee, house')
-        .eq('id', assignmentId)
-        .single();
-      
-      // 1. Marcar la asignación como completada
+  const toggleItem = async (item: ChecklistItem) => {
+    if (!item.id) return;
+    const next = !item.complete;
+    const payload = {
+      complete: next,
+      completed_by: next ? user.username : null,
+      completed_at: next ? new Date().toISOString() : null,
+    };
+
+    setItems((prev) => prev.map((row) => row.id === item.id ? { ...row, ...payload } : row));
+
+    const { error } = await (checklistTable() as any)
+      .update(payload)
+      .eq('id', item.id)
+      .eq('house', selectedHouse);
+
+    if (error) {
+      setItems((prev) => prev.map((row) => row.id === item.id ? item : row));
+      setNotice(error.message || 'No se pudo marcar la tarea');
+      return;
+    }
+
+    if (supabase && next) {
       await supabase
-        .from('calendar_assignments')
-        // @ts-expect-error Supabase schema is broader than the generated client type.
-        .update({ completed: true })
-        .eq('id', assignmentId);
-
-      // 2. Reiniciar checklist de limpieza/mantenimiento
-      if (isHyntiba) {
-        // HYNTIBA2 usa tabla legacy
-        await (checklistTable() as any)
-          .update({ complete: false })
-          .eq('house', 'HYNTIBA2 APTO 406');
-      } else {
-        // UPDATE 1: Por assignment ID
-        await (supabase
-          .from('cleaning_checklist') as any)
-          .update({ completed: false, completed_by: null, completed_at: null })
-          .eq('calendar_assignment_id_bigint', assignmentId);
-        
-        // UPDATE 2: Por employee + house (orfanos)
-        if (assignment) {
-          await (supabase
-            .from('cleaning_checklist') as any)
-            .update({ completed: false, completed_by: null, completed_at: null })
-            .eq('employee', assignment.employee)
-            .eq('house', assignment.house);
-        }
-        
-        // UPDATE 3: Por house solamente (fallback adicional)
-        await (supabase
-          .from('cleaning_checklist') as any)
-          .update({ completed: false, completed_by: null, completed_at: null })
-          .eq('house', user.house);
-      }
-
-      // 3. Reiniciar inventario de la asignación
-      await (supabase
-        .from('assignment_inventory') as any)
-        .update({ is_complete: false, checked_by: null, checked_at: null })
-        .eq('calendar_assignment_id', assignmentId);
-      
-      // Limpiar localStorage
-      if (user.house === 'HYNTIBA2 APTO 406') {
-        localStorage.removeItem('plantilla_checklist_hyntiba2');
-      }
-      localStorage.removeItem('dashboard_checklist');
-      localStorage.removeItem(CHECKLIST_KEY);
-      
-      // Pequeño delay para asegurar que la BD haya actualizado
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // 4. Recargar datos desde la base de datos
-      await fetchChecklist();
-      
-      setShowManagerConfirmMsg(true);
-      setTimeout(() => setShowManagerConfirmMsg(false), 2000);
-    } catch (error) {
-      console.error('Error al confirmar checklist:', error);
-    } finally {
-      setLoading(false);
+        .from('cleaning_checklist')
+        .update({
+          completed: true,
+          completed_by: user.username,
+          completed_at: new Date().toISOString(),
+        } as any)
+        .eq('house', selectedHouse)
+        .eq('task', item.item);
     }
+
+    setNotice(next ? 'Tarea completada' : 'Tarea reabierta');
+    setTimeout(() => setNotice(''), 1600);
+  };
+
+  const resetVisible = async () => {
+    const ids = visibleItems.map((item) => item.id);
+    if (!ids.length) return;
+    setItems((prev) => prev.map((row) => ids.includes(row.id)
+      ? { ...row, complete: false, completed_by: null, completed_at: null }
+      : row));
+    await (checklistTable() as any)
+      .update({ complete: false, completed_by: null, completed_at: null })
+      .eq('house', selectedHouse)
+      .in('id', ids);
   };
 
   return (
     <div className="checklist-list ultra-checklist">
-      <h2 className="ultra-checklist-title">Checklist {user.house}</h2>
-      {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
+      <h2 className="ultra-checklist-title">Checklist {selectedHouse}</h2>
+      <p className="checklist-live">En tiempo real</p>
+      <p className="checklist-progress">{doneCount} de {visibleItems.length} tareas completadas</p>
+      {notice && <div className="checklist-live">{notice}</div>}
 
-      {/* Formulario para agregar/editar tareas solo para managers */}
-      {!loading && (user.role === 'manager' || user.role === 'owner') && (
-        <div style={{background:'#f0f9ff',padding:'15px',borderRadius:'8px',marginBottom:'15px',border:'1px solid #bfdbfe'}}>
-          <h3 style={{marginTop:0,color:'#1e40af'}}>➕ Agregar Nueva Tarea</h3>
-          <form onSubmit={handleAddTask} style={{display:'grid',gap:'10px'}}>
-            <div>
-              <input
-                type="text"
-                placeholder="Descripción de la tarea"
-                value={taskForm.item}
-                onChange={(e) => setTaskForm({...taskForm, item: e.target.value})}
-                style={{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #cbd5e1'}}
-              />
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-              <select
-                value={taskForm.room}
-                onChange={(e) => setTaskForm({...taskForm, room: e.target.value})}
-                style={{padding:'8px',borderRadius:'4px',border:'1px solid #cbd5e1'}}
-              >
-                <option value="">- Seleccionar zona -</option>
-                <option value="LIMPIEZA">Limpieza</option>
-                <option value="MANTENIMIENTO">Mantenimiento</option>
-                <option value="Habitaciones">Habitaciones</option>
-                <option value="Cocina">Cocina</option>
-                <option value="Baños">Baños</option>
-                <option value="Sala">Sala</option>
-                <option value="Terraza">Terraza</option>
-              </select>
-              <button 
-                type="submit" 
-                disabled={loading || !taskForm.item.trim()}
-                style={{padding:'8px',background:'#2563eb',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',opacity: loading || !taskForm.item.trim() ? 0.5 : 1}}
-              >
-                Agregar Tarea
-              </button>
-            </div>
-          </form>
+      {owner && (
+        <div className="checklist-filter">
+          <button className={filter === 'regular' ? 'active' : ''} onClick={() => setFilter('regular')}>Limpieza</button>
+          <button className={filter === 'deep' ? 'active' : ''} onClick={() => setFilter('deep')}>Profunda</button>
+          <button className={filter === 'maint' ? 'active' : ''} onClick={() => setFilter('maint')}>Mantenimiento</button>
+          <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Todo</button>
         </div>
       )}
 
-      {/* Mostrar solo lo que corresponde según tipo de asignación activa para empleados */}
-      {!loading && user.role === 'empleado' && (
-        <>
-          {showCompleteMsg && (
-            <div style={{background:'#d1fae5',color:'#065f46',padding:'8px',borderRadius:'8px',marginBottom:'10px',textAlign:'center'}}>¡Tarea marcada como completada!</div>
-          )}
-          {activeAssignmentType && (activeAssignmentType.toLowerCase().includes('mantenimiento')) ? (
-            // Solo mantenimiento
-            <div className="ultra-checklist-section">
-              <h3 className="ultra-section-title">Mantenimiento</h3>
-              <div className="ultra-tasks-grid">
-                {maintenance.map((i, idx) => (
-                  <div key={i.id || idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
-                    <label className="ultra-checkbox">
-                      <input type="checkbox" checked={!!i.complete} onChange={() => toggleMaintenance(idx)} disabled={user.role !== 'empleado'} title={i.item} />
-                      <span className="ultra-task-icon">{i.complete ? '🔧' : '🛠️'}</span>
-                      <span className="ultra-task-text">{i.item}</span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            // Limpieza (regular/profunda): mostrar limpieza y (opcionalmente) inventario
-            <>
-              <div className="ultra-checklist-section">
-                <h3 className="ultra-section-title">Limpieza</h3>
-                <div className="ultra-tasks-grid">
-                  {cleaning.map((i, idx) => (
-                    <div key={i.id || idx} className={`ultra-task-card${i.complete ? ' done' : ''}`}> 
-                      <label className="ultra-checkbox">
-                        <input type="checkbox" checked={!!i.complete} onChange={() => toggleCleaning(cleaning.findIndex(c => c.id === i.id))} disabled={user.role !== 'empleado'} title={i.item} />
-                        <span className="ultra-task-icon">{i.complete ? '✔️' : '🧹'}</span>
-                        <span className="ultra-task-text">{i.item}</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Aquí puedes incluir el componente de Inventario si aplica */}
-            </>
-          )}
-        </>
+      {loading && <p className="ultra-task-text ultra-task-loading">Cargando checklist...</p>}
+
+      {!loading && grouped.length === 0 && (
+        <p className="checklist-empty">No hay tareas para esta casa todavía.</p>
       )}
 
-      {/* Para managers/owners, mostrar ambas secciones y botón de reinicio y confirmación */}
-      {!loading && (user.role === 'owner' || user.role === 'manager') && (
-        <>
-          {/* ...existing code para managers/owners... */}
-          <button onClick={resetChecklist} className="ultra-reset-btn">Reiniciar Checklist</button>
-          {/* Botón para confirmar checklist completo si todas las tareas están completas */}
-          {cleaning.length > 0 && cleaning.every(i => i.complete) && maintenance.every(i => i.complete) && (
-            <button onClick={confirmAllCompleted} className="ultra-confirm-btn" style={{marginLeft:'1rem',background:'#2563eb',color:'#fff',padding:'8px 16px',borderRadius:'8px'}}>Confirmar trabajo completado</button>
-          )}
-          {showManagerConfirmMsg && (
-            <div style={{background:'#dbeafe',color:'#1e40af',padding:'8px',borderRadius:'8px',marginTop:'10px',textAlign:'center'}}>¡Checklist confirmado como completado!</div>
-          )}
-        </>
+      {!loading && grouped.map(([room, roomItems]) => {
+        const roomDone = roomItems.filter((item) => item.complete).length;
+        return (
+          <section key={room} className="checklist-zone ultra-checklist-section">
+            <h3 className="checklist-zone-title ultra-section-title">
+              <span>{room}</span>
+              <span className="checklist-zone-count">{roomDone}/{roomItems.length}</span>
+            </h3>
+            <div className="ultra-tasks-grid">
+              {roomItems.map((item) => (
+                <div key={item.id} className={`ultra-task-card${item.complete ? ' done' : ''}`}>
+                  <label className="ultra-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={!!item.complete}
+                      onChange={() => toggleItem(item)}
+                      title={item.item}
+                    />
+                    <span className="ultra-task-icon">{item.complete ? '✔️' : '🧹'}</span>
+                    <span className="ultra-task-text">
+                      {item.item}
+                      {item.complete && (
+                        <span className="checklist-done-meta">
+                          Completado{item.completed_by ? ` por ${item.completed_by}` : ''}{item.completed_at ? ` · ${formatWhen(item.completed_at)}` : ''}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      {owner && visibleItems.length > 0 && (
+        <button onClick={resetVisible} className="ultra-reset-btn">Reiniciar checklist</button>
       )}
     </div>
   );

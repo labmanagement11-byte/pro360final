@@ -1,0 +1,80 @@
+.checklist-progress {
+  text-align: center;
+  margin: 0 0 1.25rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.checklist-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.checklist-filter button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.checklist-filter button.active {
+  background: #0284c7;
+  color: #fff;
+}
+
+.checklist-zone {
+  margin-bottom: 1.75rem;
+}
+
+.checklist-zone-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  color: #0f172a;
+  font-size: 1.15rem;
+}
+
+.checklist-zone-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+.checklist-done-meta {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.ultra-task-card.done {
+  opacity: 1;
+  border-left-color: #22c55e;
+  background: #ecfdf5;
+}
+
+.checklist-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 1.5rem 0;
+}
+
+.checklist-live {
+  text-align: center;
+  color: #15803d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
