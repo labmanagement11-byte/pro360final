@@ -388,9 +388,6 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       progress_updated_at: now,
     });
 
-    // Verificar si todas las subtareas están completadas
-    const allSubtasksCompleted = current.length === totalSubtasks && current.every(Boolean);
-
     const updateData: any = {
       notes: nextNotes,
       updated_at: now
@@ -2765,8 +2762,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         <Inventory
           user={user}
           houseName={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406'}
-          inventory={houses[allowedHouseIdx]?.inventory || []}
-          setInventory={(inventory: any[]) => setHouses(houses.map((h, i) => i === allowedHouseIdx ? { ...h, inventory } : h))}
         />
       )}
       {view === 'calendar' && <Calendar users={users as any} user={user as any} selectedHouse={houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name} />}
