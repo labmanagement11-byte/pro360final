@@ -3,6 +3,7 @@ import { FaCalendarAlt, FaUser, FaTasks, FaClock, FaBoxOpen, FaTrash } from 'rea
 import { supabase } from '../utils/supabaseClient';
 import * as realtimeService from '../utils/supabaseRealtimeService';
 import Checklist from './Checklist';
+import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
 
 const defaultTypes = [
   'Limpieza profunda',
@@ -151,14 +152,18 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
 
   const deleteEvent = async (eventId: number) => {
     if (!supabase) return;
+    const ev = events.find((item) => item.id === eventId);
+    if (ev && await shouldArchiveAssignment(ev)) {
+      await archiveCalendarAssignment(ev, user.username);
+      return;
+    }
     await (supabase as any).from('calendar_assignments').delete().eq('id', eventId);
-    // Realtime actualizará automáticamente
   };
 
   // Solo managers y dueños pueden agregar/eliminar
   const canEdit = user.role === 'owner' || user.role === 'manager';
   // Empleados solo ven sus asignaciones
-  const visibleEvents = user.role === 'empleado' ? events.filter((ev: any) => ev.employee === user.username) : events;
+  const visibleEvents = (user.role === 'empleado' ? events.filter((ev: any) => ev.employee === user.username) : events).filter((ev: any) => !ev.completed);
 
   return (
     <div className="calendar-list">
