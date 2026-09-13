@@ -441,25 +441,33 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
                       </div>
                       {issueFor === item.id && (
                         <div className="inv-issue-box">
-                          <select
-                            value={issueForm.issue_type}
-                            onChange={(e) => setIssueForm({ ...issueForm, issue_type: e.target.value })}
-                            title="Motivo"
-                          >
-                            {ISSUES.map((issue) => <option key={issue.value} value={issue.value}>{issue.label}</option>)}
-                          </select>
-                          <input
-                            type="number"
-                            min={0}
-                            value={issueForm.missing_qty}
-                            onChange={(e) => setIssueForm({ ...issueForm, missing_qty: Number(e.target.value) })}
-                            placeholder="Cantidad afectada"
-                          />
-                          <input
-                            value={issueForm.notes}
-                            onChange={(e) => setIssueForm({ ...issueForm, notes: e.target.value })}
-                            placeholder="Detalle (opcional)"
-                          />
+                          <p className="inv-issue-title">Reportar problema</p>
+                          <label className="inv-field">
+                            <span>Qué pasó</span>
+                            <select
+                              value={issueForm.issue_type}
+                              onChange={(e) => setIssueForm({ ...issueForm, issue_type: e.target.value })}
+                            >
+                              {ISSUES.map((issue) => <option key={issue.value} value={issue.value}>{issue.label}</option>)}
+                            </select>
+                          </label>
+                          <label className="inv-field">
+                            <span>Cuántos</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={issueForm.missing_qty}
+                              onChange={(e) => setIssueForm({ ...issueForm, missing_qty: Number(e.target.value) })}
+                            />
+                          </label>
+                          <label className="inv-field">
+                            <span>Detalle</span>
+                            <input
+                              value={issueForm.notes}
+                              onChange={(e) => setIssueForm({ ...issueForm, notes: e.target.value })}
+                              placeholder="Opcional"
+                            />
+                          </label>
                           <button className="inv-btn warn" type="button" onClick={() => markIssue(item)}>Guardar reporte</button>
                         </div>
                       )}

@@ -1,9 +1,9 @@
 .checklist-progress {
   text-align: left;
   margin: 0 0 0.75rem;
-  font-weight: 700;
-  color: #334155;
-  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0b1220;
+  font-size: 0.95rem;
 }
 
 .cl-head {
@@ -14,11 +14,16 @@
   margin-bottom: 0.45rem;
 }
 
+.ultra-checklist-title {
+  margin: 0;
+  color: #0b1220;
+}
+
 .cl-sub {
   margin: 0.15rem 0 0;
-  color: #64748b;
-  font-size: 0.86rem;
-  font-weight: 600;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .checklist-filter {
@@ -29,17 +34,18 @@
 }
 
 .checklist-filter button {
-  border: none;
+  border: 1px solid #94a3b8;
   border-radius: 999px;
-  padding: 0.45rem 0.85rem;
-  font-weight: 700;
+  padding: 0.5rem 0.85rem;
+  font-weight: 800;
   cursor: pointer;
-  background: #e2e8f0;
-  color: #334155;
+  background: #fff;
+  color: #0f172a;
 }
 
 .checklist-filter button.active {
-  background: #0f172a;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
   color: #fff;
 }
 
@@ -52,26 +58,26 @@
 
 .cl-tabs button {
   flex: 1 0 auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #94a3b8;
   background: #fff;
-  color: #475569;
+  color: #0f172a;
   border-radius: 999px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.78rem;
-  font-weight: 700;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .cl-tabs button.on {
-  background: #0f172a;
-  border-color: #0f172a;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
   color: #fff;
 }
 
 .checklist-zone {
   margin-bottom: 0.55rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   border-radius: 0.95rem;
   overflow: hidden;
   background: #fff;
@@ -83,7 +89,7 @@
   align-items: center;
   gap: 0.75rem;
   margin: 0 0 0.75rem;
-  color: #0f172a;
+  color: #0b1220;
   font-size: 1.15rem;
 }
 
@@ -94,30 +100,31 @@
   align-items: center;
   gap: 0.75rem;
   border: none;
-  background: #f1f5f9;
-  color: #0f172a;
-  padding: 0.85rem 0.95rem;
+  background: #e2e8f0;
+  color: #0b1220;
+  padding: 0.9rem 0.95rem;
   font-weight: 800;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   cursor: pointer;
   text-align: left;
 }
 
 .checklist-zone.open .cl-zone-btn {
-  background: #0f172a;
+  background: #1d4ed8;
   color: #fff;
 }
 
 .checklist-zone.open .checklist-zone-count {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: #1e3a8a;
+  color: #fff;
 }
 
 .checklist-zone-count {
   font-size: 0.75rem;
-  font-weight: 700;
-  color: #0f172a;
-  background: #e2e8f0;
+  font-weight: 800;
+  color: #0b1220;
+  background: #fff;
+  border: 1px solid #94a3b8;
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
   white-space: nowrap;
@@ -130,16 +137,16 @@
 }
 
 .ultra-task-card {
-  border: 1px solid #eef2f7;
+  border: 1px solid #cbd5e1;
   border-radius: 0.8rem;
-  padding: 0.7rem 0.8rem;
+  padding: 0.75rem 0.85rem;
   background: #fff;
 }
 
 .ultra-task-card.done {
   opacity: 1;
-  background: #ecfdf5;
-  border-color: #bbf7d0;
+  background: #f0fdf4;
+  border-color: #4ade80;
 }
 
 .ultra-checkbox {
@@ -150,47 +157,49 @@
 }
 
 .ultra-checkbox input {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
   margin-top: 0.15rem;
   flex: 0 0 auto;
 }
 
 .ultra-task-text {
-  color: #0f172a;
-  font-weight: 650;
+  color: #0b1220;
+  font-weight: 700;
   line-height: 1.35;
 }
 
 .checklist-done-meta {
   display: block;
   margin-top: 0.25rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #14532d;
 }
 
 .checklist-empty {
   text-align: center;
-  color: #64748b;
+  color: #1e293b;
+  font-weight: 700;
   padding: 1.2rem 0.6rem;
   background: #f8fafc;
+  border: 1px solid #cbd5e1;
   border-radius: 0.95rem;
 }
 
 .checklist-live {
-  color: #15803d;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: #ecfdf5;
-  border: 1px solid #bbf7d0;
+  color: #14532d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: #dcfce7;
+  border: 1px solid #86efac;
   border-radius: 999px;
-  padding: 0.28rem 0.65rem;
+  padding: 0.3rem 0.7rem;
   white-space: nowrap;
 }
 
 @media (max-width: 800px) {
   .cl-tabs button { flex: 1 1 calc(33% - 0.4rem); }
-  .ultra-task-card { padding: 0.8rem 0.85rem; }
-  .ultra-checkbox input { width: 1.25rem; height: 1.25rem; }
+  .ultra-task-card { padding: 0.85rem 0.9rem; }
+  .ultra-checkbox input { width: 1.3rem; height: 1.3rem; }
 }
