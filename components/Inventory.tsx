@@ -39,6 +39,8 @@ interface InventoryProps {
   houseName?: string;
 }
 
+type ViewFilter = 'pendiente' | 'reporte' | 'hecho' | 'todo';
+
 function isOwnerRole(role?: string) {
   const value = String(role || '').toLowerCase();
   return value === 'owner' || value === 'dueno' || value === 'manager';
@@ -49,6 +51,14 @@ function issueLabel(value?: string | null) {
   if (value === 'danado') return 'Dañado';
   if (value === 'perdido') return 'Perdido';
   return '';
+}
+
+function zoneName(item: InventoryItem) {
+  return String(item.location || 'General').trim() || 'General';
+}
+
+function isIssue(item: InventoryItem) {
+  return !item.complete && !!item.issue_type;
 }
 
 const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
@@ -62,6 +72,9 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
   const [issueFor, setIssueFor] = useState<string | null>(null);
   const [issueForm, setIssueForm] = useState({ issue_type: 'perdido', missing_qty: 1, notes: '' });
   const [activeAssignment, setActiveAssignment] = useState<any>(null);
+  const [filter, setFilter] = useState<ViewFilter>('pendiente');
+  const [openZone, setOpenZone] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
   const loadItems = useCallback(async (silent = false) => {
     if (!supabase) return;
@@ -125,18 +138,38 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
     };
   }, [house, owner]);
 
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      if (filter === 'pendiente') return !item.complete && !item.issue_type;
+      if (filter === 'reporte') return isIssue(item);
+      if (filter === 'hecho') return !!item.complete;
+      return true;
+    });
+  }, [items, filter]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, InventoryItem[]>();
-    items.forEach((item) => {
-      const key = String(item.location || 'General').trim() || 'General';
+    visibleItems.forEach((item) => {
+      const key = zoneName(item);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     });
     return Array.from(map.entries());
-  }, [items]);
+  }, [visibleItems]);
+
+  useEffect(() => {
+    if (!grouped.length) {
+      setOpenZone(null);
+      return;
+    }
+    if (!openZone || !grouped.some(([zone]) => zone === openZone)) {
+      setOpenZone(grouped[0][0]);
+    }
+  }, [grouped, openZone]);
 
   const doneCount = items.filter((item) => item.complete).length;
-  const issueCount = items.filter((item) => !item.complete && item.issue_type).length;
+  const issueCount = items.filter((item) => isIssue(item)).length;
+  const pendingCount = items.length - doneCount - issueCount;
   const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
 
   const flash = (text: string) => {
@@ -175,6 +208,9 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
       flash('Artículo guardado');
     }
     setForm({ name: '', quantity: 1, location: form.location, notes: '' });
+    setShowAdd(false);
+    setFilter('pendiente');
+    setOpenZone(payload.location);
     await loadItems(true);
   };
 
@@ -196,7 +232,9 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
       updated_at: new Date().toISOString(),
     }).eq('id', item.id);
     setIssueFor(null);
-    await loadItems(true);
+    setItems((prev) => prev.map((row) => row.id === item.id
+      ? { ...row, complete: true, issue_type: null, missing_qty: 0, checked_by: user.username }
+      : row));
   };
 
   const markIssue = async (item: InventoryItem) => {
@@ -228,111 +266,175 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
     await loadItems(true);
   };
 
+  const startEdit = (item: InventoryItem) => {
+    setEditId(item.id);
+    setShowAdd(true);
+    setForm({
+      name: item.name,
+      quantity: item.quantity || 1,
+      location: item.location || 'General',
+      notes: item.notes || '',
+    });
+  };
+
   return (
     <div className="inv-page">
-      <h2 className="inv-title">Inventario {house}</h2>
-      <p className="inv-live">En tiempo real</p>
-      {notice && <p className="inv-live">{notice}</p>}
+      <header className="inv-head">
+        <div>
+          <h2 className="inv-title">Inventario</h2>
+          <p className="inv-sub">{house}</p>
+        </div>
+        <span className="inv-live-dot">En vivo</span>
+      </header>
+      {notice && <p className="inv-notice">{notice}</p>}
 
       <div className="inv-progress">
         <div className="inv-progress-top">
-          <strong>Revisión de la casa</strong>
-          <span>{doneCount}/{items.length} completos</span>
+          <strong>{pct}% listo</strong>
+          <span>{doneCount}/{items.length}</span>
         </div>
         <div className="inv-bar">
           <span style={{ width: `${pct}%`, background: pct === 100 ? '#16a34a' : '#2563eb' }} />
         </div>
         <div className="inv-progress-meta">
-          <span style={{ color: '#16a34a' }}>{doneCount} ok</span>
-          <span style={{ color: '#dc2626' }}>{issueCount} con reporte</span>
-          <span style={{ color: '#d97706' }}>{items.length - doneCount - issueCount} pendientes</span>
+          <span>{pendingCount} por hacer</span>
+          <span>{issueCount} con reporte</span>
+          <span>{doneCount} hechos</span>
         </div>
       </div>
 
-      {owner && (
-        <form className="inv-form" onSubmit={saveItem}>
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Artículo"
-            required
-          />
-          <input
-            type="number"
-            min={1}
-            value={form.quantity}
-            onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-            title="Cantidad"
-          />
-          <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} title="Zona">
-            {AREAS.map((area) => <option key={area} value={area}>{area}</option>)}
-          </select>
-          <input
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="Nota opcional"
-          />
-          <button className="inv-btn main" type="submit">{editId ? 'Guardar' : 'Agregar'}</button>
-        </form>
-      )}
+      <div className="inv-tabs" role="tablist">
+        <button type="button" className={filter === 'pendiente' ? 'on' : ''} onClick={() => setFilter('pendiente')}>
+          Por hacer {pendingCount}
+        </button>
+        <button type="button" className={filter === 'reporte' ? 'on' : ''} onClick={() => setFilter('reporte')}>
+          Reportes {issueCount}
+        </button>
+        <button type="button" className={filter === 'hecho' ? 'on' : ''} onClick={() => setFilter('hecho')}>
+          Hechos {doneCount}
+        </button>
+        <button type="button" className={filter === 'todo' ? 'on' : ''} onClick={() => setFilter('todo')}>
+          Todo
+        </button>
+      </div>
 
-      {owner && activeAssignment && (
-        <div style={{ marginBottom: '1rem' }}>
-          <button className="inv-btn ok" type="button" onClick={finishJob}>
-            Terminar trabajo de {activeAssignment.employee}
+      {owner && (
+        <div className="inv-admin">
+          <button
+            className="inv-btn ghost inv-toggle"
+            type="button"
+            onClick={() => {
+              setShowAdd((prev) => !prev);
+              if (showAdd) setEditId(null);
+            }}
+          >
+            {showAdd ? 'Cerrar formulario' : (editId ? 'Editando artículo' : 'Agregar artículo')}
           </button>
+          {showAdd && (
+            <form className="inv-form" onSubmit={saveItem}>
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Artículo"
+                required
+              />
+              <div className="inv-form-row">
+                <input
+                  type="number"
+                  min={1}
+                  value={form.quantity}
+                  onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
+                  title="Cantidad"
+                />
+                <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} title="Zona">
+                  {AREAS.map((area) => <option key={area} value={area}>{area}</option>)}
+                </select>
+              </div>
+              <input
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Nota opcional"
+              />
+              <button className="inv-btn main" type="submit">{editId ? 'Guardar cambios' : 'Agregar'}</button>
+            </form>
+          )}
+          {activeAssignment && (
+            <button className="inv-btn ok inv-finish" type="button" onClick={finishJob}>
+              Terminar trabajo de {activeAssignment.employee}
+            </button>
+          )}
         </div>
       )}
 
       {loading && <p className="inv-empty">Cargando inventario...</p>}
-      {!loading && items.length === 0 && <p className="inv-empty">Aún no hay objetos guardados en esta casa.</p>}
+      {!loading && visibleItems.length === 0 && (
+        <p className="inv-empty">
+          {items.length === 0
+            ? 'Aún no hay objetos guardados en esta casa.'
+            : filter === 'pendiente'
+              ? 'Nada pendiente. Todo está revisado.'
+              : filter === 'reporte'
+                ? 'No hay reportes de roto, dañado o perdido.'
+                : filter === 'hecho'
+                  ? 'Todavía no hay artículos completos.'
+                  : 'No hay artículos en esta vista.'}
+        </p>
+      )}
 
       {!loading && grouped.map(([zone, zoneItems]) => {
+        const open = openZone === zone;
         const zoneDone = zoneItems.filter((item) => item.complete).length;
         return (
-          <section key={zone} className="inv-zone">
-            <div className="inv-zone-head">
-              <span>{zone}</span>
-              <span>{zoneDone}/{zoneItems.length}</span>
-            </div>
-            <div className="inv-grid">
-              {zoneItems.map((item) => {
-                const hasIssue = !item.complete && !!item.issue_type;
-                const klass = item.complete ? 'ok' : hasIssue ? 'issue' : '';
-                return (
-                  <article key={item.id} className={`inv-card ${klass}`}>
-                    <div className={`inv-card-band ${klass || 'wait'}`}>
-                      {item.complete ? 'Completo' : hasIssue ? issueLabel(item.issue_type) : 'Pendiente'}
-                    </div>
-                    <div className="inv-card-body">
-                      <h3>{item.name}</h3>
-                      <div className="inv-meta">
-                        Cantidad: {item.quantity}
-                        {item.notes ? ` · ${item.notes}` : ''}
-                        {hasIssue && item.missing_qty ? ` · Faltan ${item.missing_qty}` : ''}
-                        {item.checked_by ? ` · ${item.checked_by}` : ''}
+          <section key={zone} className={`inv-zone${open ? ' open' : ''}`}>
+            <button
+              type="button"
+              className="inv-zone-head"
+              onClick={() => setOpenZone(open ? null : zone)}
+              aria-expanded={open}
+            >
+              <span className="inv-zone-name">{zone}</span>
+              <span className="inv-zone-meta">
+                {filter === 'pendiente' ? `${zoneItems.length} por hacer` : `${zoneDone}/${zoneItems.length}`}
+                <i className="inv-chevron" />
+              </span>
+            </button>
+            {open && (
+              <div className="inv-list">
+                {zoneItems.map((item) => {
+                  const hasIssue = isIssue(item);
+                  const klass = item.complete ? 'ok' : hasIssue ? 'issue' : 'wait';
+                  return (
+                    <article key={item.id} className={`inv-row ${klass}`}>
+                      <div className="inv-row-main">
+                        <span className={`inv-pip ${klass}`} />
+                        <div className="inv-row-text">
+                          <h3>{item.name}</h3>
+                          <p>
+                            {item.quantity} ud.
+                            {item.notes ? ` · ${item.notes}` : ''}
+                            {hasIssue ? ` · ${issueLabel(item.issue_type)}${item.missing_qty ? ` (${item.missing_qty})` : ''}` : ''}
+                            {item.complete && item.checked_by ? ` · ${item.checked_by}` : ''}
+                          </p>
+                        </div>
+                        <span className={`inv-status ${klass}`}>
+                          {item.complete ? 'Listo' : hasIssue ? issueLabel(item.issue_type) : 'Pendiente'}
+                        </span>
                       </div>
                       <div className="inv-actions">
-                        <button className="inv-btn ok" type="button" onClick={() => markComplete(item)}>Completo</button>
+                        {!item.complete && (
+                          <button className="inv-btn ok" type="button" onClick={() => markComplete(item)}>Completo</button>
+                        )}
                         <button className="inv-btn warn" type="button" onClick={() => {
-                          setIssueFor(item.id);
+                          setIssueFor(issueFor === item.id ? null : item.id);
                           setIssueForm({
                             issue_type: item.issue_type || 'perdido',
                             missing_qty: item.missing_qty || 1,
                             notes: '',
                           });
-                        }}>Incompleto</button>
+                        }}>{hasIssue ? 'Cambiar reporte' : 'Reportar'}</button>
                         {owner && (
                           <>
-                            <button className="inv-btn ghost" type="button" onClick={() => {
-                              setEditId(item.id);
-                              setForm({
-                                name: item.name,
-                                quantity: item.quantity || 1,
-                                location: item.location || 'General',
-                                notes: item.notes || '',
-                              });
-                            }}>Editar</button>
+                            <button className="inv-btn ghost" type="button" onClick={() => startEdit(item)}>Editar</button>
                             <button className="inv-btn danger" type="button" onClick={() => deleteItem(item)}>Borrar</button>
                           </>
                         )}
@@ -361,11 +463,11 @@ const Inventory: React.FC<InventoryProps> = ({ user, houseName }) => {
                           <button className="inv-btn warn" type="button" onClick={() => markIssue(item)}>Guardar reporte</button>
                         </div>
                       )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </section>
         );
       })}
