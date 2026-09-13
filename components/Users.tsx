@@ -14,9 +14,14 @@ interface UsersProps {
   selectedHouse?: string;
 }
 
+function isOwnerUser(user?: { role?: string } | null) {
+  const role = String(user?.role || '').toLowerCase();
+  return role === 'owner' || role === 'dueno';
+}
 
 const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouses, addUser, editUser, deleteUser, selectedHouse }) => {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
   const [house, setHouse] = useState('');
@@ -25,16 +30,32 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [users, setUsers] = useState<User[]>([]);
   const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+  const owner = isOwnerUser(user);
 
   const callAdminUsersApi = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', payload: Record<string, any>) => {
     if (!supabase) {
       throw new Error('Supabase client no disponible');
     }
+
+    const action =
+      method === 'GET' ? 'list' :
+      method === 'POST' ? 'create' :
+      method === 'PATCH' ? 'update' :
+      'delete';
+
+    const { data: fnData, error: fnError } = await supabase.functions.invoke('admin-users', {
+      body: { action, ...payload },
+    });
+
+    if (!fnError && fnData && !(fnData as { error?: string }).error) {
+      return fnData;
+    }
+
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
-
     if (!token) {
-      throw new Error('No hay sesión activa para ejecutar acción de administrador');
+      throw new Error((fnData as { error?: string })?.error || fnError?.message || 'No hay sesión activa para gestionar usuarios');
     }
 
     const response = await fetch('/api/admin/users', {
@@ -50,7 +71,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     const json = await response.json();
     if (!response.ok) {
-      throw new Error(json?.error || 'Error en API de usuarios');
+      throw new Error(json?.error || (fnData as { error?: string })?.error || 'Error en API de usuarios');
     }
     return json;
   };
@@ -59,7 +80,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     const loadData = async () => {
       try {
         setLoading(true);
-        if (user?.role === 'owner') {
+        if (owner) {
           try {
             const apiResult = await callAdminUsersApi('GET', {});
             if (apiResult?.users) {
@@ -93,7 +114,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     loadData();
 
-    if (user?.role === 'owner') {
+    if (owner) {
       const channelUsers = realtimeService.subscribeToUsers(async () => {
         try {
           const apiResult = await callAdminUsersApi('GET', {});
@@ -116,7 +137,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         channelHouses?.unsubscribe?.();
       };
     }
-  }, [user, propUsers, propHouses]);
+  }, [user, propUsers, propHouses, owner]);
 
   if (!user || (user.role !== 'dueno' && user.role !== 'owner' && user.role !== 'manager')) {
     return (
@@ -141,41 +162,53 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
   const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (username && role && house) {
-      try {
-        if (user?.role === 'owner') {
-          const email = username.trim().toLowerCase();
-          const inferredUsername = email.includes('@') ? email.split('@')[0] : email;
-          const result = await callAdminUsersApi('POST', {
-            email,
-            password: password || '',
-            username: inferredUsername,
-            role,
-            house
-          });
-
-          if (result?.user) {
-            setUsers(prev => {
-              const next = prev.filter(u => String(u.id) !== String(result.user.id));
-              return [...next, result.user];
-            });
-          }
-        } else if (addUser) {
-          await addUser({ username, password: password || '', role, house });
+    setFormError('');
+    if (!username || !role || !house) {
+      setFormError('Completa nombre, rol y casa');
+      return;
+    }
+    try {
+      if (owner) {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail.includes('@')) {
+          setFormError('Escribe un correo válido. Con ese correo entra la persona.');
+          return;
         }
-        setUsername('');
-        setPassword('');
-        setRole('empleado');
-        setHouse('');
-      } catch (error) {
-        console.error('Error adding user:', error);
-        alert('Error al agregar usuario');
+        if (!password || password.length < 6) {
+          setFormError('La contraseña debe tener al menos 6 caracteres');
+          return;
+        }
+        const result = await callAdminUsersApi('POST', {
+          email: cleanEmail,
+          password,
+          username: username.trim(),
+          role,
+          house
+        });
+
+        if (result?.user) {
+          setUsers(prev => {
+            const next = prev.filter(u => String(u.id) !== String(result.user.id));
+            return [...next, result.user];
+          });
+        }
+      } else if (addUser) {
+        await addUser({ username, password: password || '', role, house });
       }
+      setUsername('');
+      setEmail('');
+      setPassword('');
+      setRole('empleado');
+      setHouse('');
+    } catch (error) {
+      console.error('Error adding user:', error);
+      setFormError(error instanceof Error ? error.message : 'Error al agregar usuario');
     }
   };
 
   const handleEditUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setFormError('');
     if (editData.username && editData.role && editUserId) {
       try {
         const idx = users.findIndex(u => String(u.id) === String(editUserId));
@@ -184,7 +217,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           throw new Error('Usuario a editar no encontrado');
         }
 
-        if (user?.role === 'owner') {
+        if (owner) {
           if (targetUser?.id) {
             const result = await callAdminUsersApi('PATCH', {
               id: String(targetUser.id),
@@ -206,20 +239,24 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         setEditData({ username: '', email: '', password: '', role: 'empleado', house: '' });
       } catch (error) {
         console.error('Error editing user:', error);
-        alert('Error al editar usuario');
+        setFormError(error instanceof Error ? error.message : 'Error al editar usuario');
       }
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
+    setFormError('');
+    const targetUser = users.find(u => String(u.id) === String(userId));
+    if (!targetUser) {
+      setFormError('Usuario a eliminar no encontrado');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar a ${targetUser.username}? Ya no podrá entrar.`)) {
+      return;
+    }
     try {
       const idx = users.findIndex(u => String(u.id) === String(userId));
-      const targetUser = idx >= 0 ? users[idx] : null;
-      if (!targetUser) {
-        throw new Error('Usuario a eliminar no encontrado');
-      }
-
-      if (user?.role === 'owner') {
+      if (owner) {
         if (targetUser?.id) {
           await callAdminUsersApi('DELETE', { id: String(targetUser.id) });
           setUsers(prev => prev.filter((u) => String(u.id) !== String(userId)));
@@ -229,21 +266,30 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Error al eliminar usuario');
+      setFormError(error instanceof Error ? error.message : 'Error al eliminar usuario');
     }
   };
 
   return (
     <div className="users-container">
       <h2>Gestión de Usuarios</h2>
+      <p className="users-help">Agrega o elimina personas aquí. Quedan en la casa asignada y pueden entrar con su correo y contraseña.</p>
       {loading && <p>Cargando datos...</p>}
+      {formError && <p className="users-error">{formError}</p>}
       <form onSubmit={handleAddUser} className="users-add-form">
         <input
           type="text"
-          placeholder="Correo del usuario"
+          placeholder="Nombre del usuario"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
+        />
+        <input
+          type="email"
+          placeholder="Correo para entrar"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required={owner}
         />
         <input
           type="password"
@@ -271,7 +317,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         {users && users.length > 0 ? (
           users
             .filter(u => {
-              if (user?.role === 'owner' || user?.role === 'dueno') {
+              if (owner) {
                 if (selectedHouse) {
                   return u.house === selectedHouse;
                 }
@@ -313,9 +359,9 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                   </select>
                   <select value={editData.house} onChange={e => setEditData({ ...editData, house: e.target.value })} title="Casa asignada">
                     <option value="" disabled>Selecciona una casa</option>
-                    {houses.map((h, idx) => {
+                    {houses.map((h, houseIdx) => {
                       const houseName = h.houseName || h.name || '';
-                      return <option key={idx} value={houseName}>{houseName}</option>;
+                      return <option key={houseIdx} value={houseName}>{houseName}</option>;
                     })}
                   </select>
                   <button type="submit">Guardar</button>
@@ -327,7 +373,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                   {(u as any).email && <span className="users-email">{(u as any).email}</span>}
                   <strong>{u.role}</strong>
                   <span className="users-house">{u.house}</span>
-                  {u.role !== 'dueno' && (
+                  {u.role !== 'dueno' && u.role !== 'owner' && (
                     <>
                       <button onClick={() => {
                         setEditUserId(String(u.id));
