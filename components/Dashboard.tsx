@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { FaCheck, FaTimes, FaCalendar, FaClipboard, FaShoppingCart, FaBoxes, FaBell } from 'react-icons/fa';
 import './Dashboard.css';
+import './AssignedTasks.css';
 import * as realtimeService from '../utils/supabaseRealtimeService';
 import { RealtimeNotificationsManager } from './RealtimeNotification';
 import './RealtimeNotification.css';
@@ -23,6 +24,8 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
   const [inventoryLoading, setInventoryLoading] = useState<Record<string, boolean>>({});
   const [inventoryProgress, setInventoryProgress] = useState<{ [key: string]: boolean }>({});
   const [expandedInventory, setExpandedInventory] = useState<Set<string>>(new Set());
+  const [openAssignedZone, setOpenAssignedZone] = useState<string | null>(null);
+  const [assignedView, setAssignedView] = useState<'pendiente' | 'hecho' | 'todo'>('pendiente');
   // Estados para inventario completo de la casa
   const [houseInventory, setHouseInventory] = useState<any[]>([]);
   const [houseInventoryExpanded, setHouseInventoryExpanded] = useState(false);
@@ -552,10 +555,15 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     <div className="dashboard-assigned-tasks-modal">
       <div className="assigned-tasks-header-v2">
         <div className="assigned-tasks-title-group">
-          <h3 className="assigned-tasks-title-v2">{isManager ? '👥 Progreso de Empleados' : '✨ Tareas Asignadas'}</h3>
-          <p className="assigned-tasks-subtitle">{isManager ? 'Supervisar el progreso de todos los empleados' : 'Tu lista de tareas asignadas por el manager'}</p>
+          <h3 className="assigned-tasks-title-v2">{isManager ? 'Progreso de empleados' : 'Tareas Asignadas'}</h3>
+          <p className="assigned-tasks-subtitle">{isManager ? 'Trabajos activos de cada empleado' : 'Toca una zona para ver solo lo que falta'}</p>
         </div>
         <span className="assigned-tasks-badge-v2">{Object.values(groupedTasks).flat().length}</span>
+      </div>
+      <div className="at-tabs">
+        <button type="button" className={assignedView === 'pendiente' ? 'on' : ''} onClick={() => setAssignedView('pendiente')}>Por hacer</button>
+        <button type="button" className={assignedView === 'hecho' ? 'on' : ''} onClick={() => setAssignedView('hecho')}>Hechas</button>
+        <button type="button" className={assignedView === 'todo' ? 'on' : ''} onClick={() => setAssignedView('todo')}>Todo</button>
       </div>
 
       {loading ? (
@@ -628,7 +636,6 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                       {/* Zonas/Subtareas para empleados */}
                       {!isManager && subtasksMap && (
                         <div className="assigned-task-zones-wrap">
-                          <div className="assigned-task-zones-title">📋 Zonas de Limpieza</div>
                           <div className="assigned-task-zones-grid">
                             {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => {
                               const zoneItemsCount = (subtasks as string[]).length;
@@ -636,31 +643,45 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                                 const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
                                 return progressArr[globalIdx];
                               }).length;
+                              const zoneKey = `${task.id}-${zona}`;
+                              const visibleSubs = (subtasks as string[]).map((subtask, idx) => {
+                                const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
+                                const done = !!progressArr[globalIdx];
+                                return { subtask, idx, globalIdx, done };
+                              }).filter((row) => {
+                                if (assignedView === 'pendiente') return !row.done;
+                                if (assignedView === 'hecho') return row.done;
+                                return true;
+                              });
+                              if (assignedView !== 'todo' && visibleSubs.length === 0) return null;
+                              const open = openAssignedZone === null ? zonaIdx === 0 : openAssignedZone === zoneKey;
                               return (
-                                <div key={zona} className="assigned-task-zone-card">
-                                  <div className="assigned-task-zone-head">
+                                <div key={zona} className={`assigned-task-zone-card${open ? ' open' : ''}`}>
+                                  <button
+                                    type="button"
+                                    className="assigned-task-zone-head"
+                                    onClick={() => setOpenAssignedZone(open ? null : zoneKey)}
+                                  >
                                     <span className="assigned-task-zone-name">{zona}</span>
-                                    <span className="assigned-task-zone-count">{zoneCompletedCount}/{zoneItemsCount}</span>
-                                  </div>
+                                    <span className={assignedView === 'pendiente' ? `${visibleSubs.length} por hacer` : `${zoneCompletedCount}/${zoneItemsCount}`}</span>
+                                  </button>
+                                  {open && (
                                   <div className="assigned-task-subtasks-grid">
-                                    {(subtasks as string[]).map((subtask, idx) => {
-                                      const globalIdx = Object.values(subtasksMap).slice(0, zonaIdx).flat().length + idx;
-                                      const isCompleted = progressArr[globalIdx];
-                                      return (
-                                        <div key={`${zona}-${idx}`} className={`assigned-task-subtask-row ${isCompleted ? 'is-completed' : ''}`}>
+                                    {visibleSubs.map((row) => (
+                                        <div key={`${zona}-${row.idx}`} className={`assigned-task-subtask-row ${row.done ? 'is-completed' : ''}`}>
                                           <button
-                                            className={`assigned-task-subtask-btn ${isCompleted ? 'done' : 'pending'}`}
-                                            onClick={() => handleSubtaskToggle(task.id, globalIdx, !isCompleted, allSubtasks.length)}
+                                            className={`assigned-task-subtask-btn ${row.done ? 'done' : 'pending'}`}
+                                            onClick={() => handleSubtaskToggle(task.id, row.globalIdx, !row.done, allSubtasks.length)}
                                           >
-                                            {isCompleted ? '✅ Completada' : '⏳ Completar'}
+                                            {row.done ? 'Hecha' : 'Completar'}
                                           </button>
-                                          <span className={`assigned-task-subtask-text ${isCompleted ? 'is-completed' : ''}`}>
-                                            {subtask}
+                                          <span className={`assigned-task-subtask-text ${row.done ? 'is-completed' : ''}`}>
+                                            {row.subtask}
                                           </span>
                                         </div>
-                                      );
-                                    })}
+                                    ))}
                                   </div>
+                                  )}
                                 </div>
                               );
                             })}

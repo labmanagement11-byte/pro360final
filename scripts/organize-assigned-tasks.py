@@ -71,7 +71,7 @@ old_zones = '''                        <div className="assigned-task-zones-wrap"
                                           >
                                             {isCompleted ? '✅ Completada' : '⏳ Completar'}
                                           </button>
-                                          <span className={`assigned-task-subtask-text ${isCompleted ? 'is-completed' : ''`}>
+                                          <span className={`assigned-task-subtask-text ${isCompleted ? 'is-completed' : ''}`}>
                                             {subtask}
                                           </span>
                                         </div>
@@ -112,19 +112,19 @@ new_zones = '''                        <div className="assigned-task-zones-wrap"
                                     onClick={() => setOpenAssignedZone(open ? null : zoneKey)}
                                   >
                                     <span className="assigned-task-zone-name">{zona}</span>
-                                    <span className="assigned-task-zone-count">{assignedView === 'pendiente' ? `${visibleSubs.length} por hacer` : `${zoneCompletedCount}/{zoneItemsCount}`}</span>
+                                    <span className={assignedView === 'pendiente' ? `${visibleSubs.length} por hacer` : `${zoneCompletedCount}/${zoneItemsCount}`}</span>
                                   </button>
                                   {open && (
                                   <div className="assigned-task-subtasks-grid">
                                     {visibleSubs.map((row) => (
-                                        <div key={`${zona}-${row.idx}`} className={`assigned-task-subtask-row ${row.done ? 'is-completed' : ''`}>
+                                        <div key={`${zona}-${row.idx}`} className={`assigned-task-subtask-row ${row.done ? 'is-completed' : ''}`}>
                                           <button
                                             className={`assigned-task-subtask-btn ${row.done ? 'done' : 'pending'}`}
                                             onClick={() => handleSubtaskToggle(task.id, row.globalIdx, !row.done, allSubtasks.length)}
                                           >
                                             {row.done ? 'Hecha' : 'Completar'}
                                           </button>
-                                          <span className={`assigned-task-subtask-text ${row.done ? 'is-completed' : ''`}>
+                                          <span className={`assigned-task-subtask-text ${row.done ? 'is-completed' : ''}`}>
                                             {row.subtask}
                                           </span>
                                         </div>
