@@ -37,10 +37,6 @@ const ROOM_ORDER = [
   'SISTEMAS ELÉCTRICOS',
 ];
 
-const REGULAR_ROOMS = new Set([
-  'LIMPIEZA GENERAL', 'HABITACIONES', 'SALA', 'COMEDOR', 'COCINA',
-  'BAÑOS', 'ZONA DE LAVADO', 'TERRAZA', 'ÁREA DE BBQ', 'ÁREA DE PISCINA',
-]);
 const DEEP_ROOMS = new Set(['LIMPIEZA PROFUNDA']);
 const MAINT_ROOMS = new Set(['ÁREAS VERDES', 'PISCINA Y AGUA', 'RUTINA DE MANTENIMIENTO', 'SISTEMAS ELÉCTRICOS']);
 
@@ -77,7 +73,7 @@ function formatWhen(value?: string | null) {
   }
 }
 
-const Checklist = ({ user, assignmentId }: ChecklistProps) => {
+const Checklist = ({ user }: ChecklistProps) => {
   const selectedHouse = houseForUser(user);
   const owner = isOwnerRole(user.role);
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -88,8 +84,8 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
 
   const loadItems = async () => {
     setLoading(true);
-    const { data, error } = await checklistTable()
-      .select('id, house, item, complete, room, assigned_to, completed_by, completed_at')
+    const { data, error } = await (checklistTable() as any)
+      .select('*')
       .eq('house', selectedHouse)
       .order('id', { ascending: true });
 
@@ -106,14 +102,14 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     const loadAssignment = async () => {
       if (!supabase) return;
       if (user.role !== 'empleado') return;
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('calendar_assignments')
         .select('type')
         .eq('employee', user.username)
         .eq('house', selectedHouse)
         .order('date', { ascending: false })
         .limit(1);
-      const type = data && data[0] ? String((data[0] as { type?: string }).type || '') : '';
+      const type = data && data[0] ? String(data[0].type || '') : '';
       setAssignmentType(type || null);
       setFilter(assignmentKind(type));
     };
@@ -139,7 +135,7 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     return () => {
       channel.unsubscribe();
     };
-  }, [selectedHouse, assignmentId]);
+  }, [selectedHouse]);
 
   const visibleItems = useMemo(() => {
     const kind = owner ? filter : (assignmentType ? assignmentKind(assignmentType) : filter);
@@ -188,13 +184,13 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     }
 
     if (supabase && next) {
-      await supabase
+      await (supabase as any)
         .from('cleaning_checklist')
         .update({
           completed: true,
           completed_by: user.username,
           completed_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('house', selectedHouse)
         .eq('task', item.item);
     }

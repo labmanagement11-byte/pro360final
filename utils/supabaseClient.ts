@@ -1,6 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Definir tipos de base de datos
 export interface Database {
   public: {
     Tables: {
@@ -14,6 +13,8 @@ export interface Database {
           assigned_to?: string | null;
           due_date?: string | null;
           created_at?: string;
+          completed_by?: string | null;
+          completed_at?: string | null;
         };
         Insert: {
           id?: number;
@@ -24,6 +25,8 @@ export interface Database {
           assigned_to?: string | null;
           due_date?: string | null;
           created_at?: string;
+          completed_by?: string | null;
+          completed_at?: string | null;
         };
         Update: {
           id?: number;
@@ -34,6 +37,8 @@ export interface Database {
           assigned_to?: string | null;
           due_date?: string | null;
           created_at?: string;
+          completed_by?: string | null;
+          completed_at?: string | null;
         };
       };
       [key: string]: any;
@@ -59,14 +64,10 @@ if (supabaseUrl && supabaseAnonKey) {
 			}
 		}
 	});
-	
-	// Log para confirmar que realtime está configurado
-	console.log('✅ Supabase client inicializado con Realtime habilitado');
 } else {
 	console.error('Missing Supabase environment variables. Supabase client will not be initialized.');
 }
 
-// Helper function to ensure supabase is defined
 export function getSupabaseClient(): SupabaseClient<Database> {
 	if (!supabaseInstance) {
 		throw new Error('Supabase client is not initialized. Check your environment variables.');
@@ -74,7 +75,6 @@ export function getSupabaseClient(): SupabaseClient<Database> {
 	return supabaseInstance;
 }
 
-// Helper for checklist table operations with proper typing
 export function checklistTable() {
 	return getSupabaseClient().from('checklist');
 }
