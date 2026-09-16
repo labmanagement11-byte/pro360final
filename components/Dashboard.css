@@ -1,1 +1,15 @@
-__LOAD_FROM_FILE__:/workspace/pro360/Dashboard.css
+/* ============================================
+   SISTEMA DE DISEÑO DASHBOARD
+   ============================================ */
+
+:root {
+  --color-primary: #0284c7;
+  --color-primary-light: #0ea5e9;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-bg: #f9fafb;
+  --color-card: #ffffff;
+  --color-text: #111827;
+  --color-text-secondary: #4b5563;
+}
