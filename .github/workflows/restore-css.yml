@@ -3,8 +3,8 @@ name: Restore Dashboard CSS
 on:
   push:
     paths:
-      - 'scripts/css-restore/**'
       - '.github/workflows/restore-css.yml'
+      - 'scripts/css-restore/**'
   workflow_dispatch:
 
 permissions:
@@ -15,28 +15,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Assemble and restore Dashboard.css
+
+      - name: Build single Dashboard.css from p1-p8
         run: |
           set -euo pipefail
-          : > /tmp/all.b64
-          for f in $(ls scripts/css-restore/part*.b64 | sort); do
-            cat "$f" >> /tmp/all.b64
+          : > components/Dashboard.css
+          for i in 1 2 3 4 5 6 7 8; do
+            f="components/Dashboard.p${i}.css"
+            if [ ! -f "$f" ]; then
+              echo "Missing $f"
+              exit 1
+            fi
+            size=$(wc -c < "$f")
+            if [ "$size" -lt 100 ]; then
+              echo "Stub too small: $f ($size)"
+              exit 1
+            fi
+            cat "$f" >> components/Dashboard.css
+            printf '\n' >> components/Dashboard.css
           done
-          base64 -d /tmp/all.b64 > components/Dashboard.css
           wc -c components/Dashboard.css
-          grep -q 'cl-admin-type-tabs' components/Dashboard.css
           grep -q -- '--color-primary' components/Dashboard.css
-          rm -f components/Dashboard.part1.css components/Dashboard.p*.css || true
-      - name: Commit restored CSS
+          grep -q 'cl-admin-type-tabs' components/Dashboard.css
+          if head -n 20 components/Dashboard.css | grep -q "@import"; then
+            echo "Unexpected @import left in Dashboard.css"
+            exit 1
+          fi
+
+      - name: Remove split chunks and commit
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch \
+            components/Dashboard.p1.css \
+            components/Dashboard.p2.css \
+            components/Dashboard.p3.css \
+            components/Dashboard.p4.css \
+            components/Dashboard.p5.css \
+            components/Dashboard.p6.css \
+            components/Dashboard.p7.css \
+            components/Dashboard.p8.css \
+            components/Dashboard.part1.css || true
           git add components/Dashboard.css
-          git rm -f --ignore-unmatch components/Dashboard.part1.css components/Dashboard.p1.css components/Dashboard.p2.css components/Dashboard.p3.css components/Dashboard.p4.css components/Dashboard.p5.css components/Dashboard.p6.css components/Dashboard.p7.css components/Dashboard.p8.css || true
           if git diff --cached --quiet; then
             echo "No changes"
             exit 0
           fi
-          git commit -m "Restore full Dashboard.css from assembled parts"
+          git commit -m "Restore single full Dashboard.css (no @import chunks)"
           git push
