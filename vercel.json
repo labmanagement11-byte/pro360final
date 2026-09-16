@@ -10,7 +10,8 @@
   },
   "git": {
     "deploymentEnabled": {
-      "main": true
+      "main": true,
+      "feat/organize-assigned-tasks": false
     }
   }
 }
