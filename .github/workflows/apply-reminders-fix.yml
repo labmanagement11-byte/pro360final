@@ -1,0 +1,45 @@
+name: Apply reminders fix
+
+on:
+  push:
+    paths:
+      - 'scripts/reminders-fix/**'
+      - '.github/workflows/apply-reminders-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble service + patch Dashboard
+        run: |
+          set -euo pipefail
+          : > /tmp/all.b64
+          for f in $(ls scripts/reminders-fix/svc_*.b64 | sort); do
+            cat "$f" >> /tmp/all.b64
+          done
+          base64 -d /tmp/all.b64 > utils/supabaseRealtimeService.ts
+          wc -c utils/supabaseRealtimeService.ts
+          grep -q "from('reminders')" utils/supabaseRealtimeService.ts
+          ! grep -q 'localStorage - Supabase schema cache issue' utils/supabaseRealtimeService.ts
+          python3 scripts/reminders-fix/patch_dashboard.py
+          python3 scripts/reminders-fix/patch_checklist_accordion.py
+          grep -q 'canManageReminders' components/Dashboard.tsx
+          grep -q 'Alertas de recordatorios vencidos' components/Dashboard.tsx
+          grep -q 'cl-admin-zones' components/Dashboard.tsx
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add utils/supabaseRealtimeService.ts components/Dashboard.tsx
+          if git diff --cached --quiet; then
+            echo No changes
+            exit 0
+          fi
+          git commit -m "Recordatorios: Supabase + alertas + managers por casa"
+          git push
