@@ -1,15 +1,4 @@
-/* ============================================
-   SISTEMA DE DISEÑO DASHBOARD
-   ============================================ */
-
-:root {
-  --color-primary: #0284c7;
-  --color-primary-light: #0ea5e9;
-  --color-success: #10b981;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
-  --color-bg: #f9fafb;
-  --color-card: #ffffff;
-  --color-text: #111827;
-  --color-text-secondary: #4b5563;
-}
+@import './Dashboard.part1.css';
+@import './Dashboard.part2.css';
+@import './Dashboard.part3.css';
+@import './Dashboard.part4.css';
