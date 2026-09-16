@@ -1,0 +1,42 @@
+name: Restore Dashboard CSS
+
+on:
+  push:
+    paths:
+      - 'scripts/css-restore/**'
+      - '.github/workflows/restore-css.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble and restore Dashboard.css
+        run: |
+          set -euo pipefail
+          : > /tmp/all.b64
+          for f in $(ls scripts/css-restore/part*.b64 | sort); do
+            cat "$f" >> /tmp/all.b64
+          done
+          base64 -d /tmp/all.b64 > components/Dashboard.css
+          wc -c components/Dashboard.css
+          grep -q 'cl-admin-type-tabs' components/Dashboard.css
+          grep -q -- '--color-primary' components/Dashboard.css
+          rm -f components/Dashboard.part1.css components/Dashboard.p*.css || true
+      - name: Commit restored CSS
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/Dashboard.css
+          git rm -f --ignore-unmatch components/Dashboard.part1.css components/Dashboard.p1.css components/Dashboard.p2.css components/Dashboard.p3.css components/Dashboard.p4.css components/Dashboard.p5.css components/Dashboard.p6.css components/Dashboard.p7.css components/Dashboard.p8.css || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Restore full Dashboard.css from assembled parts"
+          git push
