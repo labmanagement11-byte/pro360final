@@ -2339,7 +2339,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [shoppingHistoryFilterYear, setShoppingHistoryFilterYear] = useState('');
   const [shoppingHistoryFilterMonth, setShoppingHistoryFilterMonth] = useState('');
 
+  const pendingRemindersCount = (reminders || []).filter((r: any) => {
+    if (r.paid) return false;
+    const raw = r.due_date || r.due;
+    if (!raw) return false;
+    const due = new Date(raw);
+    if (Number.isNaN(due.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    const limit = new Date(today);
+    limit.setDate(limit.getDate() + 3);
+    return due <= limit;
+  }).length;
+
+  const pendingShoppingCount = (shoppingList || []).filter((i: any) => !i.is_purchased).length;
+  const pendingInventoryIssuesCount = (inventoryList || []).filter((i: any) => !!i.issue_type && !i.complete).length;
+  const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && (
+    user.role === 'empleado' ? t.assignedTo === user.username || t.assigned_to === user.username : true
+  )).length;
+  const pendingAssignmentsCount = (calendarAssignments || []).filter((a: any) => !a.completed).length;
+  const pendingCardCounts: Record<string, number> = {
+    shopping: pendingShoppingCount,
+    inventory: pendingInventoryIssuesCount,
+    reminders: pendingRemindersCount,
+    tasks: pendingTasksCount,
+    assignedTasks: pendingAssignmentsCount,
+    checklist: 0,
+    extraTasks: extraTasksForUser.length,
+  };
+
   const formatPurchaseAmount = (value: number | string | null | undefined) => {
+
     const amount = Number(value ?? 0);
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -2681,18 +2712,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             {/* Tarjeta personalizada para tareas asignadas (solo empleados) */}
             {user.role === 'empleado' && (
               <button
-                className="dashboard-card"
+                className={`dashboard-card${(pendingCardCounts.assignedTasks || 0) > 0 ? ' has-pending' : ''}`}
                 onClick={() => setSelectedModalCard('assignedTasks')}
                 aria-label="Tareas Asignadas"
               >
-                <span className="dashboard-card-title">Tareas Asignadas</span>
+                <span className="dashboard-card-title">
+                  Tareas Asignadas
+                  {(pendingCardCounts.assignedTasks || 0) > 0 && (
+                    <span className="dashboard-card-badge-pending">{pendingCardCounts.assignedTasks}</span>
+                  )}
+                </span>
                 <span className="dashboard-card-desc">Tareas de limpieza o mantenimiento asignadas por el manager</span>
               </button>
             )}
-            {cards.filter(card => card.show).map(card => (
+            {cards.filter(card => card.show).map(card => {
+              const pendingN = pendingCardCounts[card.key] || 0;
+              const showPending = pendingN > 0 && ['shopping', 'inventory', 'reminders', 'tasks', 'extraTasks'].includes(card.key);
+              return (
               <button
                 key={card.key}
-                className="dashboard-card"
+                className={`dashboard-card${showPending ? ' has-pending' : ''}`}
                 onClick={() => {
                   if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks', 'extraTasks', 'completedJobs'].includes(card.key)) {
                     setSelectedModalCard(card.key);
@@ -2704,47 +2743,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               >
                 <span className="dashboard-card-title">
                   {card.title}
-                  {card.key === 'reminders' && reminders.filter((r: any) => {
-                    if (r.paid) return false;
-                    const raw = r.due_date || r.due;
-                    if (!raw) return false;
-                    const due = new Date(raw);
-                    if (Number.isNaN(due.getTime())) return false;
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    due.setHours(0,0,0,0);
-                    const limit = new Date(today);
-                    limit.setDate(limit.getDate() + 3);
-                    return due <= limit;
-                  }).length > 0 && (
-                    <span className="dashboard-card-badge" style={{
-                      marginLeft: '0.45rem',
-                      background: '#ef4444',
-                      color: '#fff',
-                      borderRadius: '999px',
-                      padding: '0.1rem 0.45rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                    }}>
-                      {reminders.filter((r: any) => {
-                        if (r.paid) return false;
-                        const raw = r.due_date || r.due;
-                        if (!raw) return false;
-                        const due = new Date(raw);
-                        if (Number.isNaN(due.getTime())) return false;
-                        const today = new Date();
-                        today.setHours(0,0,0,0);
-                        due.setHours(0,0,0,0);
-                        const limit = new Date(today);
-                        limit.setDate(limit.getDate() + 3);
-                        return due <= limit;
-                      }).length}
-                    </span>
+                  {showPending && (
+                    <span className="dashboard-card-badge-pending">{pendingN}</span>
                   )}
                 </span>
                 <span className="dashboard-card-desc">{card.desc}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
           <p className="dashboard-home-desc">Haz clic en una tarjeta para ver el módulo correspondiente.</p>
         </>
