@@ -4,6 +4,7 @@ on:
     branches: [fix/manager-zones-users-reminders]
     paths:
       - 'scripts/batch2-*.diff'
+      - 'scripts/batch2-*.diff.hex*'
       - 'scripts/batch2-DIFFS.json'
       - 'scripts/apply-batch2-full-diffs.py'
       - '.github/workflows/apply-batch2-manager-zones.yml'
