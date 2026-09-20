@@ -5,12 +5,18 @@ root = Path(__file__).resolve().parents[1]
 meta = json.loads((root/"scripts"/"batch2-DIFFS.json").read_text())
 for name, info in meta.items():
     p = root/"scripts"/name
-    hexp = root/"scripts"/(name + ".hex")
-    if hexp.exists():
-        data = bytes.fromhex("".join(hexp.read_text().split())).decode()
+    hex_parts = sorted((root/"scripts").glob(name + ".hex.p*"))
+    if hex_parts:
+        hx = "".join("".join(pp.read_text().split()) for pp in hex_parts)
+        data = bytes.fromhex(hx).decode()
         p.write_text(data)
     else:
-        data = p.read_text()
+        hexp = root/"scripts"/(name + ".hex")
+        if hexp.exists():
+            data = bytes.fromhex("".join(hexp.read_text().split())).decode()
+            p.write_text(data)
+        else:
+            data = p.read_text()
     if hashlib.sha256(data.encode()).hexdigest() != info["sha256"] or len(data) != info["len"]:
         sys.stderr.write(f"corrupt {name}\n"); sys.exit(1)
     target = root/info["target"]
