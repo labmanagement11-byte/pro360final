@@ -3,12 +3,11 @@ on:
   push:
     branches: [fix/manager-zones-users-reminders]
     paths:
-      - 'scripts/payload-users-a.b64'
-      - 'scripts/payload-users-b.b64'
-      - 'scripts/payload-admin.b64'
-      - 'scripts/payload-dash.b64'
-      - 'scripts/payload-svc.b64'
-      - 'scripts/run-batch2-install.py'
+      - 'scripts/dash-chunks/**'
+      - 'scripts/install-dash-chunks.py'
+      - 'scripts/apply-batch2-svc.py'
+      - 'components/Users.tsx'
+      - 'supabase/functions/admin-users/**'
       - '.github/workflows/apply-batch2-manager-zones.yml'
   workflow_dispatch:
 permissions:
@@ -21,7 +20,20 @@ jobs:
         with:
           ref: fix/manager-zones-users-reminders
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: python3 scripts/run-batch2-install.py
+      - name: Apply Dashboard chunks + service comment
+        run: |
+          set -euo pipefail
+          grep -q 'canViewPasswords' components/Users.tsx
+          grep -q 'canViewPasswords' supabase/functions/admin-users/index.ts
+          if grep -q 'inferChecklistTemplateType' components/Dashboard.tsx; then
+            echo "Dashboard already patched"
+          else
+            python3 scripts/install-dash-chunks.py
+          fi
+          python3 scripts/apply-batch2-svc.py
+          grep -q 'inferChecklistTemplateType' components/Dashboard.tsx
+          grep -q 'manager fills from scratch' utils/supabaseRealtimeService.ts
+          echo "BATCH2 SOURCES OK"
       - name: Commit
         run: |
           set -euo pipefail
