@@ -1,32 +1,23 @@
 #!/usr/bin/env python3
-"""Assemble patch scripts from .chunkXX.txt or .partXX.b64, then run apply_all."""
-import base64, json, subprocess, sys
+"""Assemble patch scripts from single .b64 (wrapped ok), then apply_all."""
+import base64, subprocess, sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
-
-chunks_index = root / 'CHUNKS_INDEX.json'
-parts_index = root / 'PARTS_INDEX.json'
-
-if chunks_index.exists():
-    index = json.loads(chunks_index.read_text())
-    for item in index:
-        name = item['name']
-        n = item['chunks']
-        data = ''.join((root / f'{name}.chunk{i:02d}.txt').read_text() for i in range(n))
-        (root / name).write_text(data)
-        print('assembled chunks', name, (root / name).stat().st_size)
-elif parts_index.exists():
-    index = json.loads(parts_index.read_text())
-    for item in index:
-        name = item['name']
-        parts = item['parts']
-        data = ''.join((root / f'{name}.part{i:02d}.b64').read_text().strip() for i in range(parts))
-        (root / name).write_bytes(base64.b64decode(data))
-        print('assembled b64', name, (root / name).stat().st_size)
-else:
-    print('No CHUNKS_INDEX or PARTS_INDEX found', file=sys.stderr)
-    sys.exit(1)
+SINGLE = [
+  'patch_dashboard_pending_cards.py',
+  'patch_dashboard_no_autoseed.py',
+  'patch_assigned_tasks_house_checklist.py',
+  'patch_checklist_house.py',
+  'patch_calendar.py',
+  'patch_service_house_isolation.py',
+]
+for name in SINGLE:
+    b64path = root / f'{name}.b64'
+    if b64path.exists() and b64path.stat().st_size > 20:
+        raw = ''.join(b64path.read_text().split())
+        (root / name).write_bytes(base64.b64decode(raw))
+        print('assembled single-b64', name, (root / name).stat().st_size)
 
 r = subprocess.run([sys.executable, str(root / 'apply_all.py')], cwd=str(root.parent.parent))
 sys.exit(r.returncode)
