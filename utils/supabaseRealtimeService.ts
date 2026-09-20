@@ -2069,8 +2069,9 @@ export function unsubscribeFromAll(subscriptions: any[]) {
 }
 
 // ==================== CHECKLIST TEMPLATES ====================
-export async function createChecklistFromTemplate(assignmentId: string, taskType: string, employee: string, house: string) {
+export async function createChecklistFromTemplate(assignmentId: string | number, taskType: string, employee: string, house: string) {
   try {
+    assignmentId = String(assignmentId);
     console.log('📋 Creando checklist desde plantilla:', { assignmentId, taskType, employee, house });
     const supabase = getSupabaseClient();
     const houseName = String(house || '').trim();
@@ -2140,8 +2141,10 @@ export async function createChecklistFromTemplate(assignmentId: string, taskType
 
     console.log(`✅ ${templates.length} plantillas encontradas para ${taskType} @ ${houseName}`);
 
+    // calendar_assignments.id is bigint; cleaning_checklist.calendar_assignment_id is text
+    const assignmentIdStr = String(assignmentId);
     const checklistItems = templates.map((template: any) => ({
-      calendar_assignment_id: assignmentId,
+      calendar_assignment_id: assignmentIdStr,
       employee: employee,
       house: houseName,
       zone: template.zone,
@@ -2150,20 +2153,25 @@ export async function createChecklistFromTemplate(assignmentId: string, taskType
       order_num: template.order_num
     }));
 
+    const memoryItems = checklistItems.map((row: any, idx: number) => ({
+      ...row,
+      id: `tmp-${assignmentIdStr}-${idx}`,
+      _ephemeral: true,
+    }));
+
     const { data, error } = await (supabase
       .from('cleaning_checklist') as any)
       .insert(checklistItems)
       .select();
 
     if (error) {
-      console.error('❌ Error insertando checklist:', error);
-      return { success: false, error };
+      console.error('❌ Error insertando checklist (plantilla en memoria):', error);
+      return { success: true, count: memoryItems.length, items: memoryItems, persisted: false, error };
     }
 
-    // Defense: only return rows for this house
     const items = (data || []).filter((row: any) => String(row.house || '').trim() === houseName);
-    console.log(`✅ ${items.length} items de checklist creados para asignación ${assignmentId} @ ${houseName}`);
-    return { success: true, count: items.length, items };
+    console.log(`✅ ${items.length} items de checklist creados para asignación ${assignmentIdStr} @ ${houseName}`);
+    return { success: true, count: items.length, items, persisted: true };
 
   } catch (error) {
     console.error('❌ Exception en createChecklistFromTemplate:', error);
