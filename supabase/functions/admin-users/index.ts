@@ -19,10 +19,19 @@ function isOwnerRole(role: string) {
   return value === "dueno" || value === "owner";
 }
 
+function isManagerRole(role: string) {
+  return String(role || "").toLowerCase() === "manager";
+}
+
 function normalizeRole(role: string) {
   const value = String(role || "").trim().toLowerCase();
   if (value === "manager" || value === "empleado") return value;
   return "";
+}
+
+function sameHouse(a: string, b: string) {
+  return String(a || "").trim().toLowerCase().replace(/\s+/g, " ") ===
+    String(b || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 Deno.serve(async (req) => {
@@ -61,18 +70,34 @@ Deno.serve(async (req) => {
       .eq("id", authData.user.id)
       .single();
 
-    if (requesterError || !requester || !isOwnerRole(String((requester as { role?: string }).role || ""))) {
-      return json({ error: "Solo el dueño puede agregar o eliminar usuarios" }, 403);
+    if (requesterError || !requester) {
+      return json({ error: "Perfil no encontrado" }, 403);
+    }
+
+    const requesterRole = String((requester as { role?: string }).role || "");
+    const requesterHouse = String((requester as { house?: string }).house || "");
+    const requesterName = String((requester as { username?: string }).username || "").toLowerCase();
+    const isOwner = isOwnerRole(requesterRole);
+    const isManager = isManagerRole(requesterRole);
+    // Only Jonathan/owner may VIEW plaintext passwords from legacy users table
+    const canViewPasswords = isOwner && (requesterName === "jonathan" || requesterHouse === "all");
+
+    if (!isOwner && !isManager) {
+      return json({ error: "No tienes permiso para gestionar usuarios" }, 403);
+    }
+    if (isManager && (!requesterHouse || requesterHouse === "all")) {
+      return json({ error: "Manager sin casa asignada" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
     const action = String((body as { action?: string }).action || "list");
 
     if (action === "list") {
-      const { data: profilesData, error: profilesError } = await admin
-        .from("profiles")
-        .select("id, username, role, house")
-        .order("username", { ascending: true });
+      let query = admin.from("profiles").select("id, username, role, house").order("username", { ascending: true });
+      if (isManager) {
+        query = query.eq("house", requesterHouse);
+      }
+      const { data: profilesData, error: profilesError } = await query;
       if (profilesError) return json({ error: profilesError.message }, 400);
 
       const { data: authUsersData } = await admin.auth.admin.listUsers({ perPage: 1000 });
@@ -81,23 +106,40 @@ Deno.serve(async (req) => {
         emailMap[authUser.id] = authUser.email || "";
       }
 
+      const passwordMap: Record<string, string> = {};
+      if (canViewPasswords) {
+        const { data: legacyUsers } = await admin.from("users").select("username, password");
+        for (const row of legacyUsers || []) {
+          const uname = String((row as { username?: string }).username || "");
+          const pwd = String((row as { password?: string }).password || "");
+          if (uname) passwordMap[uname.toLowerCase()] = pwd;
+        }
+      }
+
       const users = (profilesData || []).map((p: { id: string; username: string; role: string; house: string | null }) => ({
         id: p.id,
         username: p.username,
         role: p.role,
         house: p.house,
         email: emailMap[p.id] || "",
-        password: "",
+        // Passwords ONLY for Jonathan/owner — never for managers/employees
+        password: canViewPasswords ? (passwordMap[String(p.username || "").toLowerCase()] || "") : "",
       }));
-      return json({ ok: true, users });
+      return json({ ok: true, users, canViewPasswords });
     }
 
     if (action === "create") {
       const email = String((body as { email?: string }).email || "").trim().toLowerCase();
       const password = String((body as { password?: string }).password || "").trim();
       const username = String((body as { username?: string }).username || "").trim();
-      const role = normalizeRole(String((body as { role?: string }).role || ""));
-      const house = String((body as { house?: string }).house || "").trim();
+      let role = normalizeRole(String((body as { role?: string }).role || ""));
+      let house = String((body as { house?: string }).house || "").trim();
+
+      // Managers: force house + only empleado
+      if (isManager) {
+        house = requesterHouse;
+        role = "empleado";
+      }
 
       if (!email || !email.includes("@") || password.length < 6 || !username || !role || !house) {
         return json({
@@ -114,6 +156,10 @@ Deno.serve(async (req) => {
         return json({ error: `La casa "${house}" no existe` }, 400);
       }
       const houseName = String((houseRow as { name?: string }).name || house);
+
+      if (isManager && !sameHouse(houseName, requesterHouse)) {
+        return json({ error: "Solo puedes crear usuarios en tu casa" }, 403);
+      }
 
       const created = await admin.auth.admin.createUser({
         email,
@@ -137,6 +183,7 @@ Deno.serve(async (req) => {
         return json({ error: profileError.message }, 400);
       }
 
+      // Keep legacy users row for Jonathan password-view + sync
       await admin.from("users").upsert(
         { username, password, role, house: houseName },
         { onConflict: "username" },
@@ -150,7 +197,7 @@ Deno.serve(async (req) => {
           role: insertedProfile.role,
           house: insertedProfile.house,
           email,
-          password: "",
+          password: canViewPasswords ? password : "",
         },
       });
     }
@@ -158,8 +205,8 @@ Deno.serve(async (req) => {
     if (action === "update") {
       const id = String((body as { id?: string }).id || "").trim();
       const username = String((body as { username?: string }).username || "").trim();
-      const role = normalizeRole(String((body as { role?: string }).role || ""));
-      const house = String((body as { house?: string }).house || "").trim();
+      let role = normalizeRole(String((body as { role?: string }).role || ""));
+      let house = String((body as { house?: string }).house || "").trim();
       const password = String((body as { password?: string }).password || "").trim();
       const email = String((body as { email?: string }).email || "").trim().toLowerCase();
 
@@ -169,12 +216,21 @@ Deno.serve(async (req) => {
 
       const { data: oldProfile } = await admin
         .from("profiles")
-        .select("id, username, role")
+        .select("id, username, role, house")
         .eq("id", id)
         .single();
       if (!oldProfile) return json({ error: "Usuario no encontrado" }, 404);
       if (isOwnerRole(String((oldProfile as { role?: string }).role || ""))) {
         return json({ error: "No se puede editar al dueño" }, 400);
+      }
+
+      if (isManager) {
+        house = requesterHouse;
+        role = "empleado";
+        const oldHouse = String((oldProfile as { house?: string }).house || "");
+        if (!sameHouse(oldHouse, requesterHouse)) {
+          return json({ error: "Solo puedes editar usuarios de tu casa" }, 403);
+        }
       }
 
       const { data: houseRow } = await admin
@@ -201,6 +257,10 @@ Deno.serve(async (req) => {
         if (pwdUpdate.error) {
           return json({ error: `Perfil actualizado, pero la contraseña falló: ${pwdUpdate.error.message}` }, 400);
         }
+        await admin.from("users").upsert(
+          { username, password, role, house: houseName },
+          { onConflict: "username" },
+        );
       }
       if (email) {
         const emailUpdate = await admin.auth.admin.updateUserById(id, { email });
@@ -229,7 +289,7 @@ Deno.serve(async (req) => {
           role: updatedProfile.role,
           house: updatedProfile.house,
           email,
-          password: "",
+          password: canViewPasswords && password ? password : (canViewPasswords ? "" : ""),
         },
       });
     }
@@ -241,12 +301,21 @@ Deno.serve(async (req) => {
 
       const { data: targetProfile, error: targetError } = await admin
         .from("profiles")
-        .select("id, role, username")
+        .select("id, role, username, house")
         .eq("id", id)
         .single();
       if (targetError || !targetProfile) return json({ error: "Usuario no encontrado" }, 404);
       if (isOwnerRole(String((targetProfile as { role?: string }).role || ""))) {
         return json({ error: "No se puede eliminar al dueño" }, 400);
+      }
+      if (isManager) {
+        const th = String((targetProfile as { house?: string }).house || "");
+        if (!sameHouse(th, requesterHouse)) {
+          return json({ error: "Solo puedes eliminar usuarios de tu casa" }, 403);
+        }
+        if (isManagerRole(String((targetProfile as { role?: string }).role || ""))) {
+          return json({ error: "No puedes eliminar a otro manager" }, 403);
+        }
       }
 
       const username = String((targetProfile as { username?: string }).username || "");

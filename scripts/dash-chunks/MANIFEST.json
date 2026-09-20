@@ -1,0 +1,47 @@
+{
+  "file": "components/Dashboard.tsx",
+  "sha256": "796aeaf363baf54c451b6831140bb61548e0b5541f4db9824dc8eb025f770099",
+  "len": 318982,
+  "chunks": [
+    {
+      "name": "c00.txt",
+      "sha256": "aaf1ac4ee08c308a831e4de989323358d03d14dce79affc13b17403031e56f1e",
+      "len": 40000
+    },
+    {
+      "name": "c01.txt",
+      "sha256": "1c04c372d718ef8607ed05a5283b72a707e65d6c3c082cc5a2f13bf7e3f66e0f",
+      "len": 40000
+    },
+    {
+      "name": "c02.txt",
+      "sha256": "09031c82a6ee33914ba9a7d0af743509a7d2c9c6ed4007cbe5fe375c8796dd9d",
+      "len": 40000
+    },
+    {
+      "name": "c03.txt",
+      "sha256": "2189fec9fdebd27c358f2416eb8ad5e57eb630877e7890c1070eb27b49a2cacb",
+      "len": 40000
+    },
+    {
+      "name": "c04.txt",
+      "sha256": "08ae60b121769725a10010e30e9bf1c285469d523496a964b0cb4ed9f3e35fa2",
+      "len": 40000
+    },
+    {
+      "name": "c05.txt",
+      "sha256": "2db89f51b4544635d544e0520c49f53c26f1a019bb185b93c31ca85638aa5296",
+      "len": 40000
+    },
+    {
+      "name": "c06.txt",
+      "sha256": "be5f489a10cad462c2c18a1d3853d3348b82233143d96e8f40f188b4f8b0a44a",
+      "len": 40000
+    },
+    {
+      "name": "c07.txt",
+      "sha256": "731f60a3d2ec0fe63099cde17e6730aff026b01a61bd60414c9b4ea0a8be98f5",
+      "len": 38982
+    }
+  ]
+}

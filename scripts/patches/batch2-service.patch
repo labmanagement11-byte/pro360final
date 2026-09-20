@@ -1,0 +1,15 @@
+diff --git a/utils/supabaseRealtimeService.ts b/utils/supabaseRealtimeService.ts
+index 94379d6..97bed38 100644
+--- a/utils/supabaseRealtimeService.ts
++++ b/utils/supabaseRealtimeService.ts
+@@ -1819,7 +1819,8 @@ export async function createHouse(house: any) {
+    console.error('Error creating house: empty name');
+    return null;
+  }
+-  // New house starts EMPTY: do NOT copy checklist or inventory from other houses.
++  // New house starts EMPTY with same UI modules (checklist zones, inventory, shopping, reminders).
++  // Do NOT copy checklist/inventory/shopping/reminders from other houses — manager fills from scratch.
+  const { data, error } = await (supabase
+    .from('houses') as any)
+    .insert([{
+

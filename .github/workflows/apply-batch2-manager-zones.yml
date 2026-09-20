@@ -1,0 +1,31 @@
+name: Apply batch2 manager zones users reminders
+on:
+  push:
+    branches: [fix/manager-zones-users-reminders]
+    paths:
+      - 'scripts/batch2-*.diff'
+      - 'scripts/batch2-*.diff.hex*'
+      - 'scripts/batch2-DIFFS.json'
+      - 'scripts/apply-batch2-full-diffs.py'
+      - '.github/workflows/apply-batch2-manager-zones.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/manager-zones-users-reminders
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: python3 scripts/apply-batch2-full-diffs.py
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/Dashboard.tsx components/Users.tsx utils/supabaseRealtimeService.ts supabase/functions/admin-users/index.ts
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Managers: zones accordion, shopping/reminders, Auth users, pre-due alerts"
+          git push origin HEAD:fix/manager-zones-users-reminders

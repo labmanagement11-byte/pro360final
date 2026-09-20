@@ -1,0 +1,65 @@
+{
+  "Users.diff": {
+    "sha256": "da3e1c36295dd900b12c531c162c561b277c1c1e4de98dd11bb1e936f3f87db4",
+    "len": 11039,
+    "parts": [
+      {
+        "name": "Users.diff.p00",
+        "sha256": "66124d99c164e90a7240d0c67df6ec03123438be3bfabf77fb3f1b199bb63517",
+        "len": 8000
+      },
+      {
+        "name": "Users.diff.p01",
+        "sha256": "3f872e04687d7970916ef3b3ee4e73e9ffdd397d4c44d18c8e2d9693fe394551",
+        "len": 3039
+      }
+    ],
+    "target": "components/Users.tsx"
+  },
+  "admin-users.diff": {
+    "sha256": "8ac34a8fa62c4702ad9fac5bed38c7cce1b33f3458170438f3575d6d09aae0b4",
+    "len": 9484,
+    "parts": [
+      {
+        "name": "admin-users.diff.p00",
+        "sha256": "004f66977078e6a0560c9977eec057c2102c09ec1378f2d564dbc76199d7d07a",
+        "len": 8000
+      },
+      {
+        "name": "admin-users.diff.p01",
+        "sha256": "29c15c54b5362fea9fbc1282cf28a1bbac14a86857f187cf36a840db01822214",
+        "len": 1484
+      }
+    ],
+    "target": "supabase/functions/admin-users/index.ts"
+  },
+  "Dashboard.diff": {
+    "sha256": "1fa13ed34c784259fc53b09e681210dc7be2544f8c5ec43dceadf1e00e2d47d7",
+    "len": 13104,
+    "parts": [
+      {
+        "name": "Dashboard.diff.p00",
+        "sha256": "6c3182715096532c6a5c59d23f102a4f8a93347014f968778758cc4fd93acd64",
+        "len": 8000
+      },
+      {
+        "name": "Dashboard.diff.p01",
+        "sha256": "dcb54e327d00ebc2d5190e82f6be2822eb223d898e1aecb10687fecd4c23afba",
+        "len": 5104
+      }
+    ],
+    "target": "components/Dashboard.tsx"
+  },
+  "service.diff": {
+    "sha256": "58527c75f2eed92b679e6fc00b42ac645ed34053b09e0c6c78833e4541c8f143",
+    "len": 716,
+    "parts": [
+      {
+        "name": "service.diff.p00",
+        "sha256": "58527c75f2eed92b679e6fc00b42ac645ed34053b09e0c6c78833e4541c8f143",
+        "len": 716
+      }
+    ],
+    "target": "utils/supabaseRealtimeService.ts"
+  }
+}
