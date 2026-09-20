@@ -1,12 +1,15 @@
 name: Apply reminders fix
+
 on:
   push:
     paths:
       - 'scripts/reminders-fix/**'
       - '.github/workflows/apply-reminders-fix.yml'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   apply:
     runs-on: ubuntu-latest
@@ -19,16 +22,14 @@ jobs:
           python3 scripts/reminders-fix/patch_dashboard.py || true
           python3 scripts/reminders-fix/patch_checklist_accordion.py || true
           python3 scripts/reminders-fix/fix_showReminders_order.py
-          # verify order
           python3 - <<'PY'
-from pathlib import Path
-t=Path('components/Dashboard.tsx').read_text()
-d=t.index('const showReminders = canManageReminders')
-a=t.index('Alertas de recordatorios vencidos')
-assert d < a, (d,a)
-print('order ok')
-PY
-          grep -q "from('reminders')" utils/supabaseRealtimeService.ts || grep -q 'from("reminders")' utils/supabaseRealtimeService.ts || true
+          from pathlib import Path
+          t = Path('components/Dashboard.tsx').read_text()
+          d = t.index('const showReminders = canManageReminders')
+          a = t.index('Alertas de recordatorios vencidos')
+          assert d < a, (d, a)
+          print('order ok')
+          PY
           grep -q 'canManageReminders' components/Dashboard.tsx
           grep -q 'cl-admin-zones' components/Dashboard.tsx
       - name: Commit
@@ -36,7 +37,10 @@ PY
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add utils/supabaseRealtimeService.ts components/Dashboard.tsx || true
-          if git diff --cached --quiet; then echo No changes; exit 0; fi
+          git add components/Dashboard.tsx utils/supabaseRealtimeService.ts || true
+          if git diff --cached --quiet; then
+            echo No changes
+            exit 0
+          fi
           git commit -m "Fix showReminders use-before-declare for Vercel build"
           git push
