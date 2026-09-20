@@ -1,13 +1,12 @@
-name: Apply P1 checklist/login/users fixes
+name: Apply P1 fixes
 on:
+  workflow_dispatch:
   push:
     branches: [fix/p1-checklist-login-users]
     paths:
+      - 'scripts/bootstrap-apply-p1.py'
       - 'scripts/p1-patches/**'
-      - 'scripts/apply-p1-fixes.py'
-      - 'scripts/assemble-p1-diffs.py'
       - '.github/workflows/apply-p1-fixes.yml'
-  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -18,18 +17,13 @@ jobs:
         with:
           ref: fix/p1-checklist-login-users
           fetch-depth: 0
-      - name: Assemble diffs from hex
-        run: python3 scripts/assemble-p1-diffs.py
-      - name: Apply patches
-        run: python3 scripts/apply-p1-fixes.py
-      - name: Commit and push if changed
+      - name: Bootstrap and apply P1
+        run: python3 scripts/bootstrap-apply-p1.py
+      - name: Commit and push
         run: |
           git config user.name "labmanagement11-byte"
           git config user.email "labmanagement1.1@gmail.com"
-          git add components/Dashboard.tsx components/Login.tsx components/Login.css components/Users.tsx utils/supabaseRealtimeService.ts scripts/p1-patches/*.diff
-          if git diff --staged --quiet; then
-            echo "No file changes after apply (maybe already applied)."
-            exit 0
-          fi
+          git add components/Dashboard.tsx components/Login.tsx components/Login.css components/Users.tsx utils/supabaseRealtimeService.ts || true
+          if git diff --staged --quiet; then echo none; exit 0; fi
           git commit -m "Apply P1: checklist delete, login errors, manager Usuarios, inventory red gate"
           git push origin HEAD:fix/p1-checklist-login-users
