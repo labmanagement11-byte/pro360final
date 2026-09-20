@@ -2226,7 +2226,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [users]);
 
-  const extraTasksForUser = tasksList.filter(t => t.assignedTo === user.username && t.type === 'Tarea extra' && !t.completed);
+  const extraTasksForUser = (Array.isArray(tasksList) ? tasksList : []).filter(t => (t.assignedTo === user.username || t.assigned_to === user.username) && t.type === 'Tarea extra' && !t.completed);
   
   // Debug: mostrar tareas que se cargan y el filtro
   useEffect(() => {
@@ -2263,9 +2263,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Suscribirse a cambios en tiempo real de tareas
     let tasksSubscription: any;
     try {
-      tasksSubscription = realtimeService.subscribeToTasks(houseName, (tasks: any) => {
-        console.log(`⚡ Tareas actualizadas (realtime) para ${houseName}:`, tasks);
-        setTasksList(tasks || []);
+      tasksSubscription = realtimeService.subscribeToTasks(houseName, (payload: any) => {
+        console.log(`⚡ Tareas actualizadas (realtime) para ${houseName}:`, payload);
+        if (payload?.eventType === 'INSERT' && payload.new) {
+          setTasksList(prev => {
+            if (!Array.isArray(prev)) return [payload.new];
+            if (prev.some(t => t.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+        } else if (payload?.eventType === 'UPDATE' && payload.new) {
+          setTasksList(prev => Array.isArray(prev)
+            ? prev.map(t => t.id === payload.new.id ? payload.new : t)
+            : [payload.new]);
+        } else if (payload?.eventType === 'DELETE' && payload.old) {
+          setTasksList(prev => Array.isArray(prev)
+            ? prev.filter(t => t.id !== payload.old.id)
+            : []);
+        }
       });
     } catch (error) {
       console.error(`❌ Error suscribiendo a tareas para ${houseName}:`, error);
@@ -5490,36 +5504,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <button
                                 className="dashboard-btn main"
                                 onClick={async () => {
-                                  const assignmentId = await resolveAssignmentIdForTask(task);
-                                  if (!assignmentId) return;
-                                  
-                                  const now = new Date().toISOString();
-                                  const { error } = await (supabase as any)
-                                    .from('calendar_assignments')
-                                    .update({
-                                      completed: true,
-                                      completed_at: now,
-                                      completed_by: user.username,
-                                      updated_at: now
-                                    })
-                                    .eq('id', assignmentId);
-                                  
-                                  if (error) {
-                                    console.error('❌ Error marcando tarea completada:', error);
+                                  // Extra tasks live in `tasks`, not calendar_assignments
+                                  const assignee = task.assignedTo || task.assigned_to || '';
+                                  if (assignee !== user.username) {
+                                    console.error('❌ Solo puedes completar tus propias tareas extra');
                                     return;
                                   }
-                                  
-                                  // Actualizar estado local
-                                  setCalendarAssignments(prev => prev.map(t => 
-                                    t.id === task.id 
-                                      ? { ...t, completed: true, completed_at: now, completed_by: user.username } 
-                                      : t
+
+                                  const updated = await realtimeService.updateTask(task.id, { completed: true });
+                                  if (!updated) {
+                                    console.error('❌ Error marcando tarea extra como completada');
+                                    alert('No se pudo completar la tarea. Intenta de nuevo.');
+                                    return;
+                                  }
+
+                                  setTasksList(prev => prev.map(t =>
+                                    t.id === task.id ? { ...t, ...updated, completed: true } : t
                                   ));
-                                  
-                                  console.log(`✅ [AssignedTasksCard] Tarea ${task.id} marcada como completada por ${user.username}`);
+
+                                  console.log(`✅ Tarea extra ${task.id} completada por ${user.username}`);
                                 }}
                               >
-                                ✅ Marcar Completada
+                                ✅ Completar
                               </button>
                             )}
                           </div>

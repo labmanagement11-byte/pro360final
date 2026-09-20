@@ -1,0 +1,33 @@
+name: Apply extra-task Completar fix
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/extra-task-completar]
+    paths:
+      - scripts/apply-extra-task-completar-fix.py
+      - .github/workflows/apply-extra-task-completar-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/extra-task-completar
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply patch
+        run: python3 scripts/apply-extra-task-completar-fix.py
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/Dashboard.tsx
+          if git diff --cached --quiet; then
+            echo "No Dashboard changes to commit"
+            exit 0
+          fi
+          git commit -m "Fix Completar for tarea extra: update tasks table not calendar_assignments"
+          git push origin HEAD:fix/extra-task-completar
