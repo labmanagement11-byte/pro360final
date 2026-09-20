@@ -1,0 +1,26 @@
+{
+  "batch2-Users.diff": {
+    "sha256": "da3e1c36295dd900b12c531c162c561b277c1c1e4de98dd11bb1e936f3f87db4",
+    "len": 11039,
+    "target": "components/Users.tsx",
+    "marker": "canViewPasswords"
+  },
+  "batch2-admin-users.diff": {
+    "sha256": "8ac34a8fa62c4702ad9fac5bed38c7cce1b33f3458170438f3575d6d09aae0b4",
+    "len": 9484,
+    "target": "supabase/functions/admin-users/index.ts",
+    "marker": "isManagerRole"
+  },
+  "batch2-Dashboard.diff": {
+    "sha256": "1fa13ed34c784259fc53b09e681210dc7be2544f8c5ec43dceadf1e00e2d47d7",
+    "len": 13104,
+    "target": "components/Dashboard.tsx",
+    "marker": "inferChecklistTemplateType"
+  },
+  "batch2-service.diff": {
+    "sha256": "58527c75f2eed92b679e6fc00b42ac645ed34053b09e0c6c78833e4541c8f143",
+    "len": 716,
+    "target": "utils/supabaseRealtimeService.ts",
+    "marker": "manager fills from scratch"
+  }
+}

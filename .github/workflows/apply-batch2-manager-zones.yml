@@ -3,8 +3,9 @@ on:
   push:
     branches: [fix/manager-zones-users-reminders]
     paths:
-      - 'scripts/source-diffs/**'
-      - 'scripts/apply-batch2-diffs.py'
+      - 'scripts/batch2-*.diff'
+      - 'scripts/batch2-DIFFS.json'
+      - 'scripts/apply-batch2-full-diffs.py'
       - '.github/workflows/apply-batch2-manager-zones.yml'
   workflow_dispatch:
 permissions:
@@ -17,8 +18,7 @@ jobs:
         with:
           ref: fix/manager-zones-users-reminders
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Apply verified source diffs
-        run: python3 scripts/apply-batch2-diffs.py
+      - run: python3 scripts/apply-batch2-full-diffs.py
       - name: Commit
         run: |
           set -euo pipefail
