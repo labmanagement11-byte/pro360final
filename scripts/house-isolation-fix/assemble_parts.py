@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
-"""Assemble patch scripts from single .b64 (wrapped ok), then apply_all."""
-import base64, subprocess, sys
+import json, subprocess, sys
 from pathlib import Path
-
 root = Path(__file__).resolve().parent
-SINGLE = [
-  'patch_dashboard_pending_cards.py',
-  'patch_dashboard_no_autoseed.py',
-  'patch_assigned_tasks_house_checklist.py',
-  'patch_checklist_house.py',
-  'patch_calendar.py',
-  'patch_service_house_isolation.py',
-]
-for name in SINGLE:
-    b64path = root / f'{name}.b64'
-    if b64path.exists() and b64path.stat().st_size > 20:
-        raw = ''.join(b64path.read_text().split())
-        (root / name).write_bytes(base64.b64decode(raw))
-        print('assembled single-b64', name, (root / name).stat().st_size)
-
+idx = root / 'CONCAT_INDEX.json'
+if idx.exists():
+    for item in json.loads(idx.read_text()):
+        name, n = item['name'], item['n']
+        data = ''.join((root / f'{name}.c{i:02d}').read_text() for i in range(n))
+        (root / name).write_text(data)
+        print('concat', name, len(data))
 r = subprocess.run([sys.executable, str(root / 'apply_all.py')], cwd=str(root.parent.parent))
 sys.exit(r.returncode)
