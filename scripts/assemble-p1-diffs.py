@@ -3,20 +3,25 @@ from pathlib import Path
 import binascii
 import sys
 
-root = Path(__file__).resolve().parents[1] / "scripts" / "p1-patches"
+root = Path(__file__).resolve().parents[1]
+patches = root / "scripts" / "p1-patches"
 
-def assemble(name: str) -> None:
-    parts = sorted(root.glob(f"{name}.hex.p*"))
+def assemble_into(name: str, dest: Path, required: bool = True) -> None:
+    parts = sorted(patches.glob(f"{name}.hex.p*"))
     if not parts:
-        # plain diff already present
-        if (root / name).exists():
-            print(f"plain present: {name}")
+        if dest.exists() and dest.stat().st_size > 100:
+            print(f"plain present: {dest}")
             return
-        print(f"missing hex parts for {name}", file=sys.stderr)
-        sys.exit(1)
+        if required:
+            print(f"missing hex parts for {name}", file=sys.stderr)
+            sys.exit(1)
+        print(f"skip optional {name}")
+        return
     hx = "".join(p.read_text().strip() for p in parts)
-    (root / name).write_bytes(binascii.unhexlify(hx))
-    print(f"assembled {name} -> {(root / name).stat().st_size} bytes")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(binascii.unhexlify(hx))
+    print(f"assembled {name} -> {dest} ({dest.stat().st_size} bytes)")
 
-for name in ["login-users.diff", "service.diff", "dashboard.diff"]:
-    assemble(name)
+assemble_into("login-users.diff", patches / "login-users.diff", required=True)
+assemble_into("service.diff", patches / "service.diff", required=False)
+assemble_into("apply-p1-dashboard-inline.py", root / "scripts" / "apply-p1-dashboard-inline.py", required=True)
