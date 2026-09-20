@@ -2050,6 +2050,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   }, [checklistData]);
 
 
+  // Guardar mantenimiento de tareas en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard_task_maintenance', JSON.stringify(taskMaintenanceData));
+    }
+  }, [taskMaintenanceData]);
+
+  const isOwnerLike = user.role === 'owner' || user.role === 'dueno';
+  const canManageReminders = isOwnerLike || user.role === 'manager';
+  const showReminders = canManageReminders;
+
   // Alertas de recordatorios vencidos o próximos (3 días)
   useEffect(() => {
     if (!showReminders || !reminders?.length) return;
@@ -2112,16 +2123,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     } catch {}
   }, [reminders, showReminders, allowedHouseIdx, houses]);
 
-  // Guardar mantenimiento de tareas en localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboard_task_maintenance', JSON.stringify(taskMaintenanceData));
-    }
-  }, [taskMaintenanceData]);
-
-  const isOwnerLike = user.role === 'owner' || user.role === 'dueno';
-  const canManageReminders = isOwnerLike || user.role === 'manager';
-  const showReminders = canManageReminders;
 
   // Estado para casas dinámicas y usuarios sincronizados
   // Ensure all users have a username string
