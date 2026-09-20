@@ -1,0 +1,59 @@
+name: Apply house isolation + pending cards fix
+
+on:
+  push:
+    branches:
+      - fix/pending-cards-checklist-house
+    paths:
+      - 'scripts/house-isolation-fix/**'
+      - '.github/workflows/apply-house-isolation-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/fix/pending-cards-checklist-house'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/pending-cards-checklist-house
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply Python patches
+        run: |
+          set -euo pipefail
+          python3 scripts/house-isolation-fix/assemble_parts.py
+
+      - name: Commit patched sources
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            components/Login.tsx \
+            components/Login.css \
+            components/Dashboard.tsx \
+            components/Dashboard.css \
+            components/Checklist.tsx \
+            components/Calendar.tsx \
+            utils/supabaseRealtimeService.ts \
+            scripts/house-isolation-fix \
+            .github/workflows/apply-house-isolation-fix.yml || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "$(cat <<'EOF'
+          Fix pending cards, checklist house isolation, empty new houses, login password eye
+
+          - Login: show/hide password toggle (Spanish UI)
+          - Dashboard cards: red pending alert + counts
+          - Checklist CRUD stays on Supabase; no autoseed for new houses
+          - Calendar/Checklist/AssignedTasks: filter by assignment house only
+          - createHouse empty; inventory/checklist templates no cross-house defaults
+          EOF
+          )"
+          git push origin HEAD:fix/pending-cards-checklist-house

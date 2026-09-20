@@ -1,0 +1,33 @@
+('AssignedTasksCard log anchor missing')
+
+# Replace getSubtasks function
+old_gs = '''  function getSubtasks(type: string) {
+    if (type.toLowerCase().includes('profunda')) return LIMPIEZA_PROFUNDA;
+    if (type.toLowerCase().includes('regular')) return LIMPIEZA_REGULAR;
+    if (type.toLowerCase().includes('mantenimiento')) {
+      // Unir todas las secciones de MANTENIMIENTO en un solo objeto plano (sin duplicados)
+      const allSections = Object.keys(MANTENIMIENTO).filter(z => z !== 'RUTINA DE MANTENIMIENTO');
+      const result: { [zona: string]: string[] } = {};
+      allSections.forEach(zona => {
+        result[zona] = MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO];
+      });
+      return result;
+    }
+    return null;
+  }'''
+
+new_gs = '''  function buildSubtasksFromHouseChecklist(type: string): { [zona: string]: string[] } | null {
+    const typeLower = String(type || '').toLowerCase();
+    const isDeep = typeLower.includes('profund');
+    const isMaint = typeLower.includes('manten');
+    const rows = houseChecklistRows || [];
+    if (!rows.length) {
+      // Casa sin checklist propio: vacío (no mezclar globals de otras casas)
+      return {};
+    }
+    const result: { [zona: string]: string[] } = {};
+    rows.forEach((row: any) => {
+      const room = String(row.room || 'GENERAL').trim() || 'GENERAL';
+      const assigned = String(row.assigned_to || '').toLowerCase();
+      const roomUp = room.toUpperCase();
+      const roomIsDeep = roomUp.includes('PROFUNDA') || r

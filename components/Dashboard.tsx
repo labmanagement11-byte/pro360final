@@ -26,6 +26,8 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
   const [expandedInventory, setExpandedInventory] = useState<Set<string>>(new Set());
   const [openAssignedZone, setOpenAssignedZone] = useState<string | null>(null);
   const [assignedView, setAssignedView] = useState<'pendiente' | 'hecho' | 'todo'>('pendiente');
+  const [houseChecklistRows, setHouseChecklistRows] = useState<any[]>([]);
+
   // Estados para inventario completo de la casa
   const [houseInventory, setHouseInventory] = useState<any[]>([]);
   const [houseInventoryExpanded, setHouseInventoryExpanded] = useState(false);
@@ -67,6 +69,46 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     };
   }, [user.house, user.house_id]);
 
+  // Cargar checklist SOLO de la casa del usuario/asignación (sin mezclar otras casas)
+  useEffect(() => {
+    const houseName = String(user.house || user.house_id || '').trim();
+    if (!houseName || houseName === 'all' || !supabase) {
+      setHouseChecklistRows([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('checklist')
+          .select('*')
+          .eq('house', houseName)
+          .order('id', { ascending: true });
+        if (cancelled) return;
+        if (error) {
+          console.error('[AssignedTasksCard] Error cargando checklist de casa:', error);
+          setHouseChecklistRows([]);
+          return;
+        }
+        const only = (data || []).filter((row: any) => String(row.house || '').trim() === houseName);
+        setHouseChecklistRows(only);
+      } catch (err) {
+        if (!cancelled) setHouseChecklistRows([]);
+      }
+    })();
+    const channel = (supabase as any)
+      .channel(`assigned-house-checklist-${houseName.replace(/\s+/g, '-')}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist', filter: `house=eq.${houseName}` }, async () => {
+        const { data } = await (supabase as any).from('checklist').select('*').eq('house', houseName).order('id', { ascending: true });
+        setHouseChecklistRows((data || []).filter((row: any) => String(row.house || '').trim() === houseName));
+      })
+      .subscribe();
+    return () => {
+      cancelled = true;
+      try { (supabase as any).removeChannel(channel); } catch {}
+    };
+  }, [user.house, user.house_id]);
+
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
     console.log('[AssignedTasksCard] Tareas asignadas recibidas:', assignedTasks);
@@ -92,11 +134,15 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       // Query usando columnas correctas (house y employee como texto)
       const houseFilter = user.house || user.house_id;
       console.log(`🏠 [Dashboard] Filtrando por casa: ${houseFilter} para ${user.username} (${user.role})`);
-      const { data, error } = await (supabase as any)
+      let assignQuery = (supabase as any)
         .from('calendar_assignments')
         .select('*')
-        .eq('house', houseFilter)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
+      // Never query house='all' — that mixes nothing useful; owner without house sees none here
+      if (houseFilter && houseFilter !== 'all') {
+        assignQuery = assignQuery.eq('house', houseFilter);
+      }
+      const { data, error } = await assignQuery;
       
       if (error) {
         console.error(`❌ [Dashboard] Error fetching assignments:`, error);
@@ -336,19 +382,40 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     };
   }, [user]);
 
-  function getSubtasks(type: string) {
-    if (type.toLowerCase().includes('profunda')) return LIMPIEZA_PROFUNDA;
-    if (type.toLowerCase().includes('regular')) return LIMPIEZA_REGULAR;
-    if (type.toLowerCase().includes('mantenimiento')) {
-      // Unir todas las secciones de MANTENIMIENTO en un solo objeto plano (sin duplicados)
-      const allSections = Object.keys(MANTENIMIENTO).filter(z => z !== 'RUTINA DE MANTENIMIENTO');
-      const result: { [zona: string]: string[] } = {};
-      allSections.forEach(zona => {
-        result[zona] = MANTENIMIENTO[zona as keyof typeof MANTENIMIENTO];
-      });
-      return result;
+  function buildSubtasksFromHouseChecklist(type: string): { [zona: string]: string[] } | null {
+    const typeLower = String(type || '').toLowerCase();
+    const isDeep = typeLower.includes('profund');
+    const isMaint = typeLower.includes('manten');
+    const rows = houseChecklistRows || [];
+    if (!rows.length) {
+      // Casa sin checklist propio: vacío (no mezclar globals de otras casas)
+      return {};
     }
-    return null;
+    const result: { [zona: string]: string[] } = {};
+    rows.forEach((row: any) => {
+      const room = String(row.room || 'GENERAL').trim() || 'GENERAL';
+      const assigned = String(row.assigned_to || '').toLowerCase();
+      const roomUp = room.toUpperCase();
+      const roomIsDeep = roomUp.includes('PROFUNDA') || roomUp === 'LIMPIEZA PROFUNDA';
+      const roomIsMaint = roomUp.includes('MANTEN') || ['ÁREAS VERDES','PISCINA Y AGUA','RUTINA DE MANTENIMIENTO','SISTEMAS ELÉCTRICOS'].includes(roomUp);
+      let include = false;
+      if (isMaint) include = assigned.includes('manten') || roomIsMaint;
+      else if (isDeep) include = assigned.includes('profund') || roomIsDeep;
+      else include = !assigned.includes('manten') && !assigned.includes('profund') && !roomIsDeep && !roomIsMaint;
+      if (!include) return;
+      if (!result[room]) result[room] = [];
+      result[room].push(String(row.item || ''));
+    });
+    return result;
+  }
+
+  function getSubtasks(type: string) {
+    // Prefer per-house checklist from Supabase
+    const fromHouse = buildSubtasksFromHouseChecklist(type);
+    if (fromHouse && Object.keys(fromHouse).length > 0) return fromHouse;
+    // Empty house => empty checklist (do not fall back to global hardcoded mix)
+    if ((houseChecklistRows || []).length === 0) return {};
+    return fromHouse;
   }
 
   // Guardar progreso de subtareas en Supabase (puedes mejorar esto usando una tabla aparte si lo deseas)
@@ -1814,28 +1881,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             const legacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
             setChecklistTemplatesSource('checklist');
             if (!legacy || legacy.length === 0) {
-              const seedTemplates = buildChecklistSeedTemplates(selectedHouse);
-              if (seedTemplates.length > 0) {
-                const createdLegacy = await realtimeService.createChecklistTemplatesLegacyBulk(
-                  seedTemplates.map(t => ({
-                    house: t.house,
-                    room: t.zone,
-                    item: t.task,
-                    assigned_to: t.task_type
-                  }))
-                );
-                if (!createdLegacy || createdLegacy.length === 0) {
-                  setChecklistTemplatesError('No se pudo crear la plantilla en Supabase. Revisa permisos RLS.');
-                  setChecklistTemplates([]);
-                } else {
-                  const refreshedLegacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
-                  setChecklistTemplatesError(null);
-                  setChecklistTemplates(dedupeChecklistTemplates(refreshedLegacy || []));
-                }
-              } else {
-                setChecklistTemplatesError(null);
-                setChecklistTemplates([]);
-              }
+              // Casa nueva / vacía: NO auto-copiar plantillas de otras casas ni seeds globales
+              setChecklistTemplatesError(null);
+              setChecklistTemplates([]);
             } else {
               setChecklistTemplatesError(null);
               setChecklistTemplates(dedupeChecklistTemplates(legacy || []));
@@ -1846,20 +1894,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             setChecklistTemplates([]);
           }
         } else if (!data || data.length === 0) {
-          // Auto-cargar plantilla por defecto en Supabase
-          const seedTemplates = buildChecklistSeedTemplates(selectedHouse);
-          if (seedTemplates.length > 0) {
-            const created = await realtimeService.createChecklistTemplatesBulk(seedTemplates);
-            if (!created || created.length === 0) {
-              setChecklistTemplatesError('No se pudo crear la plantilla en Supabase. Revisa permisos RLS.');
-              setChecklistTemplates([]);
-            } else {
-              const { data: refreshed } = await realtimeService.getChecklistTemplatesWithError(selectedHouse);
-              setChecklistTemplates(dedupeChecklistTemplates(refreshed || []));
-            }
-          } else {
-            setChecklistTemplates([]);
-          }
+          // Casa nueva: checklist vacío (admin agrega tareas manualmente). Sin seed/copia.
+          setChecklistTemplates([]);
           setChecklistTemplatesSource('checklist_templates');
         } else {
           setChecklistTemplatesSource('checklist_templates');
@@ -1934,17 +1970,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
 
         // Transformar datos de Supabase al formato esperado
         const checklistByZona: any = {};
-        
-        // Inicializar con zonas predefinidas
-        Object.keys(LIMPIEZA_REGULAR).forEach(zona => {
-          checklistByZona[zona] = {
-            type: 'regular',
-            tasks: LIMPIEZA_REGULAR[zona as keyof typeof LIMPIEZA_REGULAR].map((task: string) => ({
-              text: task,
-              completed: false
-            }))
-          };
-        });
+        // HOUSE_ISOLATION_EMPTY_INIT: no prefill from global templates (avoids mixing other houses)
+
         Object.keys(LIMPIEZA_PROFUNDA).forEach(zona => {
           checklistByZona[zona] = {
             type: 'profunda',
@@ -2312,7 +2339,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [shoppingHistoryFilterYear, setShoppingHistoryFilterYear] = useState('');
   const [shoppingHistoryFilterMonth, setShoppingHistoryFilterMonth] = useState('');
 
+  const pendingRemindersCount = (reminders || []).filter((r: any) => {
+    if (r.paid) return false;
+    const raw = r.due_date || r.due;
+    if (!raw) return false;
+    const due = new Date(raw);
+    if (Number.isNaN(due.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    const limit = new Date(today);
+    limit.setDate(limit.getDate() + 3);
+    return due <= limit;
+  }).length;
+
+  const pendingShoppingCount = (shoppingList || []).filter((i: any) => !i.is_purchased).length;
+  const pendingInventoryIssuesCount = (inventoryList || []).filter((i: any) => !!i.issue_type && !i.complete).length;
+  const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && (
+    user.role === 'empleado' ? t.assignedTo === user.username || t.assigned_to === user.username : true
+  )).length;
+  const pendingAssignmentsCount = (calendarAssignments || []).filter((a: any) => !a.completed).length;
+  const pendingCardCounts: Record<string, number> = {
+    shopping: pendingShoppingCount,
+    inventory: pendingInventoryIssuesCount,
+    reminders: pendingRemindersCount,
+    tasks: pendingTasksCount,
+    assignedTasks: pendingAssignmentsCount,
+    checklist: 0,
+    extraTasks: extraTasksForUser.length,
+  };
+
   const formatPurchaseAmount = (value: number | string | null | undefined) => {
+
     const amount = Number(value ?? 0);
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -2654,18 +2712,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             {/* Tarjeta personalizada para tareas asignadas (solo empleados) */}
             {user.role === 'empleado' && (
               <button
-                className="dashboard-card"
+                className={`dashboard-card${(pendingCardCounts.assignedTasks || 0) > 0 ? ' has-pending' : ''}`}
                 onClick={() => setSelectedModalCard('assignedTasks')}
                 aria-label="Tareas Asignadas"
               >
-                <span className="dashboard-card-title">Tareas Asignadas</span>
+                <span className="dashboard-card-title">
+                  Tareas Asignadas
+                  {(pendingCardCounts.assignedTasks || 0) > 0 && (
+                    <span className="dashboard-card-badge-pending">{pendingCardCounts.assignedTasks}</span>
+                  )}
+                </span>
                 <span className="dashboard-card-desc">Tareas de limpieza o mantenimiento asignadas por el manager</span>
               </button>
             )}
-            {cards.filter(card => card.show).map(card => (
+            {cards.filter(card => card.show).map(card => {
+              const pendingN = pendingCardCounts[card.key] || 0;
+              const showPending = pendingN > 0 && ['shopping', 'inventory', 'reminders', 'tasks', 'extraTasks'].includes(card.key);
+              return (
               <button
                 key={card.key}
-                className="dashboard-card"
+                className={`dashboard-card${showPending ? ' has-pending' : ''}`}
                 onClick={() => {
                   if (['calendar', 'shopping', 'reminders', 'checklist', 'inventory', 'tasks', 'extraTasks', 'completedJobs'].includes(card.key)) {
                     setSelectedModalCard(card.key);
@@ -2677,47 +2743,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               >
                 <span className="dashboard-card-title">
                   {card.title}
-                  {card.key === 'reminders' && reminders.filter((r: any) => {
-                    if (r.paid) return false;
-                    const raw = r.due_date || r.due;
-                    if (!raw) return false;
-                    const due = new Date(raw);
-                    if (Number.isNaN(due.getTime())) return false;
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    due.setHours(0,0,0,0);
-                    const limit = new Date(today);
-                    limit.setDate(limit.getDate() + 3);
-                    return due <= limit;
-                  }).length > 0 && (
-                    <span className="dashboard-card-badge" style={{
-                      marginLeft: '0.45rem',
-                      background: '#ef4444',
-                      color: '#fff',
-                      borderRadius: '999px',
-                      padding: '0.1rem 0.45rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                    }}>
-                      {reminders.filter((r: any) => {
-                        if (r.paid) return false;
-                        const raw = r.due_date || r.due;
-                        if (!raw) return false;
-                        const due = new Date(raw);
-                        if (Number.isNaN(due.getTime())) return false;
-                        const today = new Date();
-                        today.setHours(0,0,0,0);
-                        due.setHours(0,0,0,0);
-                        const limit = new Date(today);
-                        limit.setDate(limit.getDate() + 3);
-                        return due <= limit;
-                      }).length}
-                    </span>
+                  {showPending && (
+                    <span className="dashboard-card-badge-pending">{pendingN}</span>
                   )}
                 </span>
                 <span className="dashboard-card-desc">{card.desc}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
           <p className="dashboard-home-desc">Haz clic en una tarjeta para ver el módulo correspondiente.</p>
         </>

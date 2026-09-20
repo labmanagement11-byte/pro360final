@@ -401,3 +401,42 @@
     font-size: 1.2rem;
   }
 }
+
+
+/* PASSWORD SHOW/HIDE TOGGLE */
+.login-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.login-password-wrap input {
+  width: 100%;
+  padding-right: 3rem !important;
+}
+
+.login-password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.35rem;
+  border-radius: 0.5rem;
+  color: rgba(248, 250, 252, 0.9);
+  z-index: 2;
+}
+
+.login-password-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.login-password-toggle:focus-visible {
+  outline: 2px solid rgba(102, 126, 234, 0.8);
+  outline-offset: 2px;
+}

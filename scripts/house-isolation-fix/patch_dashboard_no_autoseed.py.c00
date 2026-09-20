@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""New houses stay EMPTY: do not auto-seed checklist templates when empty."""
+from pathlib import Path
+
+path = Path('components/Dashboard.tsx')
+text = path.read_text()
+
+# Block 1: legacy empty seed
+old1 = '''            if (!legacy || legacy.length === 0) {
+              const seedTemplates = buildChecklistSeedTemplates(selectedHouse);
+              if (seedTemplates.length > 0) {
+                const createdLegacy = await realtimeService.createChecklistTemplatesLegacyBulk(
+                  seedTemplates.map(t => ({
+                    house: t.house,
+                    room: t.zone,
+                    item: t.task,
+                    assigned_to: t.task_type
+                  }))
+                );
+                if (!createdLegacy || createdLegacy.length === 0) {
+                  setChecklistTemplatesError('No se pudo crear la plantilla en Supabase. Revisa permisos RLS.');
+                  setChecklistTemplates([]);
+                } else {
+                  const refreshedLegacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
+                  setChecklistTemplatesError(null);
+                  setChecklistTemplates(dedupeChecklistTemplates(refreshedLegacy || []));
+                }
+              } else {
+                setChecklistTemplatesError(null);
+                setChecklistTemplates([]);
+              }
+            } else {
+              setChecklistTemplatesError(null);
+              setChecklistTemplates(dedupeC

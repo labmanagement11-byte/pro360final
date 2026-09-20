@@ -1,0 +1,38 @@
+ror } = await (supabase as any)
+          .from('checklist')
+          .select('*')
+          .eq('house', houseName)
+          .order('id', { ascending: true });
+        if (cancelled) return;
+        if (error) {
+          console.error('[AssignedTasksCard] Error cargando checklist de casa:', error);
+          setHouseChecklistRows([]);
+          return;
+        }
+        const only = (data || []).filter((row: any) => String(row.house || '').trim() === houseName);
+        setHouseChecklistRows(only);
+      } catch (err) {
+        if (!cancelled) setHouseChecklistRows([]);
+      }
+    })();
+    const channel = (supabase as any)
+      .channel(`assigned-house-checklist-${houseName.replace(/\\s+/g, '-')}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist', filter: `house=eq.${houseName}` }, async () => {
+        const { data } = await (supabase as any).from('checklist').select('*').eq('house', houseName).order('id', { ascending: true });
+        setHouseChecklistRows((data || []).filter((row: any) => String(row.house || '').trim() === houseName));
+      })
+      .subscribe();
+    return () => {
+      cancelled = true;
+      try { (supabase as any).removeChannel(channel); } catch {}
+    };
+  }, [user.house, user.house_id]);
+
+  useEffect(() => {
+    console.log('[AssignedTasksCard] Usuario:', user);'''
+
+if load_anchor in text:
+    text = text.replace(load_anchor, load_block, 1)
+    print('house checklist loader inserted')
+else:
+    raise SystemExit

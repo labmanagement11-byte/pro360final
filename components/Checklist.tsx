@@ -67,8 +67,10 @@ function isOwnerRole(role?: string) {
   return value === 'owner' || value === 'dueno' || value === 'manager';
 }
 
-function houseForUser(user: User) {
-  if (!user.house || user.house === 'all') return 'EPIC D1';
+function houseForUser(user: User, fallbackHouse?: string | null) {
+  const explicit = String(fallbackHouse || '').trim();
+  if (explicit && explicit !== 'all') return explicit;
+  if (!user.house || user.house === 'all') return explicit || '';
   return user.house;
 }
 
@@ -95,8 +97,9 @@ function formatWhen(value?: string | null) {
   }
 }
 
-const Checklist = ({ user }: ChecklistProps) => {
-  const selectedHouse = houseForUser(user);
+const Checklist = ({ user, assignmentId }: ChecklistProps) => {
+  const [resolvedHouse, setResolvedHouse] = useState<string>(() => houseForUser(user));
+  const selectedHouse = resolvedHouse;
   const owner = isOwnerRole(user.role);
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +112,11 @@ const Checklist = ({ user }: ChecklistProps) => {
 
   const loadItems = useCallback(async () => {
     setLoading(true);
+    if (!selectedHouse || selectedHouse === 'all') {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await (checklistTable() as any)
       .select('*')
       .eq('house', selectedHouse)
@@ -118,7 +126,11 @@ const Checklist = ({ user }: ChecklistProps) => {
       console.error('Error cargando checklist:', error);
       setItems([]);
     } else {
-      setItems((data || []) as ChecklistItem[]);
+      // Defense in depth: never show another house's rows
+      const onlyThisHouse = ((data || []) as ChecklistItem[]).filter(
+        (row) => String(row.house || '').trim() === selectedHouse
+      );
+      setItems(onlyThisHouse);
     }
     setLoading(false);
   }, [selectedHouse]);
@@ -126,10 +138,37 @@ const Checklist = ({ user }: ChecklistProps) => {
   useEffect(() => {
     const loadAssignment = async () => {
       if (!supabase) return;
+
+      // CRITICAL: if assignmentId is provided, resolve THAT assignment's house only
+      if (assignmentId != null && assignmentId !== '') {
+        const { data: byId } = await (supabase as any)
+          .from('calendar_assignments')
+          .select('*')
+          .eq('id', assignmentId)
+          .maybeSingle();
+        if (byId) {
+          const houseName = String(byId.house || '').trim();
+          if (houseName) setResolvedHouse(houseName);
+          setActiveAssignment(byId);
+          const type = String(byId.type || '');
+          setAssignmentType(type || null);
+          if (type) setFilter(assignmentKind(type));
+          return;
+        }
+      }
+
+      const house = houseForUser(user, resolvedHouse);
+      if (!house) {
+        setActiveAssignment(null);
+        setAssignmentType(null);
+        return;
+      }
+      if (house !== resolvedHouse) setResolvedHouse(house);
+
       let query = (supabase as any)
         .from('calendar_assignments')
         .select('*')
-        .eq('house', selectedHouse)
+        .eq('house', house)
         .eq('completed', false)
         .order('date', { ascending: false });
       if (user.role === 'empleado') {
@@ -145,7 +184,7 @@ const Checklist = ({ user }: ChecklistProps) => {
     loadAssignment();
     if (!supabase) return;
     const channel = supabase
-      .channel(`assignments-live-${selectedHouse}-${user.username}`)
+      .channel(`assignments-live-${resolvedHouse || 'none'}-${user.username}-${assignmentId || 'none'}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -157,7 +196,7 @@ const Checklist = ({ user }: ChecklistProps) => {
     return () => {
       channel.unsubscribe();
     };
-  }, [user.username, user.role, selectedHouse]);
+  }, [user.username, user.role, user.house, assignmentId]);
 
   useEffect(() => {
     loadItems();
@@ -294,7 +333,7 @@ const Checklist = ({ user }: ChecklistProps) => {
       <header className="cl-head">
         <div>
           <h2 className="ultra-checklist-title">Checklist</h2>
-          <p className="cl-sub">{selectedHouse}</p>
+          <p className="cl-sub">{selectedHouse || 'Sin casa'}</p>
         </div>
         <span className="checklist-live">En vivo</span>
       </header>

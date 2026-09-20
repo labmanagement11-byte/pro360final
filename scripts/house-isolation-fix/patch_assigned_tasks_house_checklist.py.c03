@@ -1,0 +1,33 @@
+oomUp === 'LIMPIEZA PROFUNDA';
+      const roomIsMaint = roomUp.includes('MANTEN') || ['ÁREAS VERDES','PISCINA Y AGUA','RUTINA DE MANTENIMIENTO','SISTEMAS ELÉCTRICOS'].includes(roomUp);
+      let include = false;
+      if (isMaint) include = assigned.includes('manten') || roomIsMaint;
+      else if (isDeep) include = assigned.includes('profund') || roomIsDeep;
+      else include = !assigned.includes('manten') && !assigned.includes('profund') && !roomIsDeep && !roomIsMaint;
+      if (!include) return;
+      if (!result[room]) result[room] = [];
+      result[room].push(String(row.item || ''));
+    });
+    return result;
+  }
+
+  function getSubtasks(type: string) {
+    // Prefer per-house checklist from Supabase
+    const fromHouse = buildSubtasksFromHouseChecklist(type);
+    if (fromHouse && Object.keys(fromHouse).length > 0) return fromHouse;
+    // Empty house => empty checklist (do not fall back to global hardcoded mix)
+    if ((houseChecklistRows || []).length === 0) return {};
+    return fromHouse;
+  }'''
+
+if old_gs in text:
+    text = text.replace(old_gs, new_gs, 1)
+    print('getSubtasks patched')
+else:
+    raise SystemExit('getSubtasks not found')
+
+# Fix house filter for owner/manager with house=all — use selected house from parent if available
+# In fetchAssignedTasks:
+old_filter = '''      const houseFilter = user.house || user.house_id;
+      console.log(`🏠 [Dashboard] Filtrando por casa: ${houseFilter} para ${user.username} (${user.role})`);
+      const { data, error 

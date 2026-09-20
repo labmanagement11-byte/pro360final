@@ -48,6 +48,7 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
   // Modal para mostrar checklist de asignación seleccionada
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+  const [selectedAssignmentHouse, setSelectedAssignmentHouse] = useState<string>('');
 
   // Cargar eventos desde Supabase
   const fetchEvents = async (house: string = 'EPIC D1') => {
@@ -214,7 +215,7 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
               <span className="calendar-event-icon"><FaBoxOpen /></span>
               <span className="calendar-event-inventory">{ev.inventory}</span>
             </div>
-            <button className="calendar-btn main" onClick={() => { setSelectedAssignmentId(ev.id!); setShowChecklistModal(true); }}>Ver Checklist</button>
+            <button className="calendar-btn main" onClick={() => { setSelectedAssignmentId(ev.id!); setSelectedAssignmentHouse(String(ev.house || selectedHouse || '')); setShowChecklistModal(true); }}>Ver Checklist</button>
             {canEdit && <button className="calendar-btn danger" onClick={() => deleteEvent(ev.id!)} title="Eliminar"><FaTrash /></button>}
           </div>
         ))}
@@ -223,7 +224,7 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
           <div className="calendar-modal-overlay" style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(0,0,0,0.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
             <div className="calendar-modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'1rem',minWidth:'350px',maxWidth:'90vw',maxHeight:'90vh',overflowY:'auto',position:'relative'}}>
               <button style={{position:'absolute',top:10,right:10,fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>setShowChecklistModal(false)}>✕</button>
-              <Checklist user={{...user, password: user.password ?? ''}} assignmentId={selectedAssignmentId} />
+              <Checklist user={{...user, password: user.password ?? '', house: selectedAssignmentHouse || selectedHouse || user.house}} assignmentId={selectedAssignmentId ?? undefined} />
             </div>
           </div>
         )}
