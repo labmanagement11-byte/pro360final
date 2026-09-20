@@ -916,9 +916,9 @@ const cardStyles = {
 
 // Usuarios por defecto para la casa HYNTIBA2 APTO 406
 const defaultUsers: User[] = [
-  { username: 'Carlina', password: 'reyes123', role: 'empleado', house: 'HYNTIBA2 APTO 406' },
-  { username: 'Victor', password: 'peralta123', role: 'empleado', house: 'HYNTIBA2 APTO 406' },
-  { username: 'Alejandra', password: 'vela123', role: 'manager', house: 'HYNTIBA2 APTO 406' },
+  { username: 'Carlina', password: '', role: 'empleado', house: 'HYNTIBA2 APTO 406' },
+  { username: 'Victor', password: '', role: 'empleado', house: 'HYNTIBA2 APTO 406' },
+  { username: 'Alejandra', password: '', role: 'manager', house: 'HYNTIBA2 APTO 406' },
 ];
 
 const defaultReminders = [
@@ -1211,9 +1211,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   });
   const CHECKLIST_TEMPLATE_ROOM_ORDER = [
     'LIMPIEZA GENERAL',
+    'GENERAL',
     'HABITACIÓN 1',
     'HABITACIÓN 2',
     'HABITACIONES',
+    'ÁREA DE LA CAMA',
+    'ÁREA DE TV Y SALA',
     'SALA / COMEDOR',
     'SALA',
     'COMEDOR',
@@ -1222,6 +1225,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     'BAÑO 2',
     'BAÑO 3',
     'BAÑOS',
+    'BAÑO',
     'ZONA DE LAVADO',
     'TERRAZA',
     'ÁREA DE BBQ',
@@ -1231,7 +1235,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     'PISCINA Y AGUA',
     'RUTINA DE MANTENIMIENTO',
     'SISTEMAS ELÉCTRICOS',
+    'MANTENIMIENTO – ÁREA DE LA CAMA',
+    'MANTENIMIENTO – ÁREA DE TV Y SALA',
+    'MANTENIMIENTO – COCINA',
+    'MANTENIMIENTO – BAÑO Y GENERAL',
   ];
+
+  const inferChecklistTemplateType = (item: any): string => {
+    const explicit = String(item?.task_type || item?.assigned_to || '').trim();
+    if (explicit) return explicit;
+    const room = String(item?.zone || item?.room || '').trim().toUpperCase();
+    if (room.includes('PROFUNDA') || room === 'LIMPIEZA PROFUNDA') return 'Limpieza profunda';
+    if (
+      room.includes('MANTEN') ||
+      ['ÁREAS VERDES', 'PISCINA Y AGUA', 'RUTINA DE MANTENIMIENTO', 'SISTEMAS ELÉCTRICOS'].includes(room)
+    ) {
+      return 'Mantenimiento';
+    }
+    return 'Limpieza regular';
+  };
 
   // Casas y selección de casa
   // IMPORTANTE: Limpiamos localStorage de casas para forzar que cargue desde Supabase
@@ -1247,7 +1269,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // Estos valores serán reemplazados por getHouses() tan pronto cargue desde Supabase
     return [
       { name: 'EPIC D1', tasks: [], inventory: [], users: [] },
-      { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] }
+      { name: 'HYNTIBA2 APTO 406', tasks: [], inventory: [], users: [] },
+      { name: 'TORRE MAGNA PI', tasks: [], inventory: [], users: [] }
     ];
   });
   const isJonathanUser = String((user as any)?.username || '').toLowerCase() === 'jonathan'
@@ -1613,9 +1636,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [allowedHouseIdx, houses]);
 
-  // Cargar recordatorios desde Supabase con suscripción en tiempo real
+  // Cargar recordatorios desde Supabase (managers: siempre su casa)
   useEffect(() => {
-    const selectedHouse = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
+    const selectedHouse = (isRestrictedUser && user.house && user.house !== 'all')
+      ? user.house
+      : (houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406');
     
     const loadReminders = async () => {
       try {
@@ -2130,14 +2155,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const canManageReminders = isOwnerLike || user.role === 'manager';
   const showReminders = canManageReminders;
 
-  // Alertas de recordatorios vencidos o próximos (3 días)
+  // Alertas de recordatorios vencidos o próximos (7 días antes del vencimiento)
   useEffect(() => {
     if (!showReminders || !reminders?.length) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const soonLimit = new Date(today);
-    soonLimit.setDate(soonLimit.getDate() + 3);
+    soonLimit.setDate(soonLimit.getDate() + 7);
 
     const urgent = reminders.filter((r: any) => {
       if (r.paid) return false;
@@ -2176,7 +2201,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       if (typeof window !== 'undefined') localStorage.setItem(storageKey, msg);
     } catch {}
 
-    addRealtimeNotification(msg, overdue.length ? 'warning' : 'info');
+    addRealtimeNotification(msg, 'warning');
 
     try {
       if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -2353,8 +2378,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'users',
       title: 'Usuarios',
-      desc: 'Administra roles: dueño, manager, empleado.',
-      show: user.role === 'owner',
+      desc: 'Administra empleados de tu casa (Auth + perfiles). Solo Jonathan ve contraseñas.',
+      show: user.role === 'owner' || user.role === 'manager' || user.role === 'dueno',
     },
     {
       key: 'completedJobs',
@@ -2391,7 +2416,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     today.setHours(0, 0, 0, 0);
     due.setHours(0, 0, 0, 0);
     const limit = new Date(today);
-    limit.setDate(limit.getDate() + 3);
+    limit.setDate(limit.getDate() + 7);
     return due <= limit;
   }).length;
 
@@ -2492,9 +2517,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     setEditPurchaseAmount({ itemId: '', amount: '' });
   };
 
-  // Cargar lista de compras desde Supabase
+  // Cargar lista de compras desde Supabase (managers: siempre su casa)
   useEffect(() => {
-    const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+    const selectedHouse = (isRestrictedUser && user.house && user.house !== 'all')
+      ? user.house
+      : (houses[allowedHouseIdx]?.name || 'EPIC D1');
     const loadShopping = async () => {
       setLoadingShopping(true);
       const pending = await realtimeService.getShoppingList(selectedHouse, false);
@@ -3206,7 +3233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           <div className="dashboard-selected-house-info">
             <strong>Casa seleccionada:</strong> {houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name}
             <div className="dashboard-selected-house-desc">
-              Cada casa tiene su propia lista de tareas e inventario.
+              Cada casa nueva nace vacía con la misma estructura (Checklist por zonas, Inventario, Compras, Recordatorios). El manager asignado llena los datos desde cero — no se copia de otras casas.
             </div>
           </div>
         </div>
@@ -4041,11 +4068,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           </div>
                         </div>
                         {reminders.length > 0 ? (
-                      reminders.map((item, idx) => (
-                        <div key={idx} className="subcard">
+                      reminders.map((item, idx) => {
+                        const rawDue = item.due_date || item.due;
+                        let urgency: 'ok' | 'soon' | 'overdue' = 'ok';
+                        if (!item.paid && rawDue) {
+                          const due = new Date(rawDue);
+                          const today = new Date();
+                          today.setHours(0,0,0,0);
+                          due.setHours(0,0,0,0);
+                          const soon = new Date(today); soon.setDate(soon.getDate() + 7);
+                          if (!Number.isNaN(due.getTime())) {
+                            if (due < today) urgency = 'overdue';
+                            else if (due <= soon) urgency = 'soon';
+                          }
+                        }
+                        return (
+                        <div key={idx} className={`subcard${urgency !== 'ok' ? ' reminder-urgent' : ''}`} style={urgency === 'overdue' ? {borderColor:'#dc2626', background:'#fef2f2'} : urgency === 'soon' ? {borderColor:'#f59e0b', background:'#fffbeb'} : undefined}>
                           <div className="subcard-header">
-                            <div className="subcard-icon">🔔</div>
-                            <h3>{item.name}</h3>
+                            <div className="subcard-icon">{urgency === 'overdue' ? '🚨' : urgency === 'soon' ? '⚠️' : '🔔'}</div>
+                            <h3>{item.name}{urgency === 'overdue' ? ' (VENCIDO)' : urgency === 'soon' ? ' (por vencer)' : ''}</h3>
                             {item.frequency && item.frequency !== 'once' && (
                               <span style={{
                                 background: item.frequency === 'monthly' ? '#3b82f6' : '#8b5cf6',
@@ -4095,7 +4136,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             </div>
                           )}
                         </div>
-                      ))
+                      );
+                      })
                         ) : (
                           <div className="modal-body-empty">
                             <p>✨ No hay recordatorios pendientes</p>
@@ -4425,7 +4467,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   {(() => {
                     const filteredTemplates = checklistTemplates.filter((item: any) => {
                       if (checklistTemplateTypeFilter === 'all') return true;
-                      const type = item.task_type || item.assigned_to || 'Limpieza regular';
+                      const type = inferChecklistTemplateType(item);
                       return type === checklistTemplateTypeFilter;
                     });
                     const zoneCount = new Set(filteredTemplates.map((t: any) => t.zone || t.room || 'SIN ZONA')).size;
@@ -4488,7 +4530,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       (() => {
                         const filtered = checklistTemplates.filter((item: any) => {
                           if (checklistTemplateTypeFilter === 'all') return true;
-                          const type = item.task_type || item.assigned_to || 'Limpieza regular';
+                          const type = inferChecklistTemplateType(item);
                           return type === checklistTemplateTypeFilter;
                         });
 
@@ -4508,7 +4550,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         if (!sortedZones.length) {
                           return (
                             <div className="modal-body-empty">
-                              <p>No hay tareas en este tipo. Cambia el filtro o agrega una tarea.</p>
+                              <p>No hay tareas en este tipo para esta casa.</p>
+                              <p style={{marginTop:'0.4rem',color:'#64748b'}}>Usa el filtro (Limpieza / Profunda / Mantenimiento) o agrega una tarea con su zona.</p>
                             </div>
                           );
                         }
@@ -4539,7 +4582,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                           <div className="cl-admin-task-text">
                                             <strong>{item.task || item.item}</strong>
                                             {checklistTemplateTypeFilter === 'all' && (
-                                              <span className="cl-admin-task-meta">{item.task_type || item.assigned_to || 'Limpieza regular'}</span>
+                                              <span className="cl-admin-task-meta">{inferChecklistTemplateType(item)}</span>
                                             )}
                                           </div>
                                           {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
@@ -4602,7 +4645,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       })()
                     ) : (
                       <div className="modal-body-empty">
-                        <p>📭 No hay tareas en el template</p>
+                        <p>🏠 Casa vacía: mismo panel que EPIC D1 (zonas en acordeón), sin tareas aún.</p>
+                        <p style={{marginTop:'0.5rem',color:'#64748b'}}>El manager agrega zonas y tareas desde cero. No se copian de otras casas.</p>
                       </div>
                     )}
                   </div>

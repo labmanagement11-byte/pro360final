@@ -31,7 +31,12 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [canViewPasswords, setCanViewPasswords] = useState(false);
+  const [revealedPwdId, setRevealedPwdId] = useState<string | null>(null);
   const owner = isOwnerUser(user);
+  const isManager = String(user?.role || '').toLowerCase() === 'manager';
+  const canManageUsers = owner || isManager;
+  const managerHouse = String(user?.house || '').trim();
 
   const callAdminUsersApi = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', payload: Record<string, any>) => {
     if (!supabase) {
@@ -80,18 +85,21 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     const loadData = async () => {
       try {
         setLoading(true);
-        if (owner) {
+        if (canManageUsers) {
           try {
             const apiResult = await callAdminUsersApi('GET', {});
             if (apiResult?.users) {
               setUsers(apiResult.users);
+              setCanViewPasswords(!!apiResult.canViewPasswords && owner);
             } else {
               const fetchedUsers = await realtimeService.getUsers();
               setUsers(fetchedUsers || []);
+              setCanViewPasswords(false);
             }
           } catch {
             const fetchedUsers = await realtimeService.getUsers();
             setUsers(fetchedUsers || []);
+            setCanViewPasswords(false);
           }
           if (propHouses && propHouses.length > 0) {
             setHouses(propHouses);
@@ -99,9 +107,13 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             const fetchedHouses = await realtimeService.getHouses();
             setHouses(fetchedHouses || []);
           }
+          if (isManager && managerHouse) {
+            setHouse(managerHouse);
+          }
         } else {
           setUsers(propUsers || []);
           setHouses(propHouses || []);
+          setCanViewPasswords(false);
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -114,7 +126,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
     loadData();
 
-    if (owner) {
+    if (canManageUsers) {
       const channelUsers = realtimeService.subscribeToUsers(async () => {
         try {
           const apiResult = await callAdminUsersApi('GET', {});
@@ -137,7 +149,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         channelHouses?.unsubscribe?.();
       };
     }
-  }, [user, propUsers, propHouses, owner]);
+  }, [user, propUsers, propHouses, owner, isManager, canManageUsers, managerHouse]);
 
   if (!user || (user.role !== 'dueno' && user.role !== 'owner' && user.role !== 'manager')) {
     return (
@@ -168,7 +180,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       return;
     }
     try {
-      if (owner) {
+      if (canManageUsers) {
         const cleanEmail = email.trim().toLowerCase();
         if (!cleanEmail.includes('@')) {
           setFormError('Escribe un correo válido. Con ese correo entra la persona.');
@@ -178,12 +190,18 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           setFormError('La contraseña debe tener al menos 6 caracteres');
           return;
         }
+        const houseToUse = isManager ? managerHouse : house;
+        const roleToUse = isManager ? 'empleado' : role;
+        if (!houseToUse) {
+          setFormError('Selecciona una casa');
+          return;
+        }
         const result = await callAdminUsersApi('POST', {
           email: cleanEmail,
           password,
           username: username.trim(),
-          role,
-          house
+          role: roleToUse,
+          house: houseToUse
         });
 
         if (result?.user) {
@@ -217,15 +235,15 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           throw new Error('Usuario a editar no encontrado');
         }
 
-        if (owner) {
+        if (canManageUsers) {
           if (targetUser?.id) {
             const result = await callAdminUsersApi('PATCH', {
               id: String(targetUser.id),
               username: editData.username,
               email: editData.email || '',
               password: editData.password || '',
-              role: editData.role,
-              house: editData.house
+              role: isManager ? 'empleado' : editData.role,
+              house: isManager ? managerHouse : editData.house
             });
 
             if (result?.user) {
@@ -256,7 +274,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     }
     try {
       const idx = users.findIndex(u => String(u.id) === String(userId));
-      if (owner) {
+      if (canManageUsers) {
         if (targetUser?.id) {
           await callAdminUsersApi('DELETE', { id: String(targetUser.id) });
           setUsers(prev => prev.filter((u) => String(u.id) !== String(userId)));
@@ -273,7 +291,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   return (
     <div className="users-container">
       <h2>Gestión de Usuarios</h2>
-      <p className="users-help">Agrega o elimina personas aquí. Quedan en la casa asignada y pueden entrar con su correo y contraseña.</p>
+      <p className="users-help">Agrega o elimina personas aquí. Se guardan en Supabase Auth + perfiles automáticamente. Managers solo gestionan su casa (empleados). Solo Jonathan ve contraseñas.</p>
       {loading && <p>Cargando datos...</p>}
       {formError && <p className="users-error">{formError}</p>}
       <form onSubmit={handleAddUser} className="users-add-form">
@@ -289,7 +307,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           placeholder="Correo para entrar"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required={owner}
+          required={canManageUsers}
         />
         <input
           type="password"
@@ -299,14 +317,20 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           required
         />
         <label htmlFor="role-select" className="users-label">Rol:</label>
-        <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="manager">Manager</option>
+        <select id="role-select" value={isManager ? 'empleado' : role} onChange={(e) => setRole(e.target.value)} disabled={isManager}>
+          {!isManager && <option value="manager">Manager</option>}
           <option value="empleado">Empleado</option>
         </select>
         <label htmlFor="house-select" className="users-label">Casa asignada:</label>
-        <select id="house-select" value={house} onChange={e => setHouse(e.target.value)} required>
+        <select
+          id="house-select"
+          value={isManager ? managerHouse : house}
+          onChange={e => setHouse(e.target.value)}
+          required
+          disabled={isManager}
+        >
           <option value="" disabled>Selecciona una casa</option>
-          {houses.map((h, idx) => {
+          {(isManager ? houses.filter(h => (h.houseName || h.name || '') === managerHouse) : houses).map((h, idx) => {
             const houseName = h.houseName || h.name || '';
             return <option key={idx} value={houseName}>{houseName}</option>;
           })}
@@ -353,13 +377,23 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                     onChange={e => setEditData({ ...editData, password: e.target.value })}
                     placeholder="Nueva contraseña (opcional)"
                   />
-                  <select value={editData.role} onChange={e => setEditData({ ...editData, role: e.target.value })} title="Rol del usuario">
-                    <option value="manager">Manager</option>
+                  <select
+                    value={isManager ? 'empleado' : editData.role}
+                    onChange={e => setEditData({ ...editData, role: e.target.value })}
+                    title="Rol del usuario"
+                    disabled={isManager}
+                  >
+                    {!isManager && <option value="manager">Manager</option>}
                     <option value="empleado">Empleado</option>
                   </select>
-                  <select value={editData.house} onChange={e => setEditData({ ...editData, house: e.target.value })} title="Casa asignada">
+                  <select
+                    value={isManager ? managerHouse : editData.house}
+                    onChange={e => setEditData({ ...editData, house: e.target.value })}
+                    title="Casa asignada"
+                    disabled={isManager}
+                  >
                     <option value="" disabled>Selecciona una casa</option>
-                    {houses.map((h, houseIdx) => {
+                    {(isManager ? houses.filter(h => (h.houseName || h.name || '') === managerHouse) : houses).map((h, houseIdx) => {
                       const houseName = h.houseName || h.name || '';
                       return <option key={houseIdx} value={houseName}>{houseName}</option>;
                     })}
@@ -373,7 +407,20 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                   {(u as any).email && <span className="users-email">{(u as any).email}</span>}
                   <strong>{u.role}</strong>
                   <span className="users-house">{u.house}</span>
-                  {u.role !== 'dueno' && u.role !== 'owner' && (
+                  {canViewPasswords && (
+                    <span className="users-password">
+                      🔑 {revealedPwdId === String(u.id) ? ((u as any).password || '(sin registro)') : '••••••••'}
+                      <button
+                        type="button"
+                        className="users-reveal-pwd"
+                        onClick={() => setRevealedPwdId(revealedPwdId === String(u.id) ? null : String(u.id))}
+                        title="Solo Jonathan puede ver contraseñas"
+                      >
+                        {revealedPwdId === String(u.id) ? 'Ocultar' : 'Ver'}
+                      </button>
+                    </span>
+                  )}
+                  {u.role !== 'dueno' && u.role !== 'owner' && !(isManager && String(u.role).toLowerCase() === 'manager') && (
                     <>
                       <button onClick={() => {
                         setEditUserId(String(u.id));
