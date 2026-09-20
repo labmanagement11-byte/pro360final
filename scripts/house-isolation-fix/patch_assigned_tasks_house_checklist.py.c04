@@ -1,0 +1,27 @@
+} = await (supabase as any)
+        .from('calendar_assignments')
+        .select('*')
+        .eq('house', houseFilter)
+        .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);'''
+
+new_filter = '''      const houseFilter = user.house || user.house_id;
+      console.log(`🏠 [Dashboard] Filtrando por casa: ${houseFilter} para ${user.username} (${user.role})`);
+      let assignQuery = (supabase as any)
+        .from('calendar_assignments')
+        .select('*')
+        .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
+      // Never query house='all' — that mixes nothing useful; owner without house sees none here
+      if (houseFilter && houseFilter !== 'all') {
+        assignQuery = assignQuery.eq('house', houseFilter);
+      }
+      const { data, error } = await assignQuery;'''
+
+if old_filter in text:
+    text = text.replace(old_filter, new_filter, 1)
+    print('assignment house filter patched')
+else:
+    print('WARN assignment house filter not found')
+
+path.write_text(text)
+print('AssignedTasks house checklist OK', path.stat().st_size)
+assert 'buildSubtasksFromHouseChecklist' in path.read_text()
