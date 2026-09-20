@@ -1,1 +1,26 @@
-PLACEHOLDER_INDEX
+[
+  {
+    "name": "patch_dashboard_pending_cards.py",
+    "parts": 3
+  },
+  {
+    "name": "patch_dashboard_no_autoseed.py",
+    "parts": 3
+  },
+  {
+    "name": "patch_assigned_tasks_house_checklist.py",
+    "parts": 3
+  },
+  {
+    "name": "patch_checklist_house.py",
+    "parts": 3
+  },
+  {
+    "name": "patch_calendar.py",
+    "parts": 2
+  },
+  {
+    "name": "patch_service_house_isolation.py",
+    "parts": 4
+  }
+]
