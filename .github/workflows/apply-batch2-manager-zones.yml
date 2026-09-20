@@ -1,18 +1,18 @@
 name: Apply batch2 manager zones users reminders
-
 on:
   push:
     branches: [fix/manager-zones-users-reminders]
     paths:
-      - 'scripts/install-batch2.a.py'
-      - 'scripts/install-batch2.b.py'
-      - 'scripts/run-install-batch2.py'
+      - 'scripts/payload-users-a.b64'
+      - 'scripts/payload-users-b.b64'
+      - 'scripts/payload-admin.b64'
+      - 'scripts/payload-dash.b64'
+      - 'scripts/payload-svc.b64'
+      - 'scripts/run-batch2-install.py'
       - '.github/workflows/apply-batch2-manager-zones.yml'
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   apply:
     runs-on: ubuntu-latest
@@ -21,8 +21,7 @@ jobs:
         with:
           ref: fix/manager-zones-users-reminders
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install batch2 sources
-        run: python3 scripts/run-install-batch2.py
+      - run: python3 scripts/run-batch2-install.py
       - name: Commit
         run: |
           set -euo pipefail
