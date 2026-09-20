@@ -5,7 +5,9 @@ on:
     branches:
       - fix/manager-zones-users-reminders
     paths:
-      - 'scripts/unpack-batch2-patches.py'
+      - 'scripts/unpack-part1.b64'
+      - 'scripts/unpack-part2.b64'
+      - 'scripts/assemble-unpack.py'
       - 'scripts/apply-batch2-patches.sh'
       - '.github/workflows/apply-batch2-manager-zones.yml'
   workflow_dispatch:
@@ -25,6 +27,7 @@ jobs:
       - name: Unpack and apply patches
         run: |
           set -euo pipefail
+          python3 scripts/assemble-unpack.py
           python3 scripts/unpack-batch2-patches.py
           bash scripts/apply-batch2-patches.sh
 
