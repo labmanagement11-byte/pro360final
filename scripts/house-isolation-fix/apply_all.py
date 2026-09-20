@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run all house-isolation patches in order (skip missing/tiny scripts)."""
+"""Run all house-isolation patches in order."""
 import subprocess
 import sys
 from pathlib import Path
@@ -20,11 +20,13 @@ failed = []
 for name in scripts:
     path = root / name
     if not path.exists() or path.stat().st_size < 50:
-        print('SKIP missing/tiny', name)
+        print('MISSING', name)
+        failed.append(name)
         continue
     body = path.read_text().strip()
     if body in ('TEMP', 'PLACEHOLDER', 'PLACEHOLDER_INDEX', 'PLACEHOLDER_ASSEMBLE'):
-        print('SKIP placeholder', name)
+        print('PLACEHOLDER', name)
+        failed.append(name)
         continue
     print('\n===', name, '===')
     r = subprocess.run([sys.executable, str(path)], cwd=str(root.parent.parent))
@@ -75,13 +77,7 @@ if dash.exists() and 'pendingCardCounts' in dash.read_text() and 'const [shoppin
     else:
         print('OK pendingCardCounts after shoppingList')
 
-if failed:
-    print('FAILED scripts', failed)
+if failed or not ok:
+    print('FAILED', failed)
     sys.exit(1)
-if not ok:
-    print('Smoke incomplete (some patches not yet applied) — continuing if core login present')
-    # Soft-fail only if login eye missing
-    login = Path('components/Login.tsx')
-    if not login.exists() or 'showPassword' not in login.read_text():
-        sys.exit(1)
-print('\nALL AVAILABLE PATCHES OK')
+print('\nALL PATCHES OK')
