@@ -15,19 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Assemble service + patch Dashboard
+      - name: Patch service + Dashboard
         run: |
           set -euo pipefail
-          : > /tmp/all.b64
-          for f in $(ls scripts/reminders-fix/svc_*.b64 | sort); do
-            cat "$f" >> /tmp/all.b64
-          done
-          base64 -d /tmp/all.b64 > utils/supabaseRealtimeService.ts
-          wc -c utils/supabaseRealtimeService.ts
-          grep -q "from('reminders')" utils/supabaseRealtimeService.ts
-          ! grep -q 'localStorage - Supabase schema cache issue' utils/supabaseRealtimeService.ts
+          python3 scripts/reminders-fix/patch_reminders_service.py
           python3 scripts/reminders-fix/patch_dashboard.py
           python3 scripts/reminders-fix/patch_checklist_accordion.py
+          grep -q "from('reminders')" utils/supabaseRealtimeService.ts
+          ! grep -q 'localStorage - Supabase schema cache issue' utils/supabaseRealtimeService.ts
           grep -q 'canManageReminders' components/Dashboard.tsx
           grep -q 'Alertas de recordatorios vencidos' components/Dashboard.tsx
           grep -q 'cl-admin-zones' components/Dashboard.tsx
@@ -41,5 +36,5 @@ jobs:
             echo No changes
             exit 0
           fi
-          git commit -m "Recordatorios: Supabase + alertas + managers por casa"
+          git commit -m "Recordatorios Supabase + alertas + checklist acordeón"
           git push
