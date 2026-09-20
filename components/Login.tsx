@@ -15,6 +15,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -192,18 +193,29 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           </div>
           <div className="login-input-group">
             <label htmlFor="login-password" className="login-input-label">Contraseña</label>
-            <input
-              id="login-password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoCapitalize="none"
-              autoCorrect="off"
-              autoComplete="current-password"
-              spellCheck={false}
-              required
-            />
+            <div className="login-password-wrap">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="current-password"
+                spellCheck={false}
+                required
+              />
+              <button
+                type="button"
+                className="login-password-toggle"
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
           <label className="login-remember-label">
             <input
