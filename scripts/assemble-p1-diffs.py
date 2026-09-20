@@ -24,4 +24,6 @@ def assemble_into(name: str, dest: Path, required: bool = True) -> None:
 
 assemble_into("login-users.diff", patches / "login-users.diff", required=True)
 assemble_into("service.diff", patches / "service.diff", required=False)
-assemble_into("apply-p1-dashboard-inline.py", root / "scripts" / "apply-p1-dashboard-inline.py", required=True)
+# dashboard inline is written by the workflow from embedded b64; keep if already present
+if not (root / "scripts" / "apply-p1-dashboard-inline.py").exists():
+    assemble_into("apply-p1-dashboard-inline.py", root / "scripts" / "apply-p1-dashboard-inline.py", required=False)
