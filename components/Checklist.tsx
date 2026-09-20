@@ -333,7 +333,7 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       <header className="cl-head">
         <div>
           <h2 className="ultra-checklist-title">Checklist</h2>
-          <p className="cl-sub">{selectedHouse || 'Sin casa'}</p>
+          <p className="cl-sub">🏠 {selectedHouse || 'Sin casa'}</p>
         </div>
         <span className="checklist-live">En vivo</span>
       </header>

@@ -27,6 +27,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
   const [openAssignedZone, setOpenAssignedZone] = useState<string | null>(null);
   const [assignedView, setAssignedView] = useState<'pendiente' | 'hecho' | 'todo'>('pendiente');
   const [houseChecklistRows, setHouseChecklistRows] = useState<any[]>([]);
+  const [houseChecklistByHouse, setHouseChecklistByHouse] = useState<Record<string, any[]>>({});
 
   // Estados para inventario completo de la casa
   const [houseInventory, setHouseInventory] = useState<any[]>([]);
@@ -69,10 +70,14 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     };
   }, [user.house, user.house_id]);
 
-  // Cargar checklist SOLO de la casa del usuario/asignación (sin mezclar otras casas)
+  // Cargar checklist de la casa del usuario; si house==='all', cargar por casa de cada asignación
   useEffect(() => {
     const houseName = String(user.house || user.house_id || '').trim();
-    if (!houseName || houseName === 'all' || !supabase) {
+    if (!supabase) {
+      setHouseChecklistRows([]);
+      return;
+    }
+    if (!houseName || houseName === 'all') {
       setHouseChecklistRows([]);
       return;
     }
@@ -92,6 +97,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
         }
         const only = (data || []).filter((row: any) => String(row.house || '').trim() === houseName);
         setHouseChecklistRows(only);
+        setHouseChecklistByHouse(prev => ({ ...prev, [houseName]: only }));
       } catch (err) {
         if (!cancelled) setHouseChecklistRows([]);
       }
@@ -100,7 +106,9 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       .channel(`assigned-house-checklist-${houseName.replace(/\s+/g, '-')}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist', filter: `house=eq.${houseName}` }, async () => {
         const { data } = await (supabase as any).from('checklist').select('*').eq('house', houseName).order('id', { ascending: true });
-        setHouseChecklistRows((data || []).filter((row: any) => String(row.house || '').trim() === houseName));
+        const only = (data || []).filter((row: any) => String(row.house || '').trim() === houseName);
+        setHouseChecklistRows(only);
+        setHouseChecklistByHouse(prev => ({ ...prev, [houseName]: only }));
       })
       .subscribe();
     return () => {
@@ -108,6 +116,33 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       try { (supabase as any).removeChannel(channel); } catch {}
     };
   }, [user.house, user.house_id]);
+
+  // When user.house==='all', load checklist rows for each assignment house (never filter by 'all')
+  useEffect(() => {
+    const ownerHouse = String(user.house || user.house_id || '').trim();
+    if (ownerHouse !== 'all' || !supabase || !assignedTasks?.length) return;
+    let cancelled = false;
+    const houses = Array.from(new Set(
+      assignedTasks.map((t: any) => String(t.house || '').trim()).filter((h: string) => h && h !== 'all')
+    ));
+    (async () => {
+      const next: Record<string, any[]> = {};
+      for (const h of houses) {
+        if (houseChecklistByHouse[h]?.length) { next[h] = houseChecklistByHouse[h]; continue; }
+        try {
+          const { data, error } = await (supabase as any)
+            .from('checklist')
+            .select('*')
+            .eq('house', h)
+            .order('id', { ascending: true });
+          if (cancelled) return;
+          next[h] = error ? [] : (data || []).filter((row: any) => String(row.house || '').trim() === h);
+        } catch { next[h] = []; }
+      }
+      if (!cancelled) setHouseChecklistByHouse(prev => ({ ...prev, ...next }));
+    })();
+    return () => { cancelled = true; };
+  }, [user.house, user.house_id, assignedTasks]);
 
   useEffect(() => {
     console.log('[AssignedTasksCard] Usuario:', user);
@@ -382,11 +417,14 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     };
   }, [user]);
 
-  function buildSubtasksFromHouseChecklist(type: string): { [zona: string]: string[] } | null {
+  function buildSubtasksFromHouseChecklist(type: string, houseOverride?: string): { [zona: string]: string[] } | null {
     const typeLower = String(type || '').toLowerCase();
     const isDeep = typeLower.includes('profund');
     const isMaint = typeLower.includes('manten');
-    const rows = houseChecklistRows || [];
+    const houseKey = String(houseOverride || '').trim();
+    const rows = (houseKey && houseChecklistByHouse[houseKey])
+      ? houseChecklistByHouse[houseKey]
+      : (houseChecklistRows || []);
     if (!rows.length) {
       // Casa sin checklist propio: vacío (no mezclar globals de otras casas)
       return {};
@@ -409,12 +447,16 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     return result;
   }
 
-  function getSubtasks(type: string) {
-    // Prefer per-house checklist from Supabase
-    const fromHouse = buildSubtasksFromHouseChecklist(type);
+  function getSubtasks(type: string, taskHouse?: string) {
+    const effectiveHouse = String(taskHouse || '').trim() && String(taskHouse).trim() !== 'all'
+      ? String(taskHouse).trim()
+      : (String(user.house || user.house_id || '').trim() !== 'all' ? String(user.house || user.house_id || '').trim() : '');
+    const fromHouse = buildSubtasksFromHouseChecklist(type, effectiveHouse);
     if (fromHouse && Object.keys(fromHouse).length > 0) return fromHouse;
-    // Empty house => empty checklist (do not fall back to global hardcoded mix)
-    if ((houseChecklistRows || []).length === 0) return {};
+    const rows = effectiveHouse && houseChecklistByHouse[effectiveHouse]
+      ? houseChecklistByHouse[effectiveHouse]
+      : houseChecklistRows;
+    if ((rows || []).length === 0) return {};
     return fromHouse;
   }
 
@@ -656,7 +698,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
               </div>
               <div className="assigned-tasks-items-v2">
                 {tasks.map((task: any) => {
-                  const subtasksMap = getSubtasks(task.type || '');
+                  const subtasksMap = getSubtasks(task.type || '', task.house);
                   const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
                   const progressKey = isManager ? `${task.id}_${task.user_id || task.employee_id || task.employee}` : task.id;
                   const progressArr = subtaskProgress[progressKey] || Array(allSubtasks.length).fill(false);
@@ -674,7 +716,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                             {task.type === 'Limpieza profunda' ? '🧹 Profunda' : task.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
                           </div>
                           <div className="assigned-task-date-label">
-                            📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
+                            🏠 {task.house} • 📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
                           </div>
                         </div>
                         <div className="assigned-task-actions-box">
@@ -2354,7 +2396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   }).length;
 
   const pendingShoppingCount = (shoppingList || []).filter((i: any) => !i.is_purchased).length;
-  const pendingInventoryIssuesCount = (inventoryList || []).filter((i: any) => !!i.issue_type && !i.complete).length;
+  const pendingInventoryIssuesCount = (inventoryList || []).filter((i: any) => !i.complete).length;
   const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && (
     user.role === 'empleado' ? t.assignedTo === user.username || t.assigned_to === user.username : true
   )).length;
@@ -3443,7 +3485,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 className="assignment-btn primary"
                                 onClick={() => {
                                   console.log('🧹 Abriendo modal para asignación:', assignment.id, 'Tipo:', assignment.type);
-                                  setSelectedAssignmentForChecklist(assignment.id);
+                                  setSelectedAssignmentForChecklist(String(assignment.id));
                                   setCurrentAssignmentType(assignment.type);
                                 }}
                               >
@@ -3455,7 +3497,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   className="assignment-btn secondary"
                                   onClick={() => {
                                     console.log('📦 Abriendo inventario para asignación:', assignment.id);
-                                    setSelectedAssignmentForInventory(assignment.id);
+                                    setSelectedAssignmentForInventory(String(assignment.id));
                                   }}
                                 >
                                   <span className="assignment-btn-icon">📦</span>
@@ -5463,6 +5505,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   ? '🧹 Checklist de Limpieza Profunda'
                   : '✨ Checklist de Limpieza Regular'}
               </h2>
+              {(() => {
+                const a = calendarAssignments.find((x: any) => String(x.id) === String(selectedAssignmentForChecklist));
+                return a?.house ? <p className="modal-house-subtitle" style={{margin:'0.25rem 0 0', fontSize:'0.95rem', color:'#475569'}}>🏠 {a.house}</p> : null;
+              })()}
               <button className="modal-close" onClick={() => {
                 setSelectedAssignmentForChecklist(null);
                 setCurrentAssignmentType(null);
@@ -5472,7 +5518,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {syncedChecklists.get(selectedAssignmentForChecklist) ? (
                 (() => {
                   const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
-                  const assignment = calendarAssignments.find(a => a.id === selectedAssignmentForChecklist);
+                  const assignment = calendarAssignments.find(a => String(a.id) === String(selectedAssignmentForChecklist));
                   
                   if (!assignment) return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
                   
@@ -5501,7 +5547,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <div className="assignment-info">
                             <h3 className="assignment-employee-name">{assignment.employee}</h3>
                             <p className="assignment-date-time">
-                              📅 {(() => {
+                              🏠 {assignment.house} • 📅 {(() => {
                                 const dateStr = assignment.date;
                                 const dateParts = dateStr.split('T')[0].split('-');
                                 const date = new Date(dateParts[0], parseInt(dateParts[1]) - 1, dateParts[2]);
@@ -5577,7 +5623,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             onClick={async () => {
                               if (confirm(`¿Marcar esta asignación como completada?`)) {
                                 try {
-                                  const assignmentToComplete = calendarAssignments.find((a: any) => a.id === selectedAssignmentForChecklist);
+                                  const assignmentToComplete = calendarAssignments.find((a: any) => String(a.id) === String(selectedAssignmentForChecklist));
                                   if (!assignmentToComplete) return;
 
                                   const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
@@ -5605,7 +5651,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   }
 
                                   setCalendarAssignments(prev => prev.map((a: any) =>
-                                    a.id === selectedAssignmentForChecklist
+                                    String(a.id) === String(selectedAssignmentForChecklist)
                                       ? {
                                           ...a,
                                           completed: true,
