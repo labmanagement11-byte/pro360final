@@ -5,7 +5,8 @@ on:
     branches:
       - fix/manager-zones-users-reminders
     paths:
-      - 'scripts/bootstrap-batch2-files.py'
+      - 'scripts/unpack-batch2-patches.py'
+      - 'scripts/apply-batch2-patches.sh'
       - '.github/workflows/apply-batch2-manager-zones.yml'
   workflow_dispatch:
 
@@ -21,10 +22,10 @@ jobs:
           ref: fix/manager-zones-users-reminders
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Materialize patches and apply
+      - name: Unpack and apply patches
         run: |
           set -euo pipefail
-          python3 scripts/bootstrap-batch2-files.py
+          python3 scripts/unpack-batch2-patches.py
           bash scripts/apply-batch2-patches.sh
 
       - name: Commit patched sources

@@ -2,6 +2,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+if [[ ! -f scripts/patches/batch2-Dashboard.patch ]]; then
+  python3 scripts/unpack-batch2-patches.py
+fi
+# ensure service patch exists (may already be on branch)
 for p in \
   scripts/patches/batch2-Dashboard.patch \
   scripts/patches/batch2-Users.patch \
