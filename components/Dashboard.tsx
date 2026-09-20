@@ -1093,11 +1093,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const [checklistTemplatesError, setChecklistTemplatesError] = useState<string | null>(null);
   const [checklistTemplatesSource, setChecklistTemplatesSource] = useState<'checklist_templates' | 'checklist'>('checklist_templates');
   const [editingChecklistTemplateId, setEditingChecklistTemplateId] = useState<string | null>(null);
+  const [checklistTemplateTypeFilter, setChecklistTemplateTypeFilter] = useState<string>('Limpieza regular');
+  const [openChecklistTemplateZone, setOpenChecklistTemplateZone] = useState<string | null>(null);
   const [newChecklistTemplate, setNewChecklistTemplate] = useState({
     zone: '',
     task: '',
     task_type: 'Limpieza regular'
   });
+  const CHECKLIST_TEMPLATE_ROOM_ORDER = [
+    'LIMPIEZA GENERAL',
+    'HABITACIÓN 1',
+    'HABITACIÓN 2',
+    'HABITACIONES',
+    'SALA / COMEDOR',
+    'SALA',
+    'COMEDOR',
+    'COCINA',
+    'BAÑO 1',
+    'BAÑO 2',
+    'BAÑO 3',
+    'BAÑOS',
+    'ZONA DE LAVADO',
+    'TERRAZA',
+    'ÁREA DE BBQ',
+    'ÁREA DE PISCINA',
+    'LIMPIEZA PROFUNDA',
+    'ÁREAS VERDES',
+    'PISCINA Y AGUA',
+    'RUTINA DE MANTENIMIENTO',
+    'SISTEMAS ELÉCTRICOS',
+  ];
 
   // Casas y selección de casa
   // IMPORTANTE: Limpiamos localStorage de casas para forzar que cargue desde Supabase
@@ -1507,7 +1532,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('⚡ Evento de recordatorios recibido:', payload);
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nuevo recordatorio insertado:', payload.new);
-          addRealtimeNotification(`Nuevo recordatorio: ${payload.new?.title || 'Sin título'}`, 'info');
+          addRealtimeNotification(`Nuevo recordatorio: ${payload.new?.name || 'Sin nombre'}`, 'info');
           setReminders(prev => [...prev, payload.new]);
         } else if (payload?.eventType === 'UPDATE') {
           console.log('✏️ Recordatorio actualizado:', payload.new);
@@ -2024,6 +2049,69 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [checklistData]);
 
+
+  // Alertas de recordatorios vencidos o próximos (3 días)
+  useEffect(() => {
+    if (!showReminders || !reminders?.length) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const soonLimit = new Date(today);
+    soonLimit.setDate(soonLimit.getDate() + 3);
+
+    const urgent = reminders.filter((r: any) => {
+      if (r.paid) return false;
+      const raw = r.due_date || r.due;
+      if (!raw) return false;
+      const due = new Date(raw);
+      if (Number.isNaN(due.getTime())) return false;
+      due.setHours(0, 0, 0, 0);
+      return due <= soonLimit;
+    });
+
+    if (!urgent.length) return;
+
+    const overdue = urgent.filter((r: any) => {
+      const due = new Date(r.due_date || r.due);
+      due.setHours(0, 0, 0, 0);
+      return due < today;
+    });
+    const soon = urgent.filter((r: any) => {
+      const due = new Date(r.due_date || r.due);
+      due.setHours(0, 0, 0, 0);
+      return due >= today;
+    });
+
+    const parts: string[] = [];
+    if (overdue.length) parts.push(`${overdue.length} vencido${overdue.length > 1 ? 's' : ''}`);
+    if (soon.length) parts.push(`${soon.length} por vencer`);
+    const msg = `Recordatorios: ${parts.join(' y ')} en ${houses[allowedHouseIdx]?.name || 'tu casa'}`;
+
+    const dayKey = today.toISOString().slice(0, 10);
+    const storageKey = `reminder_alert_${houses[allowedHouseIdx]?.name || 'house'}_${dayKey}`;
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem(storageKey) === msg) {
+        return;
+      }
+      if (typeof window !== 'undefined') localStorage.setItem(storageKey, msg);
+    } catch {}
+
+    addRealtimeNotification(msg, overdue.length ? 'warning' : 'info');
+
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().catch(() => {});
+        }
+        if (Notification.permission === 'granted') {
+          new Notification('Limpieza360 Pro — Recordatorios', {
+            body: msg + (overdue[0] ? `. Ej: ${overdue[0].name}` : soon[0] ? `. Ej: ${soon[0].name}` : ''),
+          });
+        }
+      }
+    } catch {}
+  }, [reminders, showReminders, allowedHouseIdx, houses]);
+
   // Guardar mantenimiento de tareas en localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -2031,7 +2119,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [taskMaintenanceData]);
 
-  const showReminders = user.role === 'owner' || user.role === 'manager';
+  const isOwnerLike = user.role === 'owner' || user.role === 'dueno';
+  const canManageReminders = isOwnerLike || user.role === 'manager';
+  const showReminders = canManageReminders;
 
   // Estado para casas dinámicas y usuarios sincronizados
   // Ensure all users have a username string
@@ -2181,7 +2271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'reminders',
       title: 'Recordatorios',
       desc: 'Visualiza y gestiona los recordatorios de pagos y eventos.',
-      show: user.role === 'owner' || user.role === 'manager',
+      show: canManageReminders,
     },
     // Mostrar selector de casa para owners y Jonathan (manager)
     {
@@ -2584,7 +2674,46 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 }}
                 aria-label={card.title}
               >
-                <span className="dashboard-card-title">{card.title}</span>
+                <span className="dashboard-card-title">
+                  {card.title}
+                  {card.key === 'reminders' && reminders.filter((r: any) => {
+                    if (r.paid) return false;
+                    const raw = r.due_date || r.due;
+                    if (!raw) return false;
+                    const due = new Date(raw);
+                    if (Number.isNaN(due.getTime())) return false;
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    due.setHours(0,0,0,0);
+                    const limit = new Date(today);
+                    limit.setDate(limit.getDate() + 3);
+                    return due <= limit;
+                  }).length > 0 && (
+                    <span className="dashboard-card-badge" style={{
+                      marginLeft: '0.45rem',
+                      background: '#ef4444',
+                      color: '#fff',
+                      borderRadius: '999px',
+                      padding: '0.1rem 0.45rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                    }}>
+                      {reminders.filter((r: any) => {
+                        if (r.paid) return false;
+                        const raw = r.due_date || r.due;
+                        if (!raw) return false;
+                        const due = new Date(raw);
+                        if (Number.isNaN(due.getTime())) return false;
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        due.setHours(0,0,0,0);
+                        const limit = new Date(today);
+                        limit.setDate(limit.getDate() + 3);
+                        return due <= limit;
+                      }).length}
+                    </span>
+                  )}
+                </span>
                 <span className="dashboard-card-desc">{card.desc}</span>
               </button>
             ))}
@@ -3677,7 +3806,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedModalCard === 'reminders' && (
                 <>
                   {/* Formulario para agregar/editar recordatorios (Manager/Owner) */}
-                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
+                  {(canManageReminders) && (
                     <div className="modal-assignment-form">
                       <h3>🔔 {editingReminderIdx >= 0 ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h3>
                       <form onSubmit={async (e) => {
@@ -4076,7 +4205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   )}
 
                   {/* Formulario para agregar/editar tarea (solo manager/owner) */}
-                  {(user.role === 'owner' || (user.role === 'manager' && isJonathanUser)) && (
+                  {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
                     <div className="modal-assignment-form" style={{marginBottom: '2rem'}} ref={checklistFormRef}>
                       <h3>➕ {editingChecklistTemplateId ? 'Editar Tarea del Template' : 'Agregar Tarea al Template'}</h3>
                       <form onSubmit={async (e) => {
@@ -4166,12 +4295,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <input
                               id="checklist-template-zone"
                               type="text"
+                              list="checklist-template-zone-options"
                               value={newChecklistTemplate.zone}
                               onChange={(e) => setNewChecklistTemplate({ ...newChecklistTemplate, zone: e.target.value })}
                               required
                               placeholder="Ej: COCINA"
                               title="Zona"
                             />
+                            <datalist id="checklist-template-zone-options">
+                              {Array.from(new Set([
+                                ...CHECKLIST_TEMPLATE_ROOM_ORDER,
+                                ...checklistTemplates.map((t: any) => String(t.zone || t.room || '').trim()).filter(Boolean),
+                              ])).map((zoneName) => (
+                                <option key={zoneName} value={zoneName} />
+                              ))}
+                            </datalist>
                           </div>
                           <div className="form-group">
                             <label>📋 Tarea</label>
@@ -4207,21 +4345,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </div>
                   )}
 
-                  {/* Estadísticas generales */}
-                  <div className="modal-stats" style={{marginBottom: '2rem'}}>
-                    <div className="stat-box">
-                      <p className="stat-box-number">{checklistTemplates.length}</p>
-                      <p className="stat-box-label">Tareas en Template</p>
-                    </div>
-                    <div className="stat-box">
-                      <p className="stat-box-number">{new Set(checklistTemplates.map(t => t.zone)).size}</p>
-                      <p className="stat-box-label">Zonas</p>
-                    </div>
-                    <div className="stat-box">
-                      <p className="stat-box-number">{houses[allowedHouseIdx]?.name || 'EPIC D1'}</p>
-                      <p className="stat-box-label">Casa</p>
-                    </div>
-                  </div>
+                  {/* Estadísticas + filtros */}
+                  {(() => {
+                    const filteredTemplates = checklistTemplates.filter((item: any) => {
+                      if (checklistTemplateTypeFilter === 'all') return true;
+                      const type = item.task_type || item.assigned_to || 'Limpieza regular';
+                      return type === checklistTemplateTypeFilter;
+                    });
+                    const zoneCount = new Set(filteredTemplates.map((t: any) => t.zone || t.room || 'SIN ZONA')).size;
+                    return (
+                      <div className="modal-stats" style={{marginBottom: '1rem'}}>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{filteredTemplates.length}</p>
+                          <p className="stat-box-label">Tareas visibles</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{zoneCount}</p>
+                          <p className="stat-box-label">Zonas</p>
+                        </div>
+                        <div className="stat-box">
+                          <p className="stat-box-number">{houses[allowedHouseIdx]?.name || 'EPIC D1'}</p>
+                          <p className="stat-box-label">Casa</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {checklistTemplatesError && checklistTemplatesSource === 'checklist_templates' && (
                     <div style={{textAlign: 'center', marginBottom: '1rem', color: '#dc2626'}}>
                       {checklistTemplatesError}
@@ -4233,49 +4381,93 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </div>
                   )}
 
-                  {/* Zonas con tareas */}
-                  <div className="subcards-grid">
+                  <div className="cl-admin-type-tabs">
+                    {[
+                      { id: 'Limpieza regular', label: 'Limpieza' },
+                      { id: 'Limpieza profunda', label: 'Profunda' },
+                      { id: 'Mantenimiento', label: 'Mantenimiento' },
+                      { id: 'all', label: 'Todo' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        className={checklistTemplateTypeFilter === tab.id ? 'on' : ''}
+                        onClick={() => {
+                          setChecklistTemplateTypeFilter(tab.id);
+                          setOpenChecklistTemplateZone(null);
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Zonas con tareas (acordeón compacto) */}
+                  <div className="cl-admin-zones">
                     {loadingChecklistTemplates ? (
                       <div className="modal-body-empty">
                         <p>Cargando template...</p>
                       </div>
                     ) : checklistTemplates.length > 0 ? (
                       (() => {
-                        const byType = new Map<string, Map<string, any[]>>();
-                        checklistTemplates.forEach(item => {
+                        const filtered = checklistTemplates.filter((item: any) => {
+                          if (checklistTemplateTypeFilter === 'all') return true;
                           const type = item.task_type || item.assigned_to || 'Limpieza regular';
-                          if (!byType.has(type)) byType.set(type, new Map());
-                          const zones = byType.get(type)!;
-                          const zoneName = item.zone || item.room || 'SIN ZONA';
+                          return type === checklistTemplateTypeFilter;
+                        });
+
+                        const zones = new Map<string, any[]>();
+                        filtered.forEach((item: any) => {
+                          const zoneName = String(item.zone || item.room || 'SIN ZONA').trim() || 'SIN ZONA';
                           if (!zones.has(zoneName)) zones.set(zoneName, []);
                           zones.get(zoneName)!.push(item);
                         });
 
+                        const sortedZones = Array.from(zones.entries()).sort((a, b) => {
+                          const ai = CHECKLIST_TEMPLATE_ROOM_ORDER.indexOf(a[0].toUpperCase());
+                          const bi = CHECKLIST_TEMPLATE_ROOM_ORDER.indexOf(b[0].toUpperCase());
+                          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                        });
+
+                        if (!sortedZones.length) {
+                          return (
+                            <div className="modal-body-empty">
+                              <p>No hay tareas en este tipo. Cambia el filtro o agrega una tarea.</p>
+                            </div>
+                          );
+                        }
+
+                        const activeZone = openChecklistTemplateZone && sortedZones.some(([z]) => z === openChecklistTemplateZone)
+                          ? openChecklistTemplateZone
+                          : sortedZones[0][0];
+
                         return (
-                          <div style={{gridColumn: '1 / -1'}}>
-                            {Array.from(byType.entries()).map(([type, zones]) => (
-                              <div key={type} style={{marginBottom: '2.5rem'}}>
-                                <h2 style={{marginBottom: '1rem', color: '#0f172a'}}>
-                                  {type} ({Array.from(zones.values()).reduce((acc, items) => acc + items.length, 0)} tareas)
-                                </h2>
-                                {Array.from(zones.entries()).map(([zone, items]) => (
-                                  <div key={`${type}-${zone}`} style={{marginBottom: '2rem'}}>
-                                    <h3 style={{marginBottom: '1rem', color: '#2563eb'}}>
-                                      {zone} ({items.length} tareas)
-                                    </h3>
-                                    <div className="subcards-grid">
+                          <>
+                            {sortedZones.map(([zone, items]) => {
+                              const open = activeZone === zone;
+                              return (
+                                <section key={zone} className={`cl-admin-zone${open ? ' open' : ''}`}>
+                                  <button
+                                    type="button"
+                                    className="cl-admin-zone-btn"
+                                    aria-expanded={open}
+                                    onClick={() => setOpenChecklistTemplateZone(open ? null : zone)}
+                                  >
+                                    <span>{zone}</span>
+                                    <span className="cl-admin-zone-count">{items.length} tareas</span>
+                                  </button>
+                                  {open && (
+                                    <div className="cl-admin-task-list">
                                       {items.map((item: any) => (
-                                        <div key={item.id} className="subcard">
-                                          <div className="subcard-header">
-                                            <div className="subcard-icon">📋</div>
-                                            <h3>{item.task || item.item}</h3>
+                                        <div key={item.id} className="cl-admin-task-row">
+                                          <div className="cl-admin-task-text">
+                                            <strong>{item.task || item.item}</strong>
+                                            {checklistTemplateTypeFilter === 'all' && (
+                                              <span className="cl-admin-task-meta">{item.task_type || item.assigned_to || 'Limpieza regular'}</span>
+                                            )}
                                           </div>
-                                          <div className="subcard-content">
-                                            <p><strong>🏷️ Tipo:</strong> {item.task_type || item.assigned_to || 'Limpieza regular'}</p>
-                                            <p><strong>📍 Zona:</strong> {item.zone || item.room || 'SIN ZONA'}</p>
-                                          </div>
-                                          {(user.role === 'owner' || user.role === 'manager') && (
-                                            <div className="subcard-actions">
+                                          {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
+                                            <div className="cl-admin-task-actions">
                                               <button
                                                 type="button"
                                                 onClick={() => {
@@ -4292,13 +4484,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                                   });
                                                 }}
                                               >
-                                                ✏️ Editar
+                                                Editar
                                               </button>
                                               <button
                                                 type="button"
                                                 className="danger"
                                                 onClick={async () => {
-                                                  if (confirm(`¿Eliminar "${item.task}" del template?`)) {
+                                                  const label = item.task || item.item || 'tarea';
+                                                  if (confirm(`¿Eliminar "${label}" del template?`)) {
                                                     if (checklistTemplatesSource === 'checklist') {
                                                       const ok = await realtimeService.deleteChecklistTemplateLegacy(item.id);
                                                       if (ok) {
@@ -4317,18 +4510,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                                   }
                                                 }}
                                               >
-                                                🗑️ Eliminar
+                                                Eliminar
                                               </button>
                                             </div>
                                           )}
                                         </div>
                                       ))}
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
+                                  )}
+                                </section>
+                              );
+                            })}
+                          </>
                         );
                       })()
                     ) : (
