@@ -1562,11 +1562,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         } else if (payload?.eventType === 'UPDATE') {
           console.log('✏️ Tarea actualizada:', payload.new);
           addRealtimeNotification(`Tarea actualizada: ${payload.new?.title || 'Sin título'}`, 'info');
-          setTasksList(prev => prev.map(t => t.id === payload.new?.id ? payload.new : t));
+          setTasksList(prev => prev.map(t => String(t.id) === String(payload.new?.id) ? payload.new : t));
         } else if (payload?.eventType === 'DELETE') {
           console.log('🗑️ Tarea eliminada:', payload.old);
           addRealtimeNotification('Tarea eliminada', 'warning');
-          setTasksList(prev => prev.filter(t => t.id !== payload.old?.id));
+          setTasksList(prev => prev.filter(t => String(t.id) !== String(payload.old?.id)));
         }
       });
       console.log('✅ Suscripción activa:', subscription);
@@ -1943,8 +1943,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         const { data, error } = await realtimeService.getChecklistTemplatesWithError(selectedHouse);
         if (error) {
           const errorMessage = error.message || 'No se pudo cargar desde Supabase';
+          const errorCode = String((error as any)?.code || '');
           // Fallback: usar tabla checklist si checklist_templates no existe
-          if (String(errorMessage).includes('checklist_templates')) {
+          if (errorCode === 'PGRST205' || String(errorMessage).includes('checklist_templates')) {
             const legacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
             setChecklistTemplatesSource('checklist');
             if (!legacy || legacy.length === 0) {
@@ -1961,9 +1962,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             setChecklistTemplates([]);
           }
         } else if (!data || data.length === 0) {
-          // Casa nueva: checklist vacío (admin agrega tareas manualmente). Sin seed/copia.
-          setChecklistTemplates([]);
-          setChecklistTemplatesSource('checklist_templates');
+          // Prefer legacy rows when modern table is empty but legacy has house data
+          const legacy = await realtimeService.getChecklistTemplatesLegacy(selectedHouse);
+          if (legacy && legacy.length > 0) {
+            setChecklistTemplatesSource('checklist');
+            setChecklistTemplatesError(null);
+            setChecklistTemplates(dedupeChecklistTemplates(legacy));
+          } else {
+            // Casa nueva: checklist vacío (admin agrega tareas manualmente). Sin seed/copia.
+            setChecklistTemplates([]);
+            setChecklistTemplatesSource('checklist_templates');
+          }
         } else {
           setChecklistTemplatesSource('checklist_templates');
           setChecklistTemplates(dedupeChecklistTemplates(data || []));
@@ -1983,21 +1992,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       if (checklistTemplatesSource === 'checklist') {
         subscription = realtimeService.subscribeToChecklistLegacy(selectedHouse, (payload: any) => {
           if (payload?.eventType === 'INSERT') {
-            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.some(t => t.id === payload.new?.id) ? prev : [...prev, payload.new]));
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.some(t => String(t.id) === String(payload.new?.id)) ? prev : [...prev, payload.new]));
           } else if (payload?.eventType === 'UPDATE') {
-            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.map(t => t.id === payload.new?.id ? payload.new : t)));
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.map(t => String(t.id) === String(payload.new?.id) ? payload.new : t)));
           } else if (payload?.eventType === 'DELETE') {
-            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.filter(t => t.id !== payload.old?.id)));
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.filter(t => String(t.id) !== String(payload.old?.id))));
           }
         });
       } else {
         subscription = realtimeService.subscribeToChecklistTemplates(selectedHouse, (payload: any) => {
           if (payload?.eventType === 'INSERT') {
-            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.some(t => t.id === payload.new?.id) ? prev : [...prev, payload.new]));
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.some(t => String(t.id) === String(payload.new?.id)) ? prev : [...prev, payload.new]));
           } else if (payload?.eventType === 'UPDATE') {
-            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.map(t => t.id === payload.new?.id ? payload.new : t)));
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.map(t => String(t.id) === String(payload.new?.id) ? payload.new : t)));
           } else if (payload?.eventType === 'DELETE') {
-            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.filter(t => t.id !== payload.old?.id)));
+            setChecklistTemplates(prev => dedupeChecklistTemplates(prev.filter(t => String(t.id) !== String(payload.old?.id))));
           }
         });
       }
@@ -2393,7 +2402,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'users',
       title: 'Usuarios',
       desc: 'Administra empleados de tu casa (Auth + perfiles). Solo Jonathan ve contraseñas.',
-      show: user.role === 'owner' || user.role === 'manager' || user.role === 'dueno',
+      show: ['owner', 'dueno', 'manager'].includes(String(user.role || '').toLowerCase()),
     },
     {
       key: 'completedJobs',
@@ -2435,7 +2444,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   }).length;
 
   const pendingShoppingCount = (shoppingList || []).filter((i: any) => !i.is_purchased).length;
-  const pendingInventoryIssuesCount = (inventoryList || []).filter((i: any) => !i.complete).length;
+  // Incomplete inventory items alone must NOT turn Inventario red for manager/empleado.
+  // Red only when there is active work: open calendar/cleaning assignment OR open employee task.
+  const roleLowerForInv = String(user.role || '').toLowerCase();
+  const gateInventoryPendingByAssignment = roleLowerForInv === 'manager' || roleLowerForInv === 'empleado';
+  const hasActiveInventoryAssignmentWork =
+    (calendarAssignments || []).some((a: any) => !a.completed) ||
+    (tasksList || []).some((t: any) => !t.completed && (
+      roleLowerForInv === 'empleado'
+        ? (t.assignedTo === user.username || t.assigned_to === user.username)
+        : true
+    ));
+  const incompleteInventoryCount = (inventoryList || []).filter((i: any) => !i.complete).length;
+  const pendingInventoryIssuesCount =
+    !gateInventoryPendingByAssignment || hasActiveInventoryAssignmentWork
+      ? incompleteInventoryCount
+      : 0;
   const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && (
     user.role === 'empleado' ? t.assignedTo === user.username || t.assigned_to === user.username : true
   )).length;
@@ -4624,22 +4648,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                                 className="danger"
                                                 onClick={async () => {
                                                   const label = item.task || item.item || 'tarea';
-                                                  if (confirm(`¿Eliminar "${label}" del template?`)) {
-                                                    if (checklistTemplatesSource === 'checklist') {
-                                                      const ok = await realtimeService.deleteChecklistTemplateLegacy(item.id);
-                                                      if (ok) {
-                                                        setChecklistTemplates(prev => prev.filter(t => t.id !== item.id));
-                                                      } else {
-                                                        alert('No se pudo eliminar. Revisa permisos en Supabase.');
-                                                      }
-                                                    } else {
-                                                      const ok = await realtimeService.deleteChecklistTemplate(item.id);
-                                                      if (ok) {
-                                                        setChecklistTemplates(prev => prev.filter(t => t.id !== item.id));
-                                                      } else {
-                                                        alert('No se pudo eliminar. Revisa permisos en Supabase.');
-                                                      }
+                                                  if (!confirm(`¿Eliminar "${label}" del template?`)) return;
+                                                  const itemId = item.id;
+                                                  // Optimistic remove (rollback if persist fails)
+                                                  setChecklistTemplates(prev => prev.filter(t => String(t.id) !== String(itemId)));
+                                                  let ok = false;
+                                                  if (checklistTemplatesSource === 'checklist') {
+                                                    ok = await realtimeService.deleteChecklistTemplateLegacy(itemId);
+                                                  } else {
+                                                    ok = await realtimeService.deleteChecklistTemplate(itemId);
+                                                    if (!ok) {
+                                                      ok = await realtimeService.deleteChecklistTemplateLegacy(itemId);
                                                     }
+                                                  }
+                                                  if (!ok) {
+                                                    setChecklistTemplates(prev => dedupeChecklistTemplates([...prev, item]));
+                                                    alert('No se pudo eliminar. Revisa sesión/permisos en Supabase (owner/manager de esta casa).');
                                                   }
                                                 }}
                                               >

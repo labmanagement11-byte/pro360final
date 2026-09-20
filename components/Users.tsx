@@ -151,7 +151,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
     }
   }, [user, propUsers, propHouses, owner, isManager, canManageUsers, managerHouse]);
 
-  if (!user || (user.role !== 'dueno' && user.role !== 'owner' && user.role !== 'manager')) {
+  if (!user || !['dueno', 'owner', 'manager'].includes(String(user.role || '').toLowerCase())) {
     return (
       <div className="users-container">
         <h2>Gestión de Usuarios</h2>
