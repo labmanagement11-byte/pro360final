@@ -1,0 +1,39 @@
+[
+  {
+    "path": "components/Calendar.tsx",
+    "parts": [
+      "components__Calendar.tsx.b64.p00"
+    ]
+  },
+  {
+    "path": "components/Checklist.tsx",
+    "parts": [
+      "components__Checklist.tsx.b64.p00"
+    ]
+  },
+  {
+    "path": "utils/supabaseRealtimeService.ts",
+    "parts": [
+      "utils__supabaseRealtimeService.ts.b64.p00",
+      "utils__supabaseRealtimeService.ts.b64.p01",
+      "utils__supabaseRealtimeService.ts.b64.p02",
+      "utils__supabaseRealtimeService.ts.b64.p03"
+    ]
+  },
+  {
+    "path": "components/Dashboard.tsx",
+    "parts": [
+      "components__Dashboard.tsx.b64.p00",
+      "components__Dashboard.tsx.b64.p01",
+      "components__Dashboard.tsx.b64.p02",
+      "components__Dashboard.tsx.b64.p03",
+      "components__Dashboard.tsx.b64.p04",
+      "components__Dashboard.tsx.b64.p05",
+      "components__Dashboard.tsx.b64.p06",
+      "components__Dashboard.tsx.b64.p07",
+      "components__Dashboard.tsx.b64.p08",
+      "components__Dashboard.tsx.b64.p09",
+      "components__Dashboard.tsx.b64.p10"
+    ]
+  }
+]
