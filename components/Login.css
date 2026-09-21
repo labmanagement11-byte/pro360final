@@ -313,19 +313,22 @@
    ============================================ */
 
 .login-error-msg {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.05) 100%);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-left: 4px solid #ef4444;
-  color: #991b1b;
+  background: rgba(127, 29, 29, 0.92);
+  border: 1px solid rgba(252, 165, 165, 0.55);
+  border-left: 4px solid #f87171;
+  color: #fee2e2;
   padding: 1rem 1.125rem;
   border-radius: 0.875rem;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  margin-top: 1.5rem;
+  font-size: 0.975rem;
+  font-weight: 650;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
   animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 @keyframes shake {

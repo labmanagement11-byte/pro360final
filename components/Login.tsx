@@ -18,17 +18,40 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return;
+
+    let cancelled = false;
+
+    const restore = async () => {
       const saved = localStorage.getItem(SESSION_KEY);
       if (saved) {
-        const user = JSON.parse(saved);
-        if (user.role === 'owner' || user.role === 'dueno') {
-          user.role = 'owner';
-          user.house = 'all';
-          localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        // Require a live Supabase Auth session so RLS deletes/writes work
+        if (supabase) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (!sessionData?.session) {
+            localStorage.removeItem(SESSION_KEY);
+          } else if (!cancelled) {
+            const user = JSON.parse(saved);
+            if (user.role === 'owner' || user.role === 'dueno') {
+              user.role = 'owner';
+              user.house = 'all';
+              localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+            }
+            onLogin(user);
+            return;
+          } else {
+            return;
+          }
+        } else {
+          const user = JSON.parse(saved);
+          if (user.role === 'owner' || user.role === 'dueno') {
+            user.role = 'owner';
+            user.house = 'all';
+            localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+          }
+          onLogin(user);
+          return;
         }
-        onLogin(user);
-        return;
       }
 
       try {
@@ -38,10 +61,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           const devUserObj: User = { username: 'jonathan', password: '', role: 'owner', house: 'all' };
           localStorage.setItem(SESSION_KEY, JSON.stringify(devUserObj));
           onLogin(devUserObj);
-          return;
         }
       } catch (e) { /* ignore */ }
-    }
+    };
+
+    restore();
+    return () => { cancelled = true; };
   }, [onLogin]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -75,6 +100,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       });
 
       if (authError || !authData.user) {
+        console.warn('Login auth failed:', authError?.message || 'sin usuario');
         setError('Email o contraseña incorrectos');
         setLoading(false);
         return;
@@ -225,6 +251,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             />
             <span>Recordar sesión</span>
           </label>
+          {error ? (
+            <div className="login-error-msg" role="alert" aria-live="assertive">{error}</div>
+          ) : null}
           <button type="submit" disabled={loading} className="login-submit-btn">
             {loading ? (
               <span className="login-btn-content">
@@ -239,7 +268,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             )}
           </button>
         </form>
-        {error && <div className="login-error-msg">{error}</div>}
       </div>
     </div>
   );

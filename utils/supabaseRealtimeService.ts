@@ -2418,16 +2418,25 @@ export async function updateChecklistTemplateLegacy(id: string, updates: any) {
   }
 }
 
-export async function deleteChecklistTemplateLegacy(id: string) {
+export async function deleteChecklistTemplateLegacy(id: string | number) {
   try {
     const supabase = getSupabaseClient();
-    const { error } = await (supabase
+    const idNum = typeof id === 'number' ? id : Number(id);
+    const idFilter = Number.isFinite(idNum) ? idNum : id;
+
+    // .select() so RLS silent no-ops (0 rows) are detected
+    const { data, error } = await (supabase
       .from('checklist') as any)
       .delete()
-      .eq('id', id);
+      .eq('id', idFilter)
+      .select('id');
 
     if (error) {
       console.error('❌ Error eliminando checklist legacy:', error);
+      return false;
+    }
+    if (!data || data.length === 0) {
+      console.error('❌ deleteChecklistTemplateLegacy: 0 filas eliminadas (RLS o id inválido)', { id, idFilter });
       return false;
     }
 
@@ -2490,19 +2499,33 @@ export async function updateChecklistTemplate(id: string, updates: any) {
   }
 }
 
-export async function deleteChecklistTemplate(id: string) {
+export async function deleteChecklistTemplate(id: string | number) {
   try {
     const supabase = getSupabaseClient();
-    const { error } = await (supabase
+    const idNum = typeof id === 'number' ? id : Number(id);
+    const idFilter = Number.isFinite(idNum) ? idNum : id;
+
+    const { data, error } = await (supabase
       .from('checklist_templates') as any)
       .delete()
-      .eq('id', id);
-    
+      .eq('id', idFilter)
+      .select('id');
+
     if (error) {
+      // Table missing → try legacy checklist table
+      const msg = String(error.message || '');
+      const code = String((error as any).code || '');
+      if (code === 'PGRST205' || msg.includes('checklist_templates')) {
+        return deleteChecklistTemplateLegacy(idFilter);
+      }
       console.error('❌ Error eliminando template de checklist:', error);
       return false;
     }
-    
+    if (!data || data.length === 0) {
+      // Maybe row lives in legacy table
+      return deleteChecklistTemplateLegacy(idFilter);
+    }
+
     return true;
   } catch (error) {
     console.error('❌ Exception en deleteChecklistTemplate:', error);
