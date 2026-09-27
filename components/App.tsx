@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 
 import Dashboard, { User } from './Dashboard';
 import Login from './Login';
+import ReminderDueBanner from './ReminderDueBanner';
 import { supabase } from '../utils/supabaseClient';
 
 
@@ -174,6 +175,8 @@ const App = () => {
       {!userState ? (
         <Login onLogin={setUser} users={users} />
       ) : (
+        <>
+        <ReminderDueBanner user={userState} />
         <Dashboard
           user={userState}
           users={visibleUsers}
@@ -183,6 +186,7 @@ const App = () => {
           setUser={setUser}
           onLogout={handleLogout}
         />
+        </>
       )}
     </div>
   );
