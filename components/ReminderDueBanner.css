@@ -1,0 +1,101 @@
+/* Alerta visible de recordatorios por vencer (≤ 7 días) — encima del Dashboard */
+.reminder-due-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: calc(100% - 2rem);
+  max-width: 1200px;
+  /* deja espacio al botón fijo de tema (arriba a la derecha) */
+  margin: 72px auto 0;
+  padding: 0.85rem 2.75rem 0.85rem 1rem;
+  border: 2px solid #dc2626;
+  border-radius: 0.9rem;
+  background: #fef2f2;
+  color: #7f1d1d;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.2);
+  animation: reminderDuePulse 2s ease-in-out infinite;
+}
+
+.reminder-due-banner-icon {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.reminder-due-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.reminder-due-banner-text strong {
+  color: #b91c1c;
+  font-size: 1rem;
+}
+
+.reminder-due-banner-list {
+  list-style: none;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.reminder-due-banner-name {
+  font-weight: 700;
+}
+
+.reminder-due-banner-when.level-overdue,
+.reminder-due-banner-when.level-today {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.reminder-due-banner-close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reminder-due-banner-close:hover {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+/* Tarjetas de recordatorio dentro del modal: por vencer / vencido siempre en rojo */
+.subcard.reminder-urgent {
+  border: 2px solid #dc2626 !important;
+  background: #fef2f2 !important;
+  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.18);
+}
+
+.subcard.reminder-urgent h3 {
+  color: #b91c1c;
+}
+
+@keyframes reminderDuePulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.2); }
+  50% { box-shadow: 0 4px 22px rgba(220, 38, 38, 0.45); }
+}
+
+@media (max-width: 768px) {
+  .reminder-due-banner {
+    width: calc(100% - 1.5rem);
+    margin-top: 64px;
+    padding: 0.75rem 2.5rem 0.75rem 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder-due-banner {
+    animation: none;
+  }
+}

@@ -4,7 +4,7 @@ export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (
     console.log('🔔 [Realtime Service] Suscripción a calendar_assignments para casa:', house);
     const supabase = getSupabaseClient();
     const uniqueId = Date.now();
-    
+
     // Suscribirse por house (nombre de la casa) - este es el campo que se usa en la tabla
     const channel = supabase
       .channel(`calendar-assignments-house-${house.replace(/\s+/g, '-')}-${uniqueId}`)
@@ -30,7 +30,7 @@ export function subscribeToCalendarAssignmentsByHouse(house: string, callback: (
         console.log('📡 [Realtime Service] Estado suscripción casa', house, ':', status);
       });
     console.log('✅ [Realtime Service] Canal creado para casa:', house);
-    return channel;
+    return attachCalendarAssignmentsFallback(channel, 'house', house, callback);
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse (por casa):', error);
     return null;
@@ -42,7 +42,7 @@ export function subscribeToCalendarAssignments(employeeUsername: string, callbac
     console.log('🔔 [Realtime Service] Suscripción a calendar_assignments para empleado:', employeeUsername);
     const supabase = getSupabaseClient();
     const uniqueId = Date.now();
-    
+
     // Suscribirse por employee (username) - este es el campo que se usa en la tabla
     const channel = supabase
       .channel(`calendar-assignments-employee-${employeeUsername}-${uniqueId}`)
@@ -67,7 +67,7 @@ export function subscribeToCalendarAssignments(employeeUsername: string, callbac
         console.log('📡 [Realtime Service] Estado suscripción empleado', employeeUsername, ':', status);
       });
 
-    return channel;
+    return attachCalendarAssignmentsFallback(channel, 'employee', employeeUsername, callback);
   } catch (error) {
     console.error('❌ [Realtime Service] Error al suscribirse:', error);
     return null;
@@ -79,7 +79,7 @@ export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback
   try {
     console.log('🔔 [Realtime Service] Suscripción A TODOS los cambios en calendar_assignments');
     const supabase = getSupabaseClient();
-    
+
     // Subscribe sin NINGUN filtro - recibir TODOS los cambios en la tabla
     const channel = supabase
       .channel(`calendar-assignments-all-${Date.now()}`)
@@ -98,7 +98,7 @@ export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback
             house: payload.new?.house || payload.old?.house,
             employee: payload.new?.employee || payload.old?.employee
           });
-          
+
           // Llamar callback sin filtros - dejar que el componente decida
           callback({
             eventType: payload.eventType,
@@ -110,7 +110,7 @@ export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback
       .subscribe((status: any) => {
         console.log('📡 [Realtime] Estado de suscripción:', status);
       });
-    
+
     console.log('✅ [Realtime] Canal creado - escuchando TODOS los cambios');
     return channel;
   } catch (error) {
@@ -119,6 +119,161 @@ export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback
   }
 }
 import { getSupabaseClient } from './supabaseClient';
+
+// ==================== CHECKLIST DEDUPE HELPERS ====================
+function normChecklistKeyPart(value: any) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * Deduplicate cleaning_checklist rows by house + zone + task.
+ * When duplicates exist, a completed row wins over a pending one so progress is never lost.
+ */
+export function dedupeChecklistRows<T = any>(rows: T[]): T[] {
+  const byKey = new Map<string, any>();
+  const order: string[] = [];
+  (rows || []).forEach((row: any) => {
+    if (!row) return;
+    const key = [
+      normChecklistKeyPart(row.house),
+      normChecklistKeyPart(row.zone ?? row.room),
+      normChecklistKeyPart(row.task ?? row.item),
+    ].join('||');
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, row);
+      order.push(key);
+    } else if (!(existing.completed ?? existing.complete) && (row.completed ?? row.complete)) {
+      byKey.set(key, row);
+    }
+  });
+  return order.map((key) => byKey.get(key)) as T[];
+}
+
+// Prevent concurrent template inserts for the same assignment from this client
+const checklistCreationInFlight = new Map<string, Promise<any>>();
+
+// Rows this client just inserted into cleaning_checklist. Their realtime INSERT echo is
+// skipped because the caller already has them (otherwise the open checklist doubled: 32 → 64 → 96).
+const recentlyInsertedChecklistIds = new Set<string>();
+function rememberInsertedChecklistRows(rows: any[]) {
+  (rows || []).forEach((row: any) => {
+    if (row?.id == null) return;
+    const id = String(row.id);
+    recentlyInsertedChecklistIds.add(id);
+    setTimeout(() => recentlyInsertedChecklistIds.delete(id), 60000);
+  });
+}
+
+// ==================== CALENDAR ASSIGNMENTS: RESPALDO SIN REALTIME ====================
+// calendar_assignments puede no estar en la publicación supabase_realtime; en ese caso
+// ningún evento llega y la lista de Asignaciones no se refresca. Cada suscripción de
+// calendario lleva además un sondeo con diff que emite INSERT/UPDATE/DELETE al mismo
+// callback, y se refresca al instante cuando este cliente guarda/edita/elimina.
+const CALENDAR_POLL_MS = 15000;
+const calendarChangeListeners = new Set<() => void>();
+
+export function notifyCalendarAssignmentsChanged() {
+  calendarChangeListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch (err) {
+      console.warn('⚠️ [Calendar Sync] listener error:', err);
+    }
+  });
+}
+
+function attachCalendarAssignmentsFallback(
+  channel: any,
+  column: 'house' | 'employee',
+  value: string,
+  callback: (data: any) => void
+) {
+  if (!channel || typeof window === 'undefined' || !value) return channel;
+  const snapshot = new Map<string, string>();
+  let ready = false;
+  let stopped = false;
+  let running = false;
+  let again = false;
+
+  const poll = async () => {
+    if (stopped) return;
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await (supabase
+        .from('calendar_assignments') as any)
+        .select('*')
+        .eq(column, value);
+      if (stopped || error || !data) return;
+      const seen = new Set<string>();
+      (data as any[]).forEach((row: any) => {
+        const id = String(row.id);
+        const json = JSON.stringify(row);
+        seen.add(id);
+        const prev = snapshot.get(id);
+        if (ready && prev === undefined) {
+          callback({ eventType: 'INSERT', new: row, old: null });
+        } else if (ready && prev !== json) {
+          callback({ eventType: 'UPDATE', new: row, old: JSON.parse(prev as string) });
+        }
+        snapshot.set(id, json);
+      });
+      Array.from(snapshot.keys()).forEach((id) => {
+        if (seen.has(id)) return;
+        const prev = snapshot.get(id) as string;
+        snapshot.delete(id);
+        if (ready) callback({ eventType: 'DELETE', new: null, old: JSON.parse(prev) });
+      });
+      ready = true;
+    } catch (err) {
+      console.warn('⚠️ [Calendar Sync] Error en sondeo de respaldo:', err);
+    } finally {
+      running = false;
+      if (again && !stopped) {
+        again = false;
+        poll();
+      }
+    }
+  };
+
+  const pollIfVisible = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    poll();
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') poll();
+  };
+
+  poll();
+  const timer = setInterval(pollIfVisible, CALENDAR_POLL_MS);
+  calendarChangeListeners.add(poll);
+  window.addEventListener('focus', pollIfVisible);
+  document.addEventListener('visibilitychange', onVisibility);
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+    calendarChangeListeners.delete(poll);
+    window.removeEventListener('focus', pollIfVisible);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+  // Se devuelve un "handle" enlazado al canal real: supabase.removeChannel(handle) y
+  // handle.unsubscribe() detienen el respaldo y luego cierran el canal. realtime-js puede
+  // llamar internamente a channel.unsubscribe() (p. ej. si la tabla no está publicada) y
+  // eso NO debe apagar el respaldo, por eso no se modifica el canal real.
+  const handle = Object.create(channel);
+  handle.unsubscribe = (...args: any[]) => {
+    stop();
+    return channel.unsubscribe(...args);
+  };
+  return handle;
+}
 
 // Helper para normalizar campos snake_case -> camelCase
 function normalizeTask(row: any) {
@@ -146,7 +301,7 @@ export async function createTask(task: any) {
       created_at: new Date().toISOString()
     }])
     .select();
-  
+
   if (error) {
     console.error('Error creating task:', error);
     return null;
@@ -162,7 +317,7 @@ export async function getTasks(house: string = 'HYNTIBA2 APTO 406') {
       .select('*')
       .eq('house', house)
       .order('created_at', { ascending: false });
-    
+
     if (error) {
       console.error('Error fetching tasks:', error);
       return [];
@@ -177,7 +332,7 @@ export async function getTasks(house: string = 'HYNTIBA2 APTO 406') {
 export async function updateTask(taskId: string, updates: any) {
   const supabase = getSupabaseClient();
   const mappedUpdates: any = { ...updates };
-  
+
   // Map camelCase to snake_case
   if ('assignedTo' in mappedUpdates) {
     mappedUpdates.assigned_to = mappedUpdates.assignedTo;
@@ -187,13 +342,13 @@ export async function updateTask(taskId: string, updates: any) {
     mappedUpdates.created_by = mappedUpdates.createdBy;
     delete mappedUpdates.createdBy;
   }
-  
+
   const { data, error } = await (supabase
     .from('tasks') as any)
     .update(mappedUpdates)
     .eq('id', taskId)
     .select();
-  
+
   if (error) {
     console.error('Error updating task:', error);
     return null;
@@ -207,7 +362,7 @@ export async function deleteTask(taskId: string) {
     .from('tasks') as any)
     .delete()
     .eq('id', taskId);
-  
+
   if (error) {
     console.error('Error deleting task:', error);
     return false;
@@ -219,7 +374,7 @@ export function subscribeToTasks(house: string = 'HYNTIBA2 APTO 406', callback: 
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a tasks para house:', house);
     const supabase = getSupabaseClient();
-    
+
     const channel = supabase
       .channel(`tasks-changes-${house}`)
       .on(
@@ -232,14 +387,14 @@ export function subscribeToTasks(house: string = 'HYNTIBA2 APTO 406', callback: 
         },
         (payload: any) => {
           console.log('⚡ [Realtime Service] Evento recibido:', payload);
-          
+
           // Mapear el evento al formato esperado
           const mappedPayload = {
             eventType: payload.eventType,
             new: normalizeTask(payload.new),
             old: normalizeTask(payload.old)
           };
-          
+
           console.log('✅ [Realtime Service] Ejecutando callback con:', mappedPayload);
           callback(mappedPayload);
         }
@@ -247,7 +402,7 @@ export function subscribeToTasks(house: string = 'HYNTIBA2 APTO 406', callback: 
       .subscribe((status: any) => {
         console.log('📡 [Realtime Service] Estado de suscripción:', status);
       });
-    
+
     console.log('✅ [Realtime Service] Canal creado:', channel);
     return channel;
   } catch (error) {
@@ -272,7 +427,7 @@ export async function createChecklistItem(item: any) {
       completedAt: null
     }])
     .select();
-  
+
   if (error) {
     console.error('Error creating checklist item:', error);
     return null;
@@ -291,7 +446,7 @@ export async function updateChecklistItem(itemId: string, completed: boolean, co
     })
     .eq('id', itemId)
     .select();
-  
+
   if (error) {
     console.error('Error updating checklist item:', error);
     return null;
@@ -305,7 +460,7 @@ export async function getChecklistItems(taskId: string) {
     .from('checklist_items') as any)
     .select('*')
     .eq('taskId', taskId);
-  
+
   if (error) {
     console.error('Error fetching checklist items:', error);
     return [];
@@ -323,7 +478,7 @@ export function subscribeToChecklistItems(taskId: string, callback: (data: any) 
       }
     })
     .subscribe();
-  
+
   return subscription;
 }
 
@@ -342,7 +497,7 @@ export async function createInventoryItem(item: any) {
       created_at: new Date().toISOString()
     }])
     .select();
-  
+
   if (error) {
     console.error('Error creating inventory item:', error);
     return null;
@@ -360,7 +515,7 @@ export async function updateInventoryItem(itemId: string, updates: any) {
     })
     .eq('id', itemId)
     .select();
-  
+
   if (error) {
     console.error('Error updating inventory item:', error);
     return null;
@@ -375,7 +530,7 @@ export async function getInventoryItems(house: string = 'HYNTIBA2 APTO 406') {
       .from('inventory') as any)
       .select('*')
       .eq('house', house);
-    
+
     if (error) {
       console.error('Error fetching inventory:', error);
       return [];
@@ -393,7 +548,7 @@ export async function deleteInventoryItem(itemId: string) {
     .from('inventory') as any)
     .delete()
     .eq('id', itemId);
-  
+
   if (error) {
     console.error('Error deleting inventory item:', error);
     return false;
@@ -404,7 +559,7 @@ export async function deleteInventoryItem(itemId: string) {
 export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callback: (data: any) => void) {
   try {
     const supabase = getSupabaseClient();
-    
+
     const channel = supabase
       .channel(`inventory-changes-${house}`)
       .on(
@@ -425,7 +580,7 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
         }
       )
       .subscribe();
-    
+
     return channel;
   } catch (error) {
     console.error('Error subscribing to inventory:', error);
@@ -436,7 +591,7 @@ export function subscribeToInventory(house: string = 'HYNTIBA2 APTO 406', callba
 // ==================== CALENDAR ASSIGNMENTS ====================
 export async function createCalendarAssignment(assignment: any) {
   const supabase = getSupabaseClient();
-  
+
   // Generate UUID for this assignment
   const generateUUID = () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -444,9 +599,9 @@ export async function createCalendarAssignment(assignment: any) {
       return v.toString(16);
     });
   };
-  
+
   const assignmentUUID = generateUUID();
-  
+
   console.log('🔄 [Assignment] Creando asignación con UUID:', {
     uuid: assignmentUUID,
     employee: assignment.employee,
@@ -454,7 +609,7 @@ export async function createCalendarAssignment(assignment: any) {
     type: assignment.type,
     date: assignment.date
   });
-  
+
   // Try to insert with calendar_assignment_uuid column
   let { data, error } = await (supabase
     .from('calendar_assignments') as any)
@@ -468,7 +623,7 @@ export async function createCalendarAssignment(assignment: any) {
       created_at: new Date().toISOString()
     }])
     .select();
-  
+
   // If column doesn't exist, try without it
   if (error && error.message.includes('calendar_assignment_uuid')) {
     console.log('⚠️ [Assignment] Column calendar_assignment_uuid not found, inserting without it');
@@ -483,14 +638,14 @@ export async function createCalendarAssignment(assignment: any) {
         created_at: new Date().toISOString()
       }])
       .select();
-    
+
     if (error2) {
       console.error('❌ [Assignment] Error creating:', error2);
       return null;
     }
-    
+
     data = data2;
-    
+
     // Store UUID in localStorage for later use
     if (data && data[0]) {
       localStorage.setItem(`assignment_${data[0].id}_uuid`, assignmentUUID);
@@ -500,16 +655,17 @@ export async function createCalendarAssignment(assignment: any) {
     console.error('❌ [Assignment] Error creating:', error);
     return null;
   }
-  
+
   if (!data || data.length === 0) {
     console.error('❌ [Assignment] Insert returned no data');
     return null;
   }
-  
+
   const result = data[0];
   // Store the UUID in the result for immediate use
   result.calendar_assignment_uuid = assignmentUUID;
   console.log(`✅ [Assignment] Creado: ID=${result.id}, UUID=${assignmentUUID}`);
+  notifyCalendarAssignmentsChanged();
   return result;
 }
 
@@ -517,31 +673,31 @@ export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406'
   try {
     const supabase = getSupabaseClient();
     console.log('🔍 [getCalendarAssignments] Buscando en house:', house, 'employee:', employee);
-    
+
     let query = (supabase
       .from('calendar_assignments') as any)
       .select('*')
       .eq('house', house);
-    
+
     if (employee) {
       query = query.eq('employee', employee);
       console.log('👤 [getCalendarAssignments] Filtrando por employee:', employee);
     }
-    
+
     const { data, error } = await query.order('date', { ascending: true });
-    
+
     if (error) {
       console.error('❌ [getCalendarAssignments] Error:', error);
       return [];
     }
-    
+
     console.log('✅ [getCalendarAssignments] Resultados:', data?.length || 0, 'items');
     if (data && data.length > 0) {
       data.forEach((a: any) => {
         console.log(`   - ID:${a.id} | UUID:${a.calendar_assignment_uuid || 'N/A'} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
       });
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('❌ Exception fetching calendar assignments:', error);
@@ -556,17 +712,18 @@ export async function updateCalendarAssignment(assignmentId: string, updates: an
     .update(updates)
     .eq('id', assignmentId)
     .select();
-  
+
   if (error) {
     console.error('Error updating calendar assignment:', error);
     return null;
   }
+  notifyCalendarAssignmentsChanged();
   return data?.[0] || null;
 }
 
 export async function deleteCalendarAssignment(assignmentId: string) {
   const supabase = getSupabaseClient();
-  
+
   // Primero obtener la casa de la asignación para reiniciar el inventario
   try {
     const { data: assignmentData } = await (supabase
@@ -574,17 +731,17 @@ export async function deleteCalendarAssignment(assignmentId: string) {
       .select('house')
       .eq('id', assignmentId)
       .single();
-    
+
     if (assignmentData?.house) {
       console.log('🏠 [DELETE] Reiniciando inventario de la casa:', assignmentData.house);
-      
+
       // Reiniciar el inventario de la casa (complete: false, missing: 0, reason: null)
       const { data: resetData, error: resetError, count } = await (supabase
         .from('inventory') as any)
         .update({ complete: false, missing: 0, reason: null })
         .eq('house', assignmentData.house)
         .select();
-      
+
       if (resetError) {
         console.error('❌ [DELETE] Error reiniciando inventario:', resetError);
       } else {
@@ -596,16 +753,17 @@ export async function deleteCalendarAssignment(assignmentId: string) {
   } catch (error) {
     console.error('❌ [DELETE] Error obteniendo casa de la asignación:', error);
   }
-  
+
   const { error } = await (supabase
     .from('calendar_assignments') as any)
     .delete()
     .eq('id', assignmentId);
-  
+
   if (error) {
     console.error('Error deleting calendar assignment:', error);
     return false;
   }
+  notifyCalendarAssignmentsChanged();
   return true;
 }
 
@@ -624,19 +782,19 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
       .select('house')
       .eq('id', assignmentIdStr)
       .single();
-    
+
     console.log('🗑️ [DELETE] Asignación encontrada:', assignmentData, 'Error:', fetchError);
-    
+
     if (assignmentData?.house) {
       houseName = assignmentData.house;
       console.log('🏠 Reiniciando inventario de la casa:', houseName);
-      
+
       // Reiniciar el inventario de la casa (solo complete existe)
       const { error: resetError } = await (supabase
         .from('inventory') as any)
         .update({ complete: false })
         .eq('house', houseName);
-      
+
       if (resetError) {
         console.error('Error reiniciando inventario:', resetError);
       } else {
@@ -696,6 +854,7 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
   }
 
   console.log('✅ [DELETE] Asignación eliminada exitosamente');
+  notifyCalendarAssignmentsChanged();
   return true;
 }
 
@@ -703,13 +862,13 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
 // ==================== CLEANING CHECKLIST ====================
 // ==================== CLEANING CHECKLIST ====================
 export async function createCleaningChecklistItems(
-  assignmentId: string | number, 
-  employee: string, 
-  assignmentType: string, 
+  assignmentId: string | number,
+  employee: string,
+  assignmentType: string,
   house: string = 'HYNTIBA2 APTO 406'
 ) {
   console.log('🧹 [Checklist] Creando desde plantillas:', { assignmentId, employee, assignmentType, house });
-  
+
   // Usar la nueva función de plantillas que consulta checklist_templates
   const result = await createChecklistFromTemplate(
     String(assignmentId),
@@ -717,7 +876,7 @@ export async function createCleaningChecklistItems(
     employee,
     house
   );
-  
+
   if (result.success) {
     console.log(`✅ ${result.count} items creados desde plantillas`);
     return result.items || [];
@@ -731,7 +890,7 @@ export async function getCleaningChecklistItems(assignmentId: string) {
   try {
     // Asegurar que assignmentId es un string
     const assignmentIdStr = String(assignmentId);
-    
+
     console.log('🧹 [Checklist] Solicitando items para asignación:', assignmentIdStr);
     const supabase = getSupabaseClient();
     // Obtener asignación para conocer tipo y casa
@@ -754,41 +913,55 @@ export async function getCleaningChecklistItems(assignmentId: string) {
       .order('order_num', { ascending: true });
 
     if (!error && data && data.length > 0) {
-      console.log('✅ [Checklist] Items obtenidos por assignment_id:', data.length, 'items para', assignment.type);
-      return data;
+      const houseName = String(assignment.house || '').trim();
+      const unique = dedupeChecklistRows(
+        data.filter((row: any) => !houseName || String(row.house || '').trim() === houseName)
+      );
+      console.log('✅ [Checklist] Items obtenidos por assignment_id:', data.length, '→ únicos', unique.length, 'para', assignment.type);
+      return unique;
     }
 
-    // PASO 2: Búsqueda inteligente por employee + house, luego filtrar por tipo
-    console.log('🔍 [Checklist] Buscando items existentes por employee+house para tipo:', assignment.type);
-    
+    // PASO 2: Items legacy HUÉRFANOS (sin calendar_assignment_id) por employee + house.
+    // Nunca reutilizar filas de OTRAS asignaciones: antes se sumaban las de cada
+    // asignación previa de la casa (p. ej. 3 × 32 = 96 tareas en Torre Magna).
+    console.log('🔍 [Checklist] Buscando items huérfanos por employee+house para tipo:', assignment.type);
+
     const { data: existingItems, error: existingError } = await (supabase
       .from('cleaning_checklist') as any)
       .select('*')
       .eq('employee', assignment.employee)
       .eq('house', assignment.house)
+      .or('calendar_assignment_id.is.null,calendar_assignment_id.eq.')
       .order('order_num', { ascending: true });
 
     if (!existingError && existingItems && existingItems.length > 0) {
-      console.log(`📊 [Checklist] ${existingItems.length} items encontrados para ${assignment.employee} en ${assignment.house}`);
-      
-      // Filtrar por tipo basado en el contenido de la zona/tarea
-      const filteredItems = filterItemsByType(existingItems, assignment.type);
-      
+      console.log(`📊 [Checklist] ${existingItems.length} items huérfanos para ${assignment.employee} en ${assignment.house}`);
+
+      // Filtrar por tipo basado en el contenido de la zona/tarea, solo esta casa, sin duplicados
+      const houseName = String(assignment.house || '').trim();
+      const filteredItems = dedupeChecklistRows(
+        filterItemsByType(existingItems, assignment.type)
+          .filter((row: any) => String(row.house || '').trim() === houseName)
+      );
+
       if (filteredItems.length > 0) {
-        console.log('✅ [Checklist] Items filtrados por tipo:', filteredItems.length);
-        
-        // Actualizar con assignment_id (migración lenta)
-        for (const item of filteredItems) {
-          if (!item.calendar_assignment_id || item.calendar_assignment_id === '') {
-            await (supabase
+        console.log('✅ [Checklist] Items huérfanos filtrados por tipo:', filteredItems.length);
+
+        // Vincular a esta asignación (migración lenta)
+        const ids = filteredItems.map((item: any) => item.id).filter((id: any) => id != null);
+        if (ids.length > 0) {
+          try {
+            const { error: claimError } = await (supabase
               .from('cleaning_checklist') as any)
               .update({ calendar_assignment_id: assignmentIdStr })
-              .eq('id', item.id)
-              .catch((err: any) => console.warn('⚠️ [Checklist] No se pudo actualizar item:', item.id));
+              .in('id', ids);
+            if (claimError) console.warn('⚠️ [Checklist] No se pudieron vincular items huérfanos:', claimError.message);
+          } catch (err) {
+            console.warn('⚠️ [Checklist] No se pudieron vincular items huérfanos:', err);
           }
         }
-        
-        return filteredItems.filter((row: any) => String(row.house || '').trim() === String(assignment.house || '').trim());
+
+        return filteredItems.map((item: any) => ({ ...item, calendar_assignment_id: assignmentIdStr }));
       }
     }
 
@@ -810,27 +983,27 @@ export async function getCleaningChecklistItems(assignmentId: string) {
 // Helper: Filtrar items por tipo basándose en el contenido de zona/tarea
 function filterItemsByType(items: any[], assignmentType: string): any[] {
   const type = assignmentType.toLowerCase();
-  
+
   // Palabras clave para identificar cada tipo
   const regularPatterns = [
     'cocina', 'baño', 'habitaciones', 'sala', 'lavadero', 'limpieza general',
     'barrer', 'trapear', 'polvo', 'limpiar', 'lavar platos', 'tender camas'
   ];
-  
+
   const profundaPatterns = [
     'profunda', 'lavar forros', 'ventanas', 'nevera completa', 'desinfectar'
   ];
-  
+
   const mantenimientoPatterns = [
     'eléctrico', 'plomería', 'electrodomésticos', 'revisar', 'funcionamiento',
     'enchufes', 'bombillas', 'fugas', 'sanitario', 'lavadora', 'puertas', 'ventanas'
   ];
-  
+
   return items.filter((item: any) => {
     const zone = (item.zone || '').toLowerCase();
     const task = (item.task || '').toLowerCase();
     const content = `${zone} ${task}`;
-    
+
     if (type.includes('regular') || type.includes('limpieza regular')) {
       return regularPatterns.some(p => content.includes(p));
     } else if (type.includes('profunda')) {
@@ -838,7 +1011,7 @@ function filterItemsByType(items: any[], assignmentType: string): any[] {
     } else if (type.includes('mantenimiento')) {
       return mantenimientoPatterns.some(p => content.includes(p));
     }
-    
+
     return false;
   });
 }
@@ -851,7 +1024,7 @@ export async function updateCleaningChecklistItem(itemId: string, completed: boo
       completedBy,
       timestamp: new Date().toISOString()
     });
-    
+
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
       .from('cleaning_checklist') as any)
@@ -872,14 +1045,14 @@ export async function updateCleaningChecklistItem(itemId: string, completed: boo
       });
       return null;
     }
-    
+
     console.log('✅ [updateCleaningChecklistItem] Actualizado exitosamente:', {
       itemId,
       completed,
       dataLength: data?.length,
       updated_by: completedBy
     });
-    
+
     return data?.[0] || null;
   } catch (error) {
     console.error('❌ [updateCleaningChecklistItem] Exception:', error);
@@ -909,6 +1082,11 @@ export function subscribeToChecklist(assignmentId: string, callback: (data: any)
           const oldId = payload?.old?.calendar_assignment_id_bigint ?? payload?.old?.calendar_assignment_id;
           if (String(newId) !== String(assignmentId) && String(oldId) !== String(assignmentId)) {
             // No es para esta asignación
+            return;
+          }
+
+          // Eco de filas que este cliente acaba de insertar: ya están en la lista
+          if (payload.eventType === 'INSERT' && payload?.new?.id != null && recentlyInsertedChecklistIds.has(String(payload.new.id))) {
             return;
           }
 
@@ -1175,7 +1353,7 @@ export async function createAssignmentInventory(assignmentId: string | number, e
     });
     return [];
   }
-  
+
   console.log('✅ [Assignment Inventory] Items creados:', data?.length, 'para assignmentId:', id);
   return data || [];
 }
@@ -1186,7 +1364,7 @@ export async function getAssignmentInventory(assignmentId: string | number) {
     const id = String(assignmentId ?? '').trim();
     const normalizedId = normalizeAssignmentId(assignmentId);
     console.log('📦 [Assignment Inventory] Obteniendo para asignación:', id);
-    
+
     if (!normalizedId) {
       console.warn('⚠️ [Assignment Inventory] Assignment ID vacío');
       return [];
@@ -1216,7 +1394,7 @@ export async function getAssignmentInventory(assignmentId: string | number) {
       });
       return [];
     }
-    
+
     console.log('✅ [Assignment Inventory] Items obtenidos:', data?.length || 0, 'para ID:', id);
     return data || [];
   } catch (error) {
@@ -1234,7 +1412,7 @@ export async function updateAssignmentInventoryItem(itemId: string, isComplete: 
       checkedBy,
       timestamp: new Date().toISOString()
     });
-    
+
     const supabase = getSupabaseClient();
     const { data, error } = await (supabase
       .from('assignment_inventory') as any)
@@ -1256,14 +1434,14 @@ export async function updateAssignmentInventoryItem(itemId: string, isComplete: 
       });
       return null;
     }
-    
+
     console.log('✅ [updateAssignmentInventoryItem] Actualizado exitosamente:', {
       itemId,
       isComplete,
       checked_by: checkedBy,
       dataLength: data?.length
     });
-    
+
     return data?.[0] || null;
   } catch (error) {
     console.error('❌ [updateAssignmentInventoryItem] Exception:', error);
@@ -1296,13 +1474,13 @@ export function subscribeToAssignmentInventory(assignmentId: string | number, ca
         },
         (payload: any) => {
           console.log('⚡ [Assignment Inventory] Evento recibido:', payload);
-          
+
           const mappedPayload = {
             eventType: payload.eventType,
             new: payload.new,
             old: payload.old
           };
-          
+
           callback(mappedPayload);
         }
       )
@@ -1430,7 +1608,7 @@ export async function getShoppingList(house: string = 'HYNTIBA2 APTO 406', inclu
       .from('shopping_list') as any)
       .select('*')
       .eq('house', house);
-    
+
     if (!includePurchased) {
       query = query
         .eq('is_purchased', false)
@@ -1441,7 +1619,7 @@ export async function getShoppingList(house: string = 'HYNTIBA2 APTO 406', inclu
         .order('purchased_at', { ascending: false })
         .order('created_at', { ascending: false });
     }
-    
+
     const { data, error } = await query;
 
     if (error) {
@@ -1472,7 +1650,7 @@ export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 A
     if (item.size) {
       payload.size = item.size;
     }
-    
+
     let { data, error } = await (supabase
       .from('shopping_list') as any)
       .insert([payload])
@@ -1491,7 +1669,7 @@ export async function addShoppingListItem(item: any, house: string = 'HYNTIBA2 A
       return null;
     }
     console.log('✅ Shopping item added:', data?.[0]);
-    
+
     return data?.[0] || null;
   } catch (err) {
     console.error('❌ Exception adding shopping item:', err);
@@ -1613,12 +1791,20 @@ export function subscribeToShoppingList(house: string = 'HYNTIBA2 APTO 406', cal
 }
 
 // ==================== RECORDATORIOS (Supabase) ====================
+// La UI calcula la alerta con `new Date(r.due_date || r.due)`. Una fecha 'YYYY-MM-DD' se
+// interpreta como UTC y en Colombia (UTC-5) el vencimiento quedaba un día antes (un pago que
+// vence hoy salía "VENCIDO"). Con hora local explícita se interpreta como medianoche local.
+function toLocalDueDate(value: any) {
+  const str = value == null ? '' : String(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(str) ? `${str}T00:00:00` : value;
+}
+
 function mapReminderRow(row: any) {
   if (!row) return row;
   return {
     ...row,
     due: row.due_date || row.due,
-    due_date: row.due_date || row.due,
+    due_date: toLocalDueDate(row.due_date || row.due),
     invoiceNumber: row.invoice_number ?? row.invoiceNumber ?? null,
     invoice_number: row.invoice_number ?? row.invoiceNumber ?? null,
   };
@@ -1799,7 +1985,7 @@ export async function getHouses() {
       .from('houses') as any)
       .select('*')
       .order('nombre', { ascending: true });
-    
+
     if (error) {
       console.error('Error fetching houses:', error);
       return [];
@@ -1829,7 +2015,7 @@ export async function createHouse(house: any) {
       created_at: new Date().toISOString()
     }])
     .select();
-  
+
   if (error) {
     console.error('Error creating house:', error);
     return null;
@@ -1848,7 +2034,7 @@ export async function updateHouse(houseId: string, updates: any) {
     .update(updates)
     .eq('id', houseId)
     .select();
-  
+
   if (error) {
     console.error('Error updating house:', error);
     return null;
@@ -1862,7 +2048,7 @@ export async function deleteHouse(houseId: string) {
     .from('houses') as any)
     .delete()
     .eq('id', houseId);
-  
+
   if (error) {
     console.error('Error deleting house:', error);
     return false;
@@ -1874,13 +2060,13 @@ export function subscribeToHouses(callback: (data: any) => void) {
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a houses');
     const supabase = getSupabaseClient();
-    
+
     // Primero cargar todas las casas
     getHouses().then(houses => {
       console.log('📨 [Realtime Service] Casas cargadas inicialmente:', houses);
       callback(houses);
     });
-    
+
     const channel = supabase
       .channel('houses-changes')
       .on(
@@ -1976,7 +2162,7 @@ export async function createUser(user: any) {
       created_at: new Date().toISOString()
     }])
     .select();
-  
+
   if (error) {
     console.error('Error creating user:', error);
     return null;
@@ -1991,18 +2177,18 @@ export async function createUser(user: any) {
 export async function updateUser(userId: string, updates: any) {
   const supabase = getSupabaseClient();
   const mappedUpdates: any = { ...updates };
-  
+
   if ('house' in mappedUpdates) {
     mappedUpdates.house_name = mappedUpdates.house;
     delete mappedUpdates.house;
   }
-  
+
   const { data, error } = await (supabase
     .from('app_users') as any)
     .update(mappedUpdates)
     .eq('id', userId)
     .select();
-  
+
   if (error) {
     console.error('Error updating user:', error);
     return null;
@@ -2020,7 +2206,7 @@ export async function deleteUser(userId: string) {
     .from('app_users') as any)
     .delete()
     .eq('id', userId);
-  
+
   if (error) {
     console.error('Error deleting user:', error);
     return false;
@@ -2032,7 +2218,7 @@ export function subscribeToUsers(callback: (data: any) => void) {
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a app_users');
     const supabase = getSupabaseClient();
-    
+
     const channel = supabase
       .channel('users-changes')
       .on(
@@ -2071,6 +2257,22 @@ export function unsubscribeFromAll(subscriptions: any[]) {
 
 // ==================== CHECKLIST TEMPLATES ====================
 export async function createChecklistFromTemplate(assignmentId: string | number, taskType: string, employee: string, house: string) {
+  const key = String(assignmentId);
+  const pending = checklistCreationInFlight.get(key);
+  if (pending) {
+    console.log('⏳ createChecklistFromTemplate ya en curso para asignación', key, '— reutilizando');
+    return pending;
+  }
+  const run = createChecklistFromTemplateOnce(key, taskType, employee, house);
+  checklistCreationInFlight.set(key, run);
+  try {
+    return await run;
+  } finally {
+    checklistCreationInFlight.delete(key);
+  }
+}
+
+async function createChecklistFromTemplateOnce(assignmentId: string, taskType: string, employee: string, house: string): Promise<any> {
   try {
     assignmentId = String(assignmentId);
     console.log('📋 Creando checklist desde plantilla:', { assignmentId, taskType, employee, house });
@@ -2140,10 +2342,28 @@ export async function createChecklistFromTemplate(assignmentId: string | number,
       return { success: true, count: 0, items: [] };
     }
 
-    console.log(`✅ ${templates.length} plantillas encontradas para ${taskType} @ ${houseName}`);
+    // Plantillas repetidas (misma zona + tarea) solo se insertan una vez
+    templates = dedupeChecklistRows(templates.map((t: any) => ({ ...t, house: houseName })));
+
+    console.log(`✅ ${templates.length} plantillas únicas para ${taskType} @ ${houseName}`);
 
     // calendar_assignments.id is bigint; cleaning_checklist.calendar_assignment_id is text
     const assignmentIdStr = String(assignmentId);
+
+    // Idempotente: si la asignación ya tiene items, NO volver a insertar la plantilla
+    const { data: alreadyThere, error: alreadyError } = await (supabase
+      .from('cleaning_checklist') as any)
+      .select('*')
+      .eq('calendar_assignment_id', assignmentIdStr)
+      .order('order_num', { ascending: true });
+    if (!alreadyError && alreadyThere && alreadyThere.length > 0) {
+      const existingItems = dedupeChecklistRows(
+        alreadyThere.filter((row: any) => String(row.house || '').trim() === houseName)
+      );
+      console.log(`ℹ️ Asignación ${assignmentIdStr} ya tiene ${alreadyThere.length} items (${existingItems.length} únicos); no se re-inserta plantilla`);
+      return { success: true, count: existingItems.length, items: existingItems, persisted: true };
+    }
+
     const checklistItems = templates.map((template: any) => ({
       calendar_assignment_id: assignmentIdStr,
       employee: employee,
@@ -2170,7 +2390,8 @@ export async function createChecklistFromTemplate(assignmentId: string | number,
       return { success: true, count: memoryItems.length, items: memoryItems, persisted: false, error };
     }
 
-    const items = (data || []).filter((row: any) => String(row.house || '').trim() === houseName);
+    rememberInsertedChecklistRows(data || []);
+    const items = dedupeChecklistRows((data || []).filter((row: any) => String(row.house || '').trim() === houseName));
     console.log(`✅ ${items.length} items de checklist creados para asignación ${assignmentIdStr} @ ${houseName}`);
     return { success: true, count: items.length, items, persisted: true };
 
@@ -2187,20 +2408,20 @@ export async function getChecklistTemplates(house: string, taskType?: string) {
   try {
     const supabase = getSupabaseClient();
     let query = supabase.from('checklist_templates').select('*').eq('house', house);
-    
+
     if (taskType) {
       query = query.eq('task_type', taskType);
     }
-    
+
     const { data, error } = await query.order('order_num', { ascending: true });
-    
+
     if (error) {
       if ((error as any).code !== 'PGRST205') {
         console.error('❌ Error obteniendo templates de checklist:', error);
       }
       return [];
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('❌ Exception en getChecklistTemplates:', error);
@@ -2278,14 +2499,14 @@ export async function createChecklistTemplate(template: {
       .from('checklist_templates') as any)
       .insert([template])
       .select();
-    
+
     if (error) {
       if ((error as any).code !== 'PGRST205') {
         console.error('❌ Error creando template de checklist:', error);
       }
       return null;
     }
-    
+
     return data?.[0] || null;
   } catch (error) {
     console.error('❌ Exception en createChecklistTemplate:', error);
@@ -2486,12 +2707,12 @@ export async function updateChecklistTemplate(id: string, updates: any) {
       .update(updates)
       .eq('id', id)
       .select();
-    
+
     if (error) {
       console.error('❌ Error actualizando template de checklist:', error);
       return null;
     }
-    
+
     return data?.[0] || null;
   } catch (error) {
     console.error('❌ Exception en updateChecklistTemplate:', error);
@@ -2543,12 +2764,12 @@ export async function getInventoryTemplates(house: string) {
       .eq('house', house)
       .order('category', { ascending: true })
       .order('item_name', { ascending: true });
-    
+
     if (error) {
       console.error('❌ Error obteniendo templates de inventario:', error?.message, error?.code, error?.details, error?.hint);
       return [];
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('❌ Exception en getInventoryTemplates:', error);
@@ -2733,7 +2954,7 @@ export async function createInventoryFromTemplate(assignmentId: string, employee
   try {
     console.log('📦 Creando inventario desde plantilla:', { assignmentId, employee, house });
     const supabase = getSupabaseClient();
-    
+
     // Obtener templates activos para esta casa
     let { data: templates, error: templateError } = await (supabase
       .from('inventory_template') as any)
@@ -2755,14 +2976,14 @@ export async function createInventoryFromTemplate(assignmentId: string, employee
       console.error('❌ Error obteniendo templates de inventario:', templateError);
       return { success: false, error: templateError };
     }
-    
+
     if (!templates || templates.length === 0) {
       console.warn(`⚠️ No hay templates de inventario para casa ${house}`);
       return { success: true, count: 0, items: [] };
     }
-    
+
     console.log(`✅ ${templates.length} templates de inventario encontrados para ${house}`);
-    
+
     // Crear items de inventario desde templates
     const inventoryItems = templates.map((template: any) => ({
       calendar_assignment_id: assignmentId,
@@ -2775,21 +2996,21 @@ export async function createInventoryFromTemplate(assignmentId: string, employee
       complete: false,
       order_num: template.order_num
     }));
-    
+
     // Insertar en assignment_inventory
     const { data, error } = await (supabase
       .from('assignment_inventory') as any)
       .insert(inventoryItems)
       .select();
-    
+
     if (error) {
       console.error('❌ Error insertando inventario:', error);
       return { success: false, error };
     }
-    
+
     console.log(`✅ ${data?.length || 0} items de inventario creados para asignación ${assignmentId}`);
     return { success: true, count: data?.length || 0, items: data };
-    
+
   } catch (error) {
     console.error('❌ Exception en createInventoryFromTemplate:', error);
     return { success: false, error };
