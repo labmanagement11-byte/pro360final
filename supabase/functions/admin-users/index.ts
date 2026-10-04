@@ -253,6 +253,9 @@ Deno.serve(async (req) => {
       }
 
       if (password) {
+        if (!canViewPasswords) {
+          return json({ error: "Solo Jonathan puede cambiar contraseñas" }, 403);
+        }
         const pwdUpdate = await admin.auth.admin.updateUserById(id, { password });
         if (pwdUpdate.error) {
           return json({ error: `Perfil actualizado, pero la contraseña falló: ${pwdUpdate.error.message}` }, 400);
