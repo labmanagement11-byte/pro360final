@@ -9,6 +9,7 @@ import { supabase } from '../utils/supabaseClient';
 
 
 const SESSION_KEY = 'dashboard_session_user';
+const THEME_KEY = 'limpieza360-theme';
 
 function canSeeAllHouses(user: User | null) {
   if (!user) return false;
@@ -27,6 +28,7 @@ const App = () => {
   const setUser = (user: User | null) => setUserState(user);
   const [users, setUsers] = useState<User[]>([]);
   const [theme, setTheme] = useState('light');
+  const [themeReady, setThemeReady] = useState(false);
 
   const fetchUsers = async () => {
     if (!supabase) return;
@@ -116,8 +118,20 @@ const App = () => {
   };
 
   useEffect(() => {
+    const saved = localStorage.getItem(THEME_KEY);
+    const next = saved === 'light' || saved === 'dark'
+      ? saved
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    setTheme(next);
+    setThemeReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!themeReady) return;
+    document.documentElement.setAttribute('data-theme', theme);
     document.body.setAttribute('data-theme', theme);
-  }, [theme]);
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme, themeReady]);
 
   useEffect(() => {
     if (!userState && typeof window !== 'undefined') {
