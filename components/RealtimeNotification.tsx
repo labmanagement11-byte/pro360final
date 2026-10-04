@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './RealtimeNotification.css';
 
 interface RealtimeNotificationProps {
@@ -11,19 +11,21 @@ interface RealtimeNotificationProps {
 export const RealtimeNotification: React.FC<RealtimeNotificationProps> = ({
   message,
   type,
-  duration = 3000,
+  duration = 6000,
   onClose
 }) => {
   const [visible, setVisible] = useState(true);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setVisible(false);
-      onClose?.();
+      onCloseRef.current?.();
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration, onClose]);
+  }, [duration]);
 
   if (!visible) return null;
 
