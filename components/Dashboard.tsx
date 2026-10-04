@@ -2424,7 +2424,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'users',
       title: 'Usuarios',
-      desc: 'Administra empleados de tu casa (Auth + perfiles). Solo Jonathan ve contraseñas.',
+      desc: 'Agregar o eliminar usuarios.',
       show: ['owner', 'dueno', 'manager'].includes(String(user.role || '').toLowerCase()),
     },
     {
