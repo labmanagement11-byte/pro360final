@@ -7,14 +7,14 @@ const MAINT_ROOMS = new Set([
   'SISTEMAS ELÉCTRICOS',
 ]);
 
-function assignmentKind(type?: string | null): 'regular' | 'deep' | 'maint' {
+export function assignmentKind(type?: string | null): 'regular' | 'deep' | 'maint' {
   const value = String(type || '').toLowerCase();
   if (value.includes('manten')) return 'maint';
   if (value.includes('profund')) return 'deep';
   return 'regular';
 }
 
-function roomKind(room?: string | null): 'regular' | 'deep' | 'maint' {
+export function roomKind(room?: string | null): 'regular' | 'deep' | 'maint' {
   const name = String(room || '').trim().toUpperCase();
   if (name.includes('PROFUNDA')) return 'deep';
   if (MAINT_ROOMS.has(name) || name.includes('MANTEN')) return 'maint';
