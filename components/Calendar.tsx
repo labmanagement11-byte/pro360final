@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { FaCalendarAlt, FaUser, FaTasks, FaClock, FaBoxOpen, FaTrash } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaCalendarAlt } from 'react-icons/fa';
 import { supabase } from '../utils/supabaseClient';
 import * as realtimeService from '../utils/supabaseRealtimeService';
-import Checklist from './Checklist';
-import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
 
 const defaultTypes = [
   'Limpieza profunda',
@@ -11,32 +9,18 @@ const defaultTypes = [
   'Mantenimiento',
 ];
 
-interface CalendarEvent {
-  id?: number;
-  house: string;
-  date: string;
-  type: string;
-  employee: string;
-  time: string;
-  tasks: string;
-  inventory: string;
-  created_at?: string;
-}
-
 interface User {
   username: string;
   role: string;
-  house?: string; // Casa asignada (opcional)
-  password?: string; // Opcional para compatibilidad con Checklist
+  house?: string;
+  password?: string;
 }
 interface CalendarProps {
   users: User[];
   user: User;
-  selectedHouse?: string; // Casa seleccionada para filtrar usuarios
+  selectedHouse?: string;
 }
 const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     date: '',
     type: defaultTypes[0],
@@ -45,55 +29,12 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
     tasks: '',
     inventory: '',
   });
-  // Modal para mostrar checklist de asignación seleccionada
-  const [showChecklistModal, setShowChecklistModal] = useState(false);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-  const [selectedAssignmentHouse, setSelectedAssignmentHouse] = useState<string>('');
-
-  // Cargar eventos desde Supabase
-  const fetchEvents = async (house: string = 'EPIC D1') => {
-    setLoading(true);
-    if (!supabase) return;
-    const { data, error } = await (supabase as any)
-      .from('calendar_assignments')
-      .select('*')
-      .eq('house', house)
-      .order('date', { ascending: true });
-    if (!error && data) {
-      setEvents(data);
-    } else {
-      setEvents([]);
-    }
-    setLoading(false);
-  };
-
-  // Cargar eventos al montar y suscribirse a cambios en tiempo real
-  useEffect(() => {
-    const house = selectedHouse || 'EPIC D1';
-    fetchEvents(house);
-
-    if (!supabase) return;
-
-    // Suscripción realtime a cambios en calendar_assignments
-    const channel = supabase
-      .channel('calendar-assignments-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_assignments' }, (payload: any) => {
-        console.log('Cambio en calendar_assignments:', payload);
-        fetchEvents(house);
-      })
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [selectedHouse]);
 
   const addEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!supabase) return;
     const house = selectedHouse || 'EPIC D1';
 
-    // Reiniciar progreso previo de subtareas para este empleado, casa y tipo/fecha
     try {
       await (supabase as any)
         .from('subtask_progress')
@@ -115,23 +56,21 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
       tasks: form.tasks,
       inventory: form.inventory,
     };
-    
-    // Usar createCalendarAssignment que genera UUID automáticamente
+
     const insertedAssignment = await realtimeService.createCalendarAssignment(newAssignment);
     let assignmentId = null;
-    
+
     if (insertedAssignment) {
       assignmentId = insertedAssignment.id;
       console.log('✅ Assignment created with ID:', assignmentId, 'UUID:', insertedAssignment.checklist_uuid);
     }
 
-    // Crear checklist e inventario automáticamente si hay empleado y tipo
     if (assignmentId && form.employee && form.type) {
       try {
         await realtimeService.createCleaningChecklistItems(
           assignmentId,
           form.employee,
-          form.type, // tipo de limpieza/mantenimiento
+          form.type,
           house
         );
       } catch (err) {
@@ -148,27 +87,14 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
       }
     }
     setForm({ date: '', type: defaultTypes[0], employee: '', time: '', tasks: '', inventory: '' });
-    // Realtime actualizará automáticamente
   };
 
-  const deleteEvent = async (eventId: number) => {
-    if (!supabase) return;
-    const ev = events.find((item) => item.id === eventId);
-    if (ev && await shouldArchiveAssignment(ev)) {
-      await archiveCalendarAssignment(ev, user.username);
-      return;
-    }
-    await (supabase as any).from('calendar_assignments').delete().eq('id', eventId);
-  };
-
-  // Solo managers y dueños pueden agregar/eliminar
   const canEdit = user.role === 'owner' || user.role === 'manager';
-  // Empleados solo ven sus asignaciones
-  const visibleEvents = (user.role === 'empleado' ? events.filter((ev: any) => ev.employee === user.username) : events).filter((ev: any) => !ev.completed);
 
   return (
     <div className="calendar-list">
-      <h2 className="calendar-title"><FaCalendarAlt style={{marginRight:8, color:'#2563eb'}}/>Calendario de Asignaciones</h2>
+      <h2 className="calendar-title"><FaCalendarAlt style={{marginRight:8, color:'#0369a1'}}/>Calendario de Asignaciones</h2>
+      <p className="calendar-add-only-note">El calendario solo sirve para agregar. Los trabajos asignados se ven en Checklist de limpieza.</p>
       {canEdit && (
         <form className="calendar-form" onSubmit={addEvent}>
           <label htmlFor="calendar-date" className="calendar-label">Fecha:</label>
@@ -191,44 +117,6 @@ const Calendar = ({ users, user, selectedHouse }: CalendarProps) => {
           <button type="submit" className="calendar-btn main">Agregar</button>
         </form>
       )}
-      <div className="calendar-events">
-        {loading && <div className="calendar-empty">Cargando eventos...</div>}
-        {!loading && visibleEvents.length === 0 && <div className="calendar-empty">No hay asignaciones.</div>}
-        {!loading && visibleEvents.map((ev: CalendarEvent) => (
-          <div key={ev.id} className="calendar-event-card">
-            <div className="calendar-event-row">
-              <span className="calendar-event-icon"><FaCalendarAlt /></span>
-              <span className="calendar-event-date">{ev.date}</span>
-              <span className="calendar-event-type">{ev.type}</span>
-            </div>
-            <div className="calendar-event-row">
-              <span className="calendar-event-icon"><FaUser /></span>
-              <span className="calendar-event-employee">{ev.employee}</span>
-              <span className="calendar-event-icon"><FaClock /></span>
-              <span className="calendar-event-time">{ev.time}</span>
-            </div>
-            <div className="calendar-event-row">
-              <span className="calendar-event-icon"><FaTasks /></span>
-              <span className="calendar-event-tasks">{ev.tasks}</span>
-            </div>
-            <div className="calendar-event-row">
-              <span className="calendar-event-icon"><FaBoxOpen /></span>
-              <span className="calendar-event-inventory">{ev.inventory}</span>
-            </div>
-            <button className="calendar-btn main" onClick={() => { setSelectedAssignmentId(ev.id!); setSelectedAssignmentHouse(String(ev.house || selectedHouse || '')); setShowChecklistModal(true); }}>Ver Checklist</button>
-            {canEdit && <button className="calendar-btn danger" onClick={() => deleteEvent(ev.id!)} title="Eliminar"><FaTrash /></button>}
-          </div>
-        ))}
-        {/* Modal Checklist */}
-        {showChecklistModal && selectedAssignmentId && (
-          <div className="calendar-modal-overlay" style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(0,0,0,0.4)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div className="calendar-modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'1rem',minWidth:'350px',maxWidth:'90vw',maxHeight:'90vh',overflowY:'auto',position:'relative'}}>
-              <button style={{position:'absolute',top:10,right:10,fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>setShowChecklistModal(false)}>✕</button>
-              <Checklist user={{...user, password: user.password ?? '', house: selectedAssignmentHouse || selectedHouse || user.house}} assignmentId={selectedAssignmentId ?? undefined} />
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };
