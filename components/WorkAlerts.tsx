@@ -58,9 +58,9 @@ export default function WorkAlerts({ user }: { user: WorkAlertUser }) {
       stopRef.current();
       stopRef.current = () => {};
     };
-    // user.username / email identify who receives the alert
+    // username, role and house decide who receives each alert
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.username, user.email]);
+  }, [user.username, user.email, user.role, user.house]);
 
   useEffect(() => {
     const standalone = window.matchMedia("(display-mode: standalone)").matches

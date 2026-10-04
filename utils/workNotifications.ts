@@ -1,10 +1,14 @@
 import { supabase } from "./supabaseClient";
-import { employeeMatchKeys, nameBelongsToEmployee, type EmployeeIdentity } from "./employeeScope";
+import { employeeMatchKeys, isEmpleadoRole, nameBelongsToEmployee, type EmployeeIdentity } from "./employeeScope";
 
 const PUSH_STORAGE_KEY = "limpieza360.pushSubscription";
 const PERMISSION_ASKED_KEY = "limpieza360.notificationAsked";
 
-export type WorkAlertUser = EmployeeIdentity & { username?: string | null };
+export type WorkAlertUser = EmployeeIdentity & {
+  username?: string | null;
+  role?: string | null;
+  house?: string | null;
+};
 
 function vapidPublicKey(): string {
   return String(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").trim();
@@ -133,6 +137,141 @@ async function showWorkNotification(title: string, body: string, tag: string) {
 
 type AlertRow = { key: string; title: string; body: string };
 
+const REMINDER_WARNING_DAYS = 7;
+const LOST_OR_DAMAGED = new Set(["perdido", "danado"]);
+
+function roleOf(identity: WorkAlertUser): string {
+  return String(identity.role || "").trim().toLowerCase();
+}
+
+/** Owner sees every house. A manager sees only their house. Employees never do. */
+function staffScope(identity: WorkAlertUser): "all" | "house" | null {
+  if (isEmpleadoRole(identity.role)) return null;
+  const role = roleOf(identity);
+  const house = String(identity.house || "").trim().toLowerCase();
+  if (role === "owner" || role === "dueno" || role === "admin" || house === "all") return "all";
+  if (role === "manager" && house && house !== "all") return "house";
+  return null;
+}
+
+function seesHouse(identity: WorkAlertUser, house: unknown): boolean {
+  const scope = staffScope(identity);
+  if (scope === "all") return true;
+  if (scope !== "house") return false;
+  const mine = String(identity.house || "").trim().toLowerCase();
+  const theirs = String(house || "").trim().toLowerCase();
+  return Boolean(mine && theirs && mine === theirs);
+}
+
+function parseDueDay(raw: unknown): Date | null {
+  if (!raw) return null;
+  const str = String(raw).trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  const date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(str);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function reminderLevel(row: any): "soon" | "overdue" | null {
+  if (!row || row.paid) return null;
+  const due = parseDueDay(row.due_date || row.due);
+  if (!due) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((due.getTime() - today.getTime()) / 86400000);
+  if (daysLeft < 0) return "overdue";
+  if (daysLeft <= REMINDER_WARNING_DAYS) return "soon";
+  return null;
+}
+
+function reminderAlert(row: any, identity: WorkAlertUser): AlertRow | null {
+  if (!row || row.id == null || !seesHouse(identity, row.house)) return null;
+  const level = reminderLevel(row);
+  if (!level) return null;
+  const due = parseDueDay(row.due_date || row.due);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysLeft = due ? Math.round((due.getTime() - today.getTime()) / 86400000) : null;
+  const name = String(row.name || "Pago").trim();
+  const house = String(row.house || "").trim();
+  const dueText = String(row.due_date || row.due || "").slice(0, 10);
+  let when = "por vencer";
+  if (level === "overdue") {
+    const days = Math.abs(daysLeft || 0);
+    when = `vencido hace ${days} día${days === 1 ? "" : "s"}`;
+  } else if (daysLeft === 0) {
+    when = "vence hoy";
+  } else if (daysLeft != null) {
+    when = `vence en ${daysLeft} día${daysLeft === 1 ? "" : "s"}`;
+  }
+  return {
+    key: `rem:${row.id}:${level}`,
+    title: level === "overdue" ? "Recordatorio vencido" : "Recordatorio por vencer",
+    body: [name, house && `Casa ${house}`, when, dueText && `(${dueText})`].filter(Boolean).join(". "),
+  };
+}
+
+const REMINDER_SEEN_KEY = "limpieza360.reminderAlerts";
+
+function readReminderSeen(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(REMINDER_SEEN_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list.filter((item) => typeof item === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberReminder(key: string) {
+  const seen = readReminderSeen();
+  seen.add(key);
+  try {
+    localStorage.setItem(REMINDER_SEEN_KEY, JSON.stringify(Array.from(seen).slice(-300)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function inventoryAlert(row: any, identity: WorkAlertUser): AlertRow | null {
+  if (!row || row.id == null || row.complete === true) return null;
+  if (!seesHouse(identity, row.house)) return null;
+  const issue = String(row.issue_type || "").trim().toLowerCase();
+  if (!LOST_OR_DAMAGED.has(issue)) return null;
+  if (nameBelongsToEmployee(row.checked_by, identity)) return null;
+  const label = issue === "perdido" ? "perdido" : "dañado";
+  const name = String(row.name || "Artículo").trim();
+  const house = String(row.house || "").trim();
+  const zone = String(row.location || "").trim();
+  const who = String(row.checked_by || "").trim();
+  return {
+    key: `inv:${row.id}:${issue}`,
+    title: `Inventario ${label}`,
+    body: [name, house && `en ${house}`, zone && `zona ${zone}`, who && `lo reportó ${who}`].filter(Boolean).join(". "),
+  };
+}
+
+function shoppingAlert(row: any, identity: WorkAlertUser): AlertRow | null {
+  if (!row || row.id == null || row.is_purchased === true) return null;
+  if (!seesHouse(identity, row.house)) return null;
+  if (nameBelongsToEmployee(row.added_by, identity)) return null;
+  const name = String(row.item_name || row.name || "Artículo").trim();
+  const qty = String(row.quantity || "").trim();
+  const house = String(row.house || "").trim();
+  const who = String(row.added_by || "").trim();
+  return {
+    key: `shop:${row.id}`,
+    title: "Nuevo artículo en la lista de compras",
+    body: [`${name}${qty ? ` (${qty})` : ""}`, house && `Casa ${house}`, who && `lo agregó ${who}`].filter(Boolean).join(". "),
+  };
+}
+
+
+
 function assignmentRow(row: any, identity: WorkAlertUser): AlertRow | null {
   if (!row || row.id == null) return null;
   if (!nameBelongsToEmployee(row.employee, identity)) return null;
@@ -182,6 +321,9 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
   const seen = new Set<string>();
   let primedCal = false;
   let primedTasks = false;
+  let primedReminders = false;
+  let primedInventory = false;
+  let primedShopping = false;
   let stopped = false;
 
   const consider = async (rows: AlertRow[], allowNotify: boolean) => {
@@ -190,6 +332,18 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
       seen.add(row.key);
       if (allowNotify) await showWorkNotification(row.title, row.body, row.key);
     }
+  };
+
+  const loadStaff = async (table: "reminders" | "inventory" | "shopping_list") => {
+    if (!supabase || !staffScope(identity)) return null;
+    let query = (supabase.from(table) as any).select("*");
+    if (staffScope(identity) === "house") query = query.eq("house", String(identity.house || "").trim());
+    if (table === "reminders") query = query.eq("paid", false).order("due_date", { ascending: true });
+    if (table === "inventory") query = query.in("issue_type", ["perdido", "danado"]);
+    if (table === "shopping_list") query = query.order("created_at", { ascending: false }).limit(40);
+    const { data, error } = await query;
+    if (error || !data) return null;
+    return data as any[];
   };
 
   const scan = async () => {
@@ -214,6 +368,39 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
       await consider(rows, primedTasks);
       primedTasks = true;
     }
+    if (staffScope(identity)) {
+      const [reminders, inventory, shopping] = await Promise.all([
+        loadStaff("reminders"),
+        loadStaff("inventory"),
+        loadStaff("shopping_list"),
+      ]);
+      if (reminders !== null) {
+        const already = readReminderSeen();
+        const rows = reminders
+          .map((row) => reminderAlert(row, identity))
+          .filter((row): row is AlertRow => Boolean(row))
+          .filter((row) => !already.has(row.key));
+        // A due date can arrive without a new row, so the first look
+        // also notifies. The key is remembered so it does not repeat.
+        await consider(rows, true);
+        rows.forEach((row) => rememberReminder(row.key));
+        primedReminders = true;
+      }
+      if (inventory !== null) {
+        const rows = inventory
+          .map((row) => inventoryAlert(row, identity))
+          .filter((row): row is AlertRow => Boolean(row));
+        await consider(rows, primedInventory);
+        primedInventory = true;
+      }
+      if (shopping !== null) {
+        const rows = shopping
+          .map((row) => shoppingAlert(row, identity))
+          .filter((row): row is AlertRow => Boolean(row));
+        await consider(rows, primedShopping);
+        primedShopping = true;
+      }
+    }
   };
 
   scan();
@@ -235,8 +422,26 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "tasks" }, (payload: any) => {
       const row = taskRow(payload.new, identity);
       if (row && primedTasks) consider([row], true);
-    })
-    .subscribe();
+    });
+  if (staffScope(identity)) {
+    channel
+      .on("postgres_changes", { event: "*", schema: "public", table: "reminders" }, (payload: any) => {
+        const row = reminderAlert(payload.new, identity);
+        if (row && primedReminders && !readReminderSeen().has(row.key)) {
+          consider([row], true);
+          rememberReminder(row.key);
+        }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, (payload: any) => {
+        const row = inventoryAlert(payload.new, identity);
+        if (row && primedInventory) consider([row], true);
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "shopping_list" }, (payload: any) => {
+        const row = shoppingAlert(payload.new, identity);
+        if (row && primedShopping) consider([row], true);
+      });
+  }
+  channel.subscribe();
 
   return () => {
     stopped = true;
