@@ -4186,3 +4186,63 @@ body,
     gap: 0.1rem;
   }
 }
+
+/* Botón Volver: fila del layout, no flotante */
+.dashboard-back-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  position: static;
+  margin: 0 0 1rem 0;
+  padding: 0;
+  width: 100%;
+}
+.modal-content > .dashboard-back-row,
+.dashboard-modal > .dashboard-back-row {
+  margin: 0;
+  padding: 1rem 1.25rem 0 1.25rem;
+  flex-shrink: 0;
+}
+.dashboard-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1.15rem;
+  border-radius: 12px;
+  border: none;
+  background: #0369a1;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(3, 105, 161, 0.32);
+  position: static;
+}
+.dashboard-back-btn:hover {
+  background: #075985;
+}
+.dashboard-back-btn:active {
+  background: #0c4a6e;
+  transform: translateY(1px);
+}
+.dashboard-back-btn:focus-visible {
+  outline: 3px solid #bae6fd;
+  outline-offset: 2px;
+}
+.dashboard-back-arrow {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+@media (min-width: 768px) {
+  .dashboard-back-btn {
+    width: auto;
+    min-width: 280px;
+  }
+}
