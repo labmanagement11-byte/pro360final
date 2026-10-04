@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Dashboard, { User } from './Dashboard';
 import Login from './Login';
 import ReminderDueBanner from './ReminderDueBanner';
+import WorkAlerts from './WorkAlerts';
 import { supabase } from '../utils/supabaseClient';
 
 
@@ -176,6 +177,7 @@ const App = () => {
         <Login onLogin={setUser} users={users} />
       ) : (
         <>
+        <WorkAlerts user={userState} />
         <ReminderDueBanner user={userState} />
         <Dashboard
           user={userState}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,11 +15,26 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Limpieza 360Pro - Gestión de Propiedades",
   description: "Aplicación profesional para la gestión de limpiezas y mantenimiento de propiedades",
+  applicationName: "Limpieza360",
   icons: {
-    icon: [{ url: "/limpieza360pro-logo.png", type: "image/png" }],
-    apple: "/limpieza360pro-logo.png",
-    shortcut: "/limpieza360pro-logo.png",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/limpieza360pro-logo.png", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+    shortcut: "/icon-192.png",
   },
+  appleWebApp: {
+    capable: true,
+    title: "Limpieza360",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0369a1",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -28,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
       </body>
