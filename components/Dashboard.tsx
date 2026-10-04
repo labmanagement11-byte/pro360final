@@ -2775,6 +2775,182 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [user.role, user.username, user.house, houses, selectedHouseIdx]);
 
+  // Historial interno de pantallas (vistas y modales) para el botón Volver
+  // y para que el atrás del teléfono no salga del sitio.
+  type NavSnap = {
+    view: string;
+    modal: string | null;
+    checklist: string | null;
+    assignmentType: string | null;
+    inventory: string | null;
+    progress: { assignment: any; employee: string; type: string } | null;
+    maintenance: any | null;
+  };
+  const navKey = (s: NavSnap) => {
+    const progressKey = s.progress
+      ? `${s.progress.employee}|${s.progress.type}|${s.progress.assignment?.id ?? ''}`
+      : '';
+    const maintKey = s.maintenance
+      ? `${s.maintenance.id ?? s.maintenance.taskIdx ?? ''}|${s.maintenance.title ?? ''}`
+      : '';
+    return [s.view, s.modal ?? '', s.checklist ?? '', s.inventory ?? '', progressKey, maintKey].join('::');
+  };
+  const readNavSnap = (): NavSnap => ({
+    view,
+    modal: selectedModalCard,
+    checklist: selectedAssignmentForChecklist,
+    assignmentType: currentAssignmentType,
+    inventory: selectedAssignmentForInventory,
+    progress: selectedEmployeeForProgress,
+    maintenance: selectedTaskMaintenance,
+  });
+  const navStackRef = useRef<NavSnap[]>([]);
+  const navFutureRef = useRef<NavSnap[]>([]);
+  const navCurrentRef = useRef<NavSnap | null>(null);
+  const navIgnoreRef = useRef(false);
+  const navSeededRef = useRef(false);
+  const navSkipPopRef = useRef(0);
+  const navPushedRef = useRef(0);
+  const applyNavSnapRef = useRef<(snap: NavSnap) => void>(() => {});
+  applyNavSnapRef.current = (snap: NavSnap) => {
+    setView(snap.view);
+    setSelectedModalCard(snap.modal);
+    setSelectedAssignmentForChecklist(snap.checklist);
+    setCurrentAssignmentType(snap.assignmentType);
+    setSelectedAssignmentForInventory(snap.inventory);
+    setSelectedEmployeeForProgress(snap.progress);
+    setSelectedTaskMaintenance(snap.maintenance);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const next = readNavSnap();
+    if (!navSeededRef.current) {
+      navSeededRef.current = true;
+      navCurrentRef.current = next;
+      const existing = window.history.state;
+      if (!existing || existing.app !== 'l360') {
+        const base = { app: 'l360', kind: 'root', key: navKey(next) };
+        window.history.replaceState(base, '');
+        window.history.pushState({ ...base, sentinel: true }, '');
+      }
+      return;
+    }
+    if (navIgnoreRef.current) {
+      navIgnoreRef.current = false;
+      navCurrentRef.current = next;
+      return;
+    }
+    const prev = navCurrentRef.current;
+    if (prev && navKey(prev) === navKey(next)) {
+      navCurrentRef.current = next;
+      return;
+    }
+    const stack = navStackRef.current;
+    const top = stack[stack.length - 1];
+    if (top && navKey(top) === navKey(next)) {
+      stack.pop();
+      if (prev) navFutureRef.current.push(prev);
+      navCurrentRef.current = next;
+      if (navPushedRef.current > 0) {
+        navPushedRef.current -= 1;
+        navSkipPopRef.current += 1;
+        window.history.back();
+      }
+      return;
+    }
+    if (prev) stack.push(prev);
+    navFutureRef.current = [];
+    navCurrentRef.current = next;
+    navPushedRef.current += 1;
+    window.history.pushState({ app: 'l360', kind: 'screen', key: navKey(next) }, '');
+  }, [
+    view,
+    selectedModalCard,
+    selectedAssignmentForChecklist,
+    currentAssignmentType,
+    selectedAssignmentForInventory,
+    selectedEmployeeForProgress,
+    selectedTaskMaintenance,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPop = (event: PopStateEvent) => {
+      if (navSkipPopRef.current > 0) {
+        navSkipPopRef.current -= 1;
+        return;
+      }
+      const state = event.state as { app?: string; kind?: string; key?: string } | null;
+      if (!state || state.app !== 'l360') return;
+      const landedKey = state.key || '';
+      const futureTop = navFutureRef.current[navFutureRef.current.length - 1];
+      if (futureTop && navKey(futureTop) === landedKey) {
+        const forwardSnap = navFutureRef.current.pop()!;
+        if (navCurrentRef.current) navStackRef.current.push(navCurrentRef.current);
+        navPushedRef.current += 1;
+        navIgnoreRef.current = true;
+        navCurrentRef.current = forwardSnap;
+        applyNavSnapRef.current(forwardSnap);
+        return;
+      }
+      const top = navStackRef.current[navStackRef.current.length - 1];
+      if (top && navPushedRef.current > 0 && (navKey(top) === landedKey || state.kind === 'root')) {
+        navStackRef.current.pop();
+        navPushedRef.current -= 1;
+        if (navCurrentRef.current) navFutureRef.current.push(navCurrentRef.current);
+        navIgnoreRef.current = true;
+        navCurrentRef.current = top;
+        applyNavSnapRef.current(top);
+        return;
+      }
+      // Ya en el dashboard raíz: este atrás se queda en la página y el siguiente puede salir.
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const atNavRoot = view === 'home'
+    && !selectedModalCard
+    && !selectedAssignmentForChecklist
+    && !selectedAssignmentForInventory
+    && !selectedEmployeeForProgress
+    && !selectedTaskMaintenance;
+  const nestedNavOpen = !!(
+    selectedModalCard
+    || selectedAssignmentForChecklist
+    || selectedAssignmentForInventory
+    || selectedEmployeeForProgress
+    || selectedTaskMaintenance
+  );
+  const goBackInApp = () => {
+    const top = navStackRef.current[navStackRef.current.length - 1];
+    if (top) {
+      applyNavSnapRef.current(top);
+      return;
+    }
+    if (!atNavRoot) {
+      navIgnoreRef.current = true;
+      applyNavSnapRef.current({
+        view: 'home',
+        modal: null,
+        checklist: null,
+        assignmentType: null,
+        inventory: null,
+        progress: null,
+        maintenance: null,
+      });
+    }
+  };
+  const backRow = !atNavRoot ? (
+    <div className="dashboard-back-row">
+      <button type="button" className="dashboard-back-btn" onClick={goBackInApp} aria-label="Volver">
+        <span className="dashboard-back-arrow" aria-hidden="true">←</span>
+        Volver
+      </button>
+    </div>
+  ) : null;
+
   // Solución robusta: solo renderizar dashboard en cliente, nunca en SSR
   const [isClient, setIsClient] = useState(false);
   useEffect(() => { setIsClient(true); }, []);
@@ -2836,6 +3012,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           </button>
         )}
       </div>
+      {!nestedNavOpen && backRow}
       {view === 'home' && (
         <>
           <div className="dashboard-cards">
@@ -3315,6 +3492,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {selectedModalCard && (
         <div className="modal-overlay" onClick={() => setSelectedModalCard(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
+            {backRow}
             <div className="modal-header">
               <h2>
                 {selectedModalCard === 'calendar' && '📅 Calendario de Asignaciones'}
@@ -4716,6 +4894,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedTaskMaintenance && (
                 <div className="modal-overlay" onClick={() => setSelectedTaskMaintenance(null)}>
                   <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    {backRow}
                     <div className="modal-header">
                       <h2>🔧 Checklist de Mantenimiento</h2>
                       <button className="modal-close" onClick={() => setSelectedTaskMaintenance(null)}>✕</button>
@@ -5636,6 +5815,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           setCurrentAssignmentType(null);
         }}>
           <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
+            {backRow}
             <div className="modal-header">
               <h2>
                 {currentAssignmentType?.toLowerCase().includes('mantenimiento')
@@ -5925,6 +6105,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {selectedAssignmentForInventory && (
         <div className="modal-overlay" onClick={() => setSelectedAssignmentForInventory(null)}>
           <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
+            {backRow}
             <div className="modal-header">
               <h2>📦 Inventario</h2>
               <button className="modal-close" onClick={() => setSelectedAssignmentForInventory(null)}>✕</button>
@@ -6079,6 +6260,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       {selectedEmployeeForProgress && (
         <div className="modal-overlay" onClick={() => setSelectedEmployeeForProgress(null)}>
           <div className="dashboard-modal ultra-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '800px', maxHeight: '90vh', overflow: 'auto'}}>
+            {backRow}
             <div className="modal-header">
               <h2 style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                 👤 Progreso de {selectedEmployeeForProgress.employee}
@@ -6250,9 +6432,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         </div>
       )}
       
-      {view !== 'home' && (
-        <button className="dashboard-back-btn" onClick={() => setView('home')} aria-label="Volver al dashboard">← Volver</button>
-      )}
+
     </div>
   );
 };
