@@ -9,7 +9,30 @@ export async function completeExtraTask(
   if (!task?.id) return { ok: false, error: "missing task id" };
   if (assignee !== username) return { ok: false, error: "Solo puedes completar tus propias tareas extra" };
 
-  const updated = await realtimeService.updateTask(task.id, { completed: true });
+  const completedAt = new Date().toISOString();
+  // Always persist completed:true. Add who/when only if those columns exist.
+  let updated = await realtimeService.updateTask(task.id, {
+    completed: true,
+    completedBy: username,
+    completedAt,
+  });
+  if (!updated) {
+    updated = await realtimeService.updateTask(task.id, {
+      completed: true,
+      completedBy: username,
+    });
+  }
+  if (!updated) {
+    updated = await realtimeService.updateTask(task.id, { completed: true });
+  }
   if (!updated) return { ok: false, error: "No se pudo completar la tarea" };
-  return { ok: true, task: { ...updated, completed: true } };
+  return {
+    ok: true,
+    task: {
+      ...updated,
+      completed: true,
+      completedBy: updated.completedBy || updated.completed_by || username,
+      completedAt: updated.completedAt || updated.completed_at || completedAt,
+    },
+  };
 }

@@ -9,6 +9,7 @@ import './RealtimeNotification.css';
 
 import Tasks from './Tasks';
 import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
+import { completeExtraTask } from '../utils/completeExtraTask';
 
 // Tarjeta personalizada para tareas asignadas
 const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resolveAssignmentIdForTask, assignmentIdMap }: { 
@@ -2235,7 +2236,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [users]);
 
-  const extraTasksForUser = (Array.isArray(tasksList) ? tasksList : []).filter(t => (t.assignedTo === user.username || t.assigned_to === user.username) && t.type === 'Tarea extra' && !t.completed);
+  const isExtraTask = (t: any) => String(t?.type || '').trim().toLowerCase() === 'tarea extra';
+  const taskAssignee = (t: any) => t?.assignedTo || t?.assigned_to || '';
+  const taskCompletedBy = (t: any) => t?.completedBy || t?.completed_by || '';
+  const taskCompletedAt = (t: any) => t?.completedAt || t?.completed_at || '';
+  const houseExtraTasks = (Array.isArray(tasksList) ? tasksList : []).filter(isExtraTask);
+  const extraTasksPending = houseExtraTasks.filter((t: any) => !t.completed);
+  const extraTasksDone = houseExtraTasks.filter((t: any) => !!t.completed);
+  const extraTasksForUser = extraTasksPending.filter((t: any) => taskAssignee(t) === user.username);
+  const formatExtraTaskWhen = (value: string | null | undefined) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('es-CO', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'America/Bogota',
+    });
+  };
   
   // Debug: mostrar tareas que se cargan y el filtro
   useEffect(() => {
@@ -2282,7 +2300,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           });
         } else if (payload?.eventType === 'UPDATE' && payload.new) {
           setTasksList(prev => Array.isArray(prev)
-            ? prev.map(t => t.id === payload.new.id ? payload.new : t)
+            ? prev.map(t => t.id === payload.new.id ? {
+                ...t,
+                ...payload.new,
+                completedBy: payload.new.completedBy || payload.new.completed_by || t.completedBy || '',
+                completedAt: payload.new.completedAt || payload.new.completed_at || t.completedAt || null,
+              } : t)
             : [payload.new]);
         } else if (payload?.eventType === 'DELETE' && payload.old) {
           setTasksList(prev => Array.isArray(prev)
@@ -2358,8 +2381,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'extraTasks',
       title: 'Tareas Extra',
-      desc: 'Tareas adicionales asignadas al empleado.',
-      show: user.role === 'empleado' && extraTasksForUser.length > 0,
+      desc: 'Pendientes y completadas de esta casa. Todos ven quién las terminó.',
+      show: ['owner', 'manager', 'empleado', 'admin'].includes(user.role) && houseExtraTasks.length > 0,
     },
     {
       key: 'checklist',
@@ -2471,7 +2494,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     tasks: pendingTasksCount,
     assignedTasks: pendingAssignmentsCount,
     checklist: 0,
-    extraTasks: extraTasksForUser.length,
+    extraTasks: user.role === 'empleado' ? extraTasksForUser.length : extraTasksPending.length,
   };
 
   const formatPurchaseAmount = (value: number | string | null | undefined) => {
@@ -5429,6 +5452,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               <p><strong>👤 Asignado a:</strong> {task.assignedTo || 'Sin asignar'}</p>
                               <p><strong>🏠 Tipo:</strong> {task.type}</p>
                               <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
+                              {task.completed && (
+                                <p><strong>Completada por:</strong> {taskCompletedBy(task) || taskAssignee(task) || 'Sin registro'}</p>
+                              )}
+                              {task.completed && formatExtraTaskWhen(taskCompletedAt(task)) && (
+                                <p><strong>Cuándo:</strong> {formatExtraTaskWhen(taskCompletedAt(task))}</p>
+                              )}
                               <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
                                 {task.completed ? '✅ Completada' : '⏳ Pendiente'}
                               </span>
@@ -5503,61 +5532,97 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
               
               {selectedModalCard === 'extraTasks' && (
-                <>
-                  <div className="subcards-grid">
-                    {extraTasksForUser.length === 0 ? (
-                      <div className="modal-body-empty">
-                        <p>No tienes tareas extra pendientes.</p>
-                      </div>
-                    ) : (
-                      extraTasksForUser.map(task => (
-                        <div key={task.id} className="subcard">
-                          <div className="subcard-header">
-                            <div className="subcard-icon">🟦</div>
-                            <h3>{task.title}</h3>
-                          </div>
-                          <div className="subcard-content">
-                            <p><strong>📄 Descripción:</strong> {task.description || 'Sin descripción'}</p>
-                            <p><strong>👤 Asignado por:</strong> {task.createdBy || task.created_by || 'Manager'}</p>
-                            <span className={`subcard-badge ${task.completed ? 'success' : 'warning'}`}>
-                              {task.completed ? '✅ Completada' : '⏳ Pendiente'}
-                            </span>
-                          </div>
-                          <div className="subcard-actions">
-                            {!task.completed && (
-                              <button
-                                className="dashboard-btn main"
-                                onClick={async () => {
-                                  // Extra tasks live in `tasks`, not calendar_assignments
-                                  const assignee = task.assignedTo || task.assigned_to || '';
-                                  if (assignee !== user.username) {
-                                    console.error('❌ Solo puedes completar tus propias tareas extra');
-                                    return;
-                                  }
-
-                                  const updated = await realtimeService.updateTask(task.id, { completed: true });
-                                  if (!updated) {
-                                    console.error('❌ Error marcando tarea extra como completada');
-                                    alert('No se pudo completar la tarea. Intenta de nuevo.');
-                                    return;
-                                  }
-
-                                  setTasksList(prev => prev.map(t =>
-                                    t.id === task.id ? { ...t, ...updated, completed: true } : t
-                                  ));
-
-                                  console.log(`✅ Tarea extra ${task.id} completada por ${user.username}`);
-                                }}
-                              >
-                                ✅ Completar
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
+                <div className="extra-task-panel">
+                  <div className="extra-task-summary">
+                    <p className="extra-task-summary-house">
+                      Casa: {houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || houses[allowedHouseIdx]?.name || 'Esta casa'}
+                    </p>
+                    <p className="extra-task-summary-counts">
+                      <span>{extraTasksPending.length} pendiente{extraTasksPending.length === 1 ? '' : 's'}</span>
+                      <span>{extraTasksDone.length} completada{extraTasksDone.length === 1 ? '' : 's'}</span>
+                    </p>
                   </div>
-                </>
+                  {houseExtraTasks.length === 0 ? (
+                    <p className="extra-task-empty">No hay tareas extra en esta casa.</p>
+                  ) : (
+                    <>
+                      <section className="extra-task-section">
+                        <h3 className="extra-task-section-title">Pendientes</h3>
+                        {extraTasksPending.length === 0 ? (
+                          <p className="extra-task-empty">No hay tareas extra pendientes.</p>
+                        ) : (
+                          <div className="extra-task-list">
+                            {extraTasksPending.map((task: any) => {
+                              const houseLabel = task.house || houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || '';
+                              const canComplete = user.role === 'empleado' && taskAssignee(task) === user.username;
+                              return (
+                                <article key={task.id} className="extra-task-card is-pending">
+                                  <header className="extra-task-card-head">
+                                    <h3 className="extra-task-title">{task.title || 'Sin título'}</h3>
+                                    <span className="extra-task-status is-pending">Pendiente</span>
+                                  </header>
+                                  <p className="extra-task-desc">{task.description || 'Sin descripción'}</p>
+                                  <dl className="extra-task-meta">
+                                    <div><dt>Casa</dt><dd>{houseLabel || 'Esta casa'}</dd></div>
+                                    <div><dt>Asignada a</dt><dd>{taskAssignee(task) || 'Sin asignar'}</dd></div>
+                                    <div><dt>Asignada por</dt><dd>{task.createdBy || task.created_by || 'Manager'}</dd></div>
+                                  </dl>
+                                  {canComplete && (
+                                    <button
+                                      type="button"
+                                      className="extra-task-complete"
+                                      onClick={async () => {
+                                        const result = await completeExtraTask(task, user.username);
+                                        if (!result.ok) {
+                                          alert(result.error || 'No se pudo completar la tarea. Intenta de nuevo.');
+                                          return;
+                                        }
+                                        setTasksList(prev => prev.map(t =>
+                                          t.id === task.id ? { ...t, ...result.task, completed: true } : t
+                                        ));
+                                      }}
+                                    >
+                                      Completar
+                                    </button>
+                                  )}
+                                </article>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+                      <section className="extra-task-section">
+                        <h3 className="extra-task-section-title">Completadas</h3>
+                        {extraTasksDone.length === 0 ? (
+                          <p className="extra-task-empty">Todavía no hay tareas extra completadas en esta casa.</p>
+                        ) : (
+                          <div className="extra-task-list">
+                            {extraTasksDone.map((task: any) => {
+                              const houseLabel = task.house || houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || '';
+                              const who = taskCompletedBy(task) || taskAssignee(task) || 'Sin registro';
+                              const when = formatExtraTaskWhen(taskCompletedAt(task));
+                              return (
+                                <article key={task.id} className="extra-task-card is-done">
+                                  <header className="extra-task-card-head">
+                                    <h3 className="extra-task-title">{task.title || 'Sin título'}</h3>
+                                    <span className="extra-task-status is-done">Completada</span>
+                                  </header>
+                                  <p className="extra-task-desc">{task.description || 'Sin descripción'}</p>
+                                  <dl className="extra-task-meta">
+                                    <div><dt>Casa</dt><dd>{houseLabel || 'Esta casa'}</dd></div>
+                                    <div><dt>Asignada a</dt><dd>{taskAssignee(task) || 'Sin asignar'}</dd></div>
+                                    <div><dt>Completada por</dt><dd>{who}</dd></div>
+                                    {when && <div><dt>Cuándo</dt><dd>{when}</dd></div>}
+                                  </dl>
+                                </article>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </div>

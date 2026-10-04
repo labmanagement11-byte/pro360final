@@ -282,6 +282,8 @@ function normalizeTask(row: any) {
     ...row,
     assignedTo: row.assigned_to ?? row.assignedTo ?? '',
     createdBy: row.created_by ?? row.createdBy ?? '',
+    completedBy: row.completed_by ?? row.completedBy ?? '',
+    completedAt: row.completed_at ?? row.completedAt ?? null,
   };
 }
 
@@ -341,6 +343,14 @@ export async function updateTask(taskId: string, updates: any) {
   if ('createdBy' in mappedUpdates) {
     mappedUpdates.created_by = mappedUpdates.createdBy;
     delete mappedUpdates.createdBy;
+  }
+  if ('completedBy' in mappedUpdates) {
+    mappedUpdates.completed_by = mappedUpdates.completedBy;
+    delete mappedUpdates.completedBy;
+  }
+  if ('completedAt' in mappedUpdates) {
+    mappedUpdates.completed_at = mappedUpdates.completedAt;
+    delete mappedUpdates.completedAt;
   }
 
   const { data, error } = await (supabase
