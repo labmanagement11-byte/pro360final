@@ -313,3 +313,20 @@
     padding: 1rem;
   }
 }
+
+.users-login {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.users-login input {
+  flex: 1;
+  min-width: 0;
+}
+.users-domain {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.95rem;
+}

@@ -21,7 +21,6 @@ function isOwnerUser(user?: { role?: string } | null) {
 
 const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouses, addUser, editUser, deleteUser, selectedHouse }) => {
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('empleado');
   const [house, setHouse] = useState('');
@@ -171,17 +170,18 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
-    if (!username || !role || !house) {
-      setFormError('Completa nombre, rol y casa');
+    const localName = username.trim().toLowerCase();
+    if (!localName || !role || !house) {
+      setFormError('Completa el nombre, el rol y la casa');
+      return;
+    }
+    if (!/^[a-z0-9._-]{2,}$/.test(localName)) {
+      setFormError('El nombre va en minúsculas, sin espacios. Solo letras, números, punto o guion.');
       return;
     }
     try {
       if (canManageUsers) {
-        const cleanEmail = email.trim().toLowerCase();
-        if (!cleanEmail.includes('@')) {
-          setFormError('Escribe un correo válido. Con ese correo entra la persona.');
-          return;
-        }
+        const cleanEmail = `${localName}@360pro.com`;
         if (!password || password.length < 6) {
           setFormError('La contraseña debe tener al menos 6 caracteres');
           return;
@@ -195,7 +195,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         const result = await callAdminUsersApi('POST', {
           email: cleanEmail,
           password,
-          username: username.trim(),
+          username: localName,
           role: roleToUse,
           house: houseToUse
         });
@@ -207,10 +207,9 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
           });
         }
       } else if (addUser) {
-        await addUser({ username, password: password || '', role, house });
+        await addUser({ username: localName, password: password || '', role, house });
       }
       setUsername('');
-      setEmail('');
       setPassword('');
       setRole('empleado');
       setHouse('');
@@ -233,11 +232,16 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
 
         if (canManageUsers) {
           if (targetUser?.id) {
+            const editName = editData.username.trim().toLowerCase();
+            if (!/^[a-z0-9._-]{2,}$/.test(editName)) {
+              setFormError('El nombre va en minúsculas, sin espacios.');
+              return;
+            }
             const result = await callAdminUsersApi('PATCH', {
               id: String(targetUser.id),
-              username: editData.username,
-              email: editData.email || '',
-              password: editData.password || '',
+              username: editName,
+              email: `${editName}@360pro.com`,
+              password: canViewPasswords ? (editData.password || '') : '',
               role: isManager ? 'empleado' : editData.role,
               house: isManager ? managerHouse : editData.house
             });
@@ -289,23 +293,26 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
       <h2>Gestión de Usuarios</h2>
       <p className="users-help">Agregar o eliminar usuarios.</p>
       {formError && <p className="users-error">{formError}</p>}
-      <form onSubmit={handleAddUser} className="users-add-form">
-        <input
-          type="text"
-          placeholder="Nombre del usuario"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Correo para entrar"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required={canManageUsers}
-        />
+      <form onSubmit={handleAddUser} className="users-add-form" autoComplete="off">
+        <label className="users-login">
+          <input
+            type="text"
+            name="new-user-name"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="nombre"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+            required
+          />
+          <span className="users-domain">@360pro.com</span>
+        </label>
         <input
           type="password"
+          name="new-user-password"
+          autoComplete="new-password"
           placeholder="Contraseña"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -351,27 +358,28 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
             <li key={u.id || idx}>
               {editUserId === String(u.id) ? (
                 <form onSubmit={handleEditUser} className="users-edit-form">
-                  <input
-                    type="text"
-                    value={editData.username}
-                    onChange={e => setEditData({ ...editData, username: e.target.value })}
-                    required
-                    placeholder="Nombre del usuario"
-                    title="Nombre del usuario"
-                  />
-                  <input
-                    type="email"
-                    value={editData.email}
-                    onChange={e => setEditData({ ...editData, email: e.target.value })}
-                    placeholder="Email"
-                    title="Email de acceso"
-                  />
-                  <input
-                    type="password"
-                    value={editData.password}
-                    onChange={e => setEditData({ ...editData, password: e.target.value })}
-                    placeholder="Nueva contraseña (opcional)"
-                  />
+                  <label className="users-login">
+                    <input
+                      type="text"
+                      value={editData.username}
+                      onChange={e => setEditData({ ...editData, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })}
+                      required
+                      placeholder="nombre"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                    <span className="users-domain">@360pro.com</span>
+                  </label>
+                  {canViewPasswords && (
+                    <input
+                      type="password"
+                      value={editData.password}
+                      onChange={e => setEditData({ ...editData, password: e.target.value })}
+                      placeholder="Nueva contraseña (opcional)"
+                      autoComplete="new-password"
+                    />
+                  )}
                   <select
                     value={isManager ? 'empleado' : editData.role}
                     onChange={e => setEditData({ ...editData, role: e.target.value })}
