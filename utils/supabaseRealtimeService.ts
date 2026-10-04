@@ -119,6 +119,7 @@ export function subscribeToAllCalendarAssignmentsByHouse(house: string, callback
   }
 }
 import { getSupabaseClient } from './supabaseClient';
+import { employeeMatchKeys, nameBelongsToEmployee, type EmployeeIdentity } from './employeeScope';
 
 // ==================== CHECKLIST DEDUPE HELPERS ====================
 function normChecklistKeyPart(value: any) {
@@ -679,19 +680,26 @@ export async function createCalendarAssignment(assignment: any) {
   return result;
 }
 
-export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406', employee?: string) {
+export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406', employee?: string | EmployeeIdentity) {
   try {
     const supabase = getSupabaseClient();
-    console.log('🔍 [getCalendarAssignments] Buscando en house:', house, 'employee:', employee);
+    const matchKeys = employee ? employeeMatchKeys(employee) : [];
+    console.log('🔍 [getCalendarAssignments] Buscando en house:', house, 'employee keys:', matchKeys);
 
     let query = (supabase
       .from('calendar_assignments') as any)
       .select('*')
       .eq('house', house);
 
-    if (employee) {
-      query = query.eq('employee', employee);
-      console.log('👤 [getCalendarAssignments] Filtrando por employee:', employee);
+    // Empleado: no traer filas de otros. El nombre guardado puede ser el usuario
+    // o la parte local del correo, en cualquier mayúscula.
+    if (matchKeys.length > 0) {
+      const orFilter = matchKeys
+        .map((key) => `employee.ilike."${key.replace(/"/g, '')}"`)
+        .join(',');
+      query = query.or(orFilter);
+    } else if (employee) {
+      return [];
     }
 
     const { data, error } = await query.order('date', { ascending: true });
@@ -701,14 +709,12 @@ export async function getCalendarAssignments(house: string = 'HYNTIBA2 APTO 406'
       return [];
     }
 
-    console.log('✅ [getCalendarAssignments] Resultados:', data?.length || 0, 'items');
-    if (data && data.length > 0) {
-      data.forEach((a: any) => {
-        console.log(`   - ID:${a.id} | UUID:${a.calendar_assignment_uuid || 'N/A'} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
-      });
-    }
+    const rows = employee
+      ? (data || []).filter((row: any) => nameBelongsToEmployee(row.employee, employee))
+      : (data || []);
 
-    return data || [];
+    console.log('✅ [getCalendarAssignments] Resultados:', rows.length, 'items');
+    return rows;
   } catch (error) {
     console.error('❌ Exception fetching calendar assignments:', error);
     return [];

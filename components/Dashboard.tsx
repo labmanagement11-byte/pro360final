@@ -10,6 +10,7 @@ import './RealtimeNotification.css';
 import Tasks from './Tasks';
 import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
 import { completeExtraTask } from '../utils/completeExtraTask';
+import { isEmpleadoRole, nameBelongsToEmployee } from '../utils/employeeScope';
 
 // Tarjeta personalizada para tareas asignadas
 const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resolveAssignmentIdForTask, assignmentIdMap }: { 
@@ -185,13 +186,16 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       }
       
       if (isMounted) {
-        // Filter by employee on client side (solo empleados)
-        const scoped = isManagerUser ? (data || []) : (data || []).filter((a: any) => a.employee === user.username);
+        // Empleado: solo sus trabajos. Manager sigue viendo toda la casa.
+        // Dueño u otro rol que no es manager conserva el filtro exacto de antes.
+        const employeeViewer = isEmpleadoRole(user.role);
+        const scoped = employeeViewer
+          ? (data || []).filter((a: any) => nameBelongsToEmployee(a.employee, user))
+          : isManagerUser
+            ? (data || [])
+            : (data || []).filter((a: any) => a.employee === user.username);
         const filtered = scoped.filter((a: any) => !a.completed);
-        console.log(`✅ [Dashboard] Total asignaciones en casa:`, data?.length, `| Para usuario:`, filtered.length);
-        (data || []).forEach((a: any) => {
-          console.log(`  - ID:${a.id} | Employee:${a.employee} | Type:${a.type} | Date:${a.date}`);
-        });
+        console.log(`✅ [Dashboard] Asignaciones visibles:`, filtered.length);
         setAssignedTasks(filtered || []);
       }
       setLoading(false);
@@ -370,15 +374,18 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
         .eq('house', currentHouse)
         .in('type', ['Limpieza', 'Limpieza profunda', 'Limpieza regular', 'Mantenimiento']);
 
-      if (!isManager) {
-        query = query.eq('employee', user.username);
-      }
-
       const { data, error } = await query;
       if (error || !data) return;
 
+      const employeeViewer = isEmpleadoRole(user.role);
+      const rows = isManager
+        ? data
+        : data.filter((row: any) => employeeViewer
+            ? nameBelongsToEmployee(row.employee, user)
+            : row.employee === user.username);
+
       const progressMap: { [key: string]: boolean[] } = {};
-      data.forEach((row: any) => {
+      rows.forEach((row: any) => {
         const progressArr = parseProgressFromNotes(row.notes);
         if (isManager) {
           progressMap[`${row.id}_${row.employee}`] = progressArr;
@@ -403,7 +410,9 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
           if (!employeeName) return;
           setSubtaskProgress(prev => ({ ...prev, [`${changed.id}_${employeeName}`]: progressArr }));
         } else {
-          if ((payload?.new?.employee || payload?.old?.employee) !== user.username) return;
+          const who = payload?.new?.employee || payload?.old?.employee;
+          const employeeViewer = isEmpleadoRole(user.role);
+          if (employeeViewer ? !nameBelongsToEmployee(who, user) : who !== user.username) return;
           setSubtaskProgress(prev => ({ ...prev, [String(changed.id)]: progressArr }));
         }
       })
@@ -1066,6 +1075,14 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, deleteUser, setUser, onLogout }) => {
+  const viewerRef = useRef(user);
+  viewerRef.current = user;
+  const taskIsVisibleToViewer = (task: any) => {
+    const viewer = viewerRef.current;
+    if (!isEmpleadoRole(viewer?.role)) return true;
+    const assignee = task?.assignedTo || task?.assigned_to || '';
+    return nameBelongsToEmployee(assignee, viewer);
+  };
   // Estado para mapear IDs de tareas a IDs de asignaciones
   const [assignmentIdMap, setAssignmentIdMap] = useState<Record<string, string>>({});
 
@@ -1538,8 +1555,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       try {
         setLoadingTasks(true);
         const tasks = await realtimeService.getTasks(selectedHouse);
-        console.log('✅ Tareas cargadas para', selectedHouse, ':', tasks);
-        setTasksList(tasks || []);
+        const visible = (tasks || []).filter(taskIsVisibleToViewer);
+        console.log('✅ Tareas cargadas para', selectedHouse, ':', visible.length);
+        setTasksList(visible);
         setLoadingTasks(false);
       } catch (error) {
         console.error('❌ Error loading tasks:', error);
@@ -1555,19 +1573,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     try {
       console.log('🔔 Suscribiendo a cambios en tiempo real de tareas para:', selectedHouse);
       subscription = realtimeService.subscribeToTasks(selectedHouse, (payload: any) => {
-        console.log('⚡ Evento recibido en tiempo real:', payload);
+        const row = payload?.new;
+        const visible = !row || taskIsVisibleToViewer(row);
         if (payload?.eventType === 'INSERT') {
-          console.log('➕ Nueva tarea insertada:', payload.new);
-          addRealtimeNotification(`Nueva tarea: ${payload.new?.title || 'Sin título'}`, 'info');
-          setTasksList(prev => [...prev, payload.new]);
+          if (!visible) return;
+          addRealtimeNotification(`Nueva tarea: ${row?.title || 'Sin título'}`, 'info');
+          setTasksList(prev => [...prev, row]);
         } else if (payload?.eventType === 'UPDATE') {
-          console.log('✏️ Tarea actualizada:', payload.new);
-          addRealtimeNotification(`Tarea actualizada: ${payload.new?.title || 'Sin título'}`, 'info');
-          setTasksList(prev => prev.map(t => String(t.id) === String(payload.new?.id) ? payload.new : t));
+          if (!visible) {
+            setTasksList(prev => prev.filter(t => String(t.id) !== String(row?.id)));
+            return;
+          }
+          addRealtimeNotification(`Tarea actualizada: ${row?.title || 'Sin título'}`, 'info');
+          setTasksList(prev => prev.map(t => String(t.id) === String(row?.id) ? row : t));
         } else if (payload?.eventType === 'DELETE') {
-          console.log('🗑️ Tarea eliminada:', payload.old);
-          addRealtimeNotification('Tarea eliminada', 'warning');
-          setTasksList(prev => prev.filter(t => String(t.id) !== String(payload.old?.id)));
+          const oldRow = payload?.old;
+          const assigneeKnown = !!(oldRow?.assignedTo || oldRow?.assigned_to);
+          const mine = assigneeKnown && taskIsVisibleToViewer(oldRow);
+          if (!isEmpleadoRole(viewerRef.current?.role) || mine) {
+            addRealtimeNotification('Tarea eliminada', 'warning');
+          }
+          setTasksList(prev => prev.filter(t => String(t.id) !== String(oldRow?.id)));
         }
       });
       console.log('✅ Suscripción activa:', subscription);
@@ -2240,10 +2266,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const taskAssignee = (t: any) => t?.assignedTo || t?.assigned_to || '';
   const taskCompletedBy = (t: any) => t?.completedBy || t?.completed_by || '';
   const taskCompletedAt = (t: any) => t?.completedAt || t?.completed_at || '';
-  const houseExtraTasks = (Array.isArray(tasksList) ? tasksList : []).filter(isExtraTask);
+  const isEmployeeViewer = isEmpleadoRole(user.role);
+  // Empleado: solo tareas cuyo asignado es su usuario o la parte local de su correo.
+  // Manager y dueño siguen viendo todas las de la casa.
+  const tasksVisibleToViewer = (Array.isArray(tasksList) ? tasksList : []).filter((t: any) =>
+    !isEmployeeViewer || nameBelongsToEmployee(taskAssignee(t), user)
+  );
+  const houseExtraTasks = tasksVisibleToViewer.filter(isExtraTask);
   const extraTasksPending = houseExtraTasks.filter((t: any) => !t.completed);
   const extraTasksDone = houseExtraTasks.filter((t: any) => !!t.completed);
-  const extraTasksForUser = extraTasksPending.filter((t: any) => taskAssignee(t) === user.username);
+  const extraTasksForUser = extraTasksPending;
   const formatExtraTaskWhen = (value: string | null | undefined) => {
     if (!value) return '';
     const date = new Date(value);
@@ -2258,9 +2290,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   // Debug: mostrar tareas que se cargan y el filtro
   useEffect(() => {
     console.log('👤 Usuario actual:', user.username);
-    console.log('📋 Todas las tareas cargadas:', tasksList);
-    console.log('🟦 Tareas extra para este usuario:', extraTasksForUser);
-  }, [tasksList, user.username]);
+    console.log('📋 Tareas visibles:', tasksVisibleToViewer.length, 'de', Array.isArray(tasksList) ? tasksList.length : 0);
+    console.log('🟦 Tareas extra visibles:', extraTasksForUser.length);
+  }, [tasksList, user.username, user.role, user.email]);
 
   // Cargar tareas de la casa seleccionada
   useEffect(() => {
@@ -2275,8 +2307,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         setLoadingTasks(true);
         console.log(`📋 Cargando tareas para casa: ${houseName}`);
         const tasks = await realtimeService.getTasks(houseName);
-        console.log(`✅ Tareas cargadas para ${houseName}:`, tasks);
-        setTasksList(tasks || []);
+        const visible = (tasks || []).filter(taskIsVisibleToViewer);
+        console.log(`✅ Tareas cargadas para ${houseName}:`, visible.length);
+        setTasksList(visible);
       } catch (error) {
         console.error(`❌ Error cargando tareas para ${houseName}:`, error);
         setTasksList([]);
@@ -2293,12 +2326,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       tasksSubscription = realtimeService.subscribeToTasks(houseName, (payload: any) => {
         console.log(`⚡ Tareas actualizadas (realtime) para ${houseName}:`, payload);
         if (payload?.eventType === 'INSERT' && payload.new) {
+          if (!taskIsVisibleToViewer(payload.new)) return;
           setTasksList(prev => {
             if (!Array.isArray(prev)) return [payload.new];
             if (prev.some(t => t.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
         } else if (payload?.eventType === 'UPDATE' && payload.new) {
+          if (!taskIsVisibleToViewer(payload.new)) {
+            setTasksList(prev => Array.isArray(prev) ? prev.filter(t => t.id !== payload.new.id) : []);
+            return;
+          }
           setTasksList(prev => Array.isArray(prev)
             ? prev.map(t => t.id === payload.new.id ? {
                 ...t,
@@ -2381,8 +2419,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'extraTasks',
       title: 'Tareas Extra',
-      desc: 'Pendientes y completadas de esta casa. Todos ven quién las terminó.',
-      show: ['owner', 'manager', 'empleado', 'admin'].includes(user.role) && houseExtraTasks.length > 0,
+      desc: isEmployeeViewer
+        ? 'Solo tus tareas extra, pendientes y completadas.'
+        : 'Pendientes y completadas de esta casa. Todos ven quién las terminó.',
+      show: (isEmployeeViewer
+        ? houseExtraTasks.length > 0
+        : ['owner', 'manager', 'empleado', 'admin'].includes(user.role) && houseExtraTasks.length > 0),
     },
     {
       key: 'checklist',
@@ -2475,7 +2517,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     (calendarAssignments || []).some((a: any) => !a.completed) ||
     (tasksList || []).some((t: any) => !t.completed && (
       roleLowerForInv === 'empleado'
-        ? (t.assignedTo === user.username || t.assigned_to === user.username)
+        ? nameBelongsToEmployee(t.assignedTo || t.assigned_to, user)
         : true
     ));
   const incompleteInventoryCount = (inventoryList || []).filter((i: any) => !i.complete).length;
@@ -2484,7 +2526,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       ? incompleteInventoryCount
       : 0;
   const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && (
-    user.role === 'empleado' ? t.assignedTo === user.username || t.assigned_to === user.username : true
+    isEmployeeViewer ? nameBelongsToEmployee(t.assignedTo || t.assigned_to, user) : true
   )).length;
   const pendingAssignmentsCount = (calendarAssignments || []).filter((a: any) => !a.completed).length;
   const pendingCardCounts: Record<string, number> = {
@@ -2494,7 +2536,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     tasks: pendingTasksCount,
     assignedTasks: pendingAssignmentsCount,
     checklist: 0,
-    extraTasks: user.role === 'empleado' ? extraTasksForUser.length : extraTasksPending.length,
+    extraTasks: extraTasksPending.length,
   };
 
   const formatPurchaseAmount = (value: number | string | null | undefined) => {
@@ -2667,8 +2709,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         console.log('🏠 Casa:', houseName);
         
         // Si es empleado, cargar solo sus asignaciones de su casa
-        const assignments = user.role === 'empleado' 
-          ? await realtimeService.getCalendarAssignments(houseName, user.username)
+        const assignments = isEmpleadoRole(user.role)
+          ? await realtimeService.getCalendarAssignments(houseName, { username: user.username, email: user.email })
           : await realtimeService.getCalendarAssignments(houseName);
         
         console.log('✅ Asignaciones cargadas:', assignments);
@@ -2700,15 +2742,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           (payload: any) => {
             console.log('⚡ Evento de calendario recibido (empleado):', payload);
             if (payload?.eventType === 'INSERT') {
-              // Verificar que la asignación es para este empleado
-              if (payload.new?.employee === user.username) {
+              if (nameBelongsToEmployee(payload.new?.employee, user)) {
                 setCalendarAssignments(prev => {
                   if (prev.some(a => a.id === payload.new?.id)) return prev;
                   return [...prev, payload.new];
                 });
               }
             } else if (payload?.eventType === 'UPDATE') {
-              setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+              if (!nameBelongsToEmployee(payload.new?.employee, user)) {
+                setCalendarAssignments(prev => prev.filter(a => a.id !== payload.new?.id));
+              } else {
+                setCalendarAssignments(prev => prev.map(a => a.id === payload.new?.id ? payload.new : a));
+              }
             } else if (payload?.eventType === 'DELETE') {
               setCalendarAssignments(prev => prev.filter(a => a.id !== payload.old?.id));
             }
@@ -2722,7 +2767,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             (payload: any) => {
               console.log('⚡ Evento de casa recibido (empleado):', payload);
               // Solo procesar si es para este empleado
-              if (payload?.eventType === 'INSERT' && payload.new?.employee === user.username) {
+              if (payload?.eventType === 'INSERT' && nameBelongsToEmployee(payload.new?.employee, user)) {
                 setCalendarAssignments(prev => {
                   if (prev.some(a => a.id === payload.new?.id)) return prev;
                   return [...prev, payload.new];
@@ -5596,11 +5641,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   <div className="subcards-grid">
                     {loadingTasks ? (
                       <div className="modal-body-empty"><p>Cargando tareas...</p></div>
-                    ) : tasksList.length > 0 ? (
+                    ) : tasksVisibleToViewer.length > 0 ? (
                       <>
                         <div className="modal-stats">
                           <div className="stat-box">
-                            <p className="stat-box-number">{tasksList.length}</p>
+                            <p className="stat-box-number">{tasksVisibleToViewer.length}</p>
                             <p className="stat-box-label">Tareas totales</p>
                           </div>
                           <div className="stat-box">
@@ -5722,7 +5767,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </p>
                   </div>
                   {houseExtraTasks.length === 0 ? (
-                    <p className="extra-task-empty">No hay tareas extra en esta casa.</p>
+                    <p className="extra-task-empty">{isEmployeeViewer ? 'No tienes tareas extra.' : 'No hay tareas extra en esta casa.'}</p>
                   ) : (
                     <>
                       <section className="extra-task-section">
@@ -5733,7 +5778,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           <div className="extra-task-list">
                             {extraTasksPending.map((task: any) => {
                               const houseLabel = task.house || houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || '';
-                              const canComplete = user.role === 'empleado' && taskAssignee(task) === user.username;
+                              const canComplete = isEmployeeViewer && nameBelongsToEmployee(taskAssignee(task), user);
                               return (
                                 <article key={task.id} className="extra-task-card is-pending">
                                   <header className="extra-task-card-head">
@@ -5773,7 +5818,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <section className="extra-task-section">
                         <h3 className="extra-task-section-title">Completadas</h3>
                         {extraTasksDone.length === 0 ? (
-                          <p className="extra-task-empty">Todavía no hay tareas extra completadas en esta casa.</p>
+                          <p className="extra-task-empty">{isEmployeeViewer ? 'Todavía no tienes tareas extra completadas.' : 'Todavía no hay tareas extra completadas en esta casa.'}</p>
                         ) : (
                           <div className="extra-task-list">
                             {extraTasksDone.map((task: any) => {
@@ -5836,10 +5881,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             <div className="modal-body">
               {syncedChecklists.get(selectedAssignmentForChecklist) ? (
                 (() => {
-                  const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
                   const assignment = calendarAssignments.find(a => String(a.id) === String(selectedAssignmentForChecklist));
+                  const checklistItems = (syncedChecklists.get(selectedAssignmentForChecklist) || []).filter((item: any) =>
+                    !isEmployeeViewer || !item?.employee || nameBelongsToEmployee(item.employee, user)
+                  );
                   
-                  if (!assignment) return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
+                  if (!assignment || (isEmployeeViewer && !nameBelongsToEmployee(assignment.employee, user))) {
+                    return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
+                  }
                   
                   // Agrupar por zona
                   const zones = new Map<string, any[]>();
