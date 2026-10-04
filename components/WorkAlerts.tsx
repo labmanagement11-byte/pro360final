@@ -111,19 +111,22 @@ export default function WorkAlerts({ user }: { user: WorkAlertUser }) {
       justifyContent: "space-between",
     }}>
       <div style={{ flex: "1 1 220px" }}>
-        <strong style={{ display: "block", marginBottom: 4 }}>Limpieza360 en el teléfono</strong>
-        <span style={{ fontSize: 14, lineHeight: 1.4 }}>
-          {showPermission
-            ? "Activa los avisos para enterarte de un horario o una tarea extra."
-            : "Agrégala a la pantalla de inicio. No hace falta tienda ni membresía."}
-          {iosHint ? " En iPhone: Safari, Compartir, Agregar a inicio." : ""}
-        </span>
+        {showPermission ? (
+          <>
+            <strong style={{ display: "block", marginBottom: 4 }}>Limpieza360 en el teléfono</strong>
+            <span style={{ fontSize: 14, lineHeight: 1.4 }}>
+              Activa los avisos para enterarte de un horario o una tarea extra.
+            </span>
+          </>
+        ) : (
+          <strong style={{ display: "block", fontSize: 16 }}>Descarga la aplicación</strong>
+        )}
       </div>
       {showPermission && (
         <button type="button" onClick={enable} style={buttonStyle}>Activar avisos</button>
       )}
       {installEvent && (
-        <button type="button" onClick={install} style={buttonStyle}>Agregar a inicio</button>
+        <button type="button" onClick={install} style={buttonStyle}>Descarga la aplicación</button>
       )}
     </div>
   );
