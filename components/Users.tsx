@@ -29,7 +29,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   const [editData, setEditData] = useState({ username: '', email: '', password: '', role: 'empleado', house: '' });
   const [users, setUsers] = useState<User[]>([]);
   const [houses, setHouses] = useState<{ id?: string; houseName?: string; name?: string }[]>([]);
-  const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [canViewPasswords, setCanViewPasswords] = useState(false);
   const [revealedPwdId, setRevealedPwdId] = useState<string | null>(null);
@@ -84,7 +83,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   useEffect(() => {
     const loadData = async () => {
       try {
-        setLoading(true);
         if (canManageUsers) {
           try {
             const apiResult = await callAdminUsersApi('GET', {});
@@ -119,8 +117,6 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
         console.error('Error loading data:', error);
         setUsers(propUsers || []);
         setHouses(propHouses || []);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -291,8 +287,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
   return (
     <div className="users-container">
       <h2>Gestión de Usuarios</h2>
-      <p className="users-help">Agrega o elimina personas aquí. Se guardan en Supabase Auth + perfiles automáticamente. Managers solo gestionan su casa (empleados). Solo Jonathan ve contraseñas.</p>
-      {loading && <p>Cargando datos...</p>}
+      <p className="users-help">Agregar o eliminar usuarios.</p>
       {formError && <p className="users-error">{formError}</p>}
       <form onSubmit={handleAddUser} className="users-add-form">
         <input
@@ -414,7 +409,7 @@ const Users: React.FC<UsersProps> = ({ user, users: propUsers, houses: propHouse
                         type="button"
                         className="users-reveal-pwd"
                         onClick={() => setRevealedPwdId(revealedPwdId === String(u.id) ? null : String(u.id))}
-                        title="Solo Jonathan puede ver contraseñas"
+                        title="Ver u ocultar contraseña"
                       >
                         {revealedPwdId === String(u.id) ? 'Ocultar' : 'Ver'}
                       </button>
