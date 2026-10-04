@@ -10,6 +10,7 @@ import './RealtimeNotification.css';
 import Tasks from './Tasks';
 import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
 import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee, isCompletedWithinOneYear } from '../utils/completeExtraTask';
+import { closeCalendarAssignment, employeeConfirmation, notesWithEmployeeConfirmation, notesWithoutEmployeeConfirmation, syncPendingEmployeeConfirmations } from '../utils/calendarWork';
 import { isEmpleadoRole, nameBelongsToEmployee } from '../utils/employeeScope';
 
 // Tarjeta personalizada para tareas asignadas
@@ -189,14 +190,17 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
         // Empleado: solo sus trabajos. Manager sigue viendo toda la casa.
         // Dueño u otro rol que no es manager conserva el filtro exacto de antes.
         const employeeViewer = isEmpleadoRole(user.role);
+        const isOwnerUser = ['owner', 'dueno'].includes(String(user.role || '').toLowerCase())
+          || String(user.username || '').trim().toLowerCase() === 'jonathan';
         const scoped = employeeViewer
           ? (data || []).filter((a: any) => nameBelongsToEmployee(a.employee, user))
-          : isManagerUser
+          : (isManagerUser || isOwnerUser)
             ? (data || [])
             : (data || []).filter((a: any) => a.employee === user.username);
         const filtered = scoped.filter((a: any) => !a.completed);
-        console.log(`✅ [Dashboard] Asignaciones visibles:`, filtered.length);
-        setAssignedTasks(filtered || []);
+        const visible = employeeViewer ? filtered : await syncPendingEmployeeConfirmations(filtered);
+        console.log(`✅ [Dashboard] Asignaciones visibles:`, visible.length);
+        setAssignedTasks(visible || []);
       }
       setLoading(false);
     };
@@ -503,6 +507,14 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       }
     }
 
+    const allDone = totalSubtasks > 0 && current.length >= totalSubtasks && current.slice(0, totalSubtasks).every(Boolean);
+    if (allDone) {
+      notesObj.employee_confirmed_by = user.username;
+      notesObj.employee_confirmed_at = now;
+    } else {
+      delete notesObj.employee_confirmed_by;
+      delete notesObj.employee_confirmed_at;
+    }
     const nextNotes = JSON.stringify({
       ...notesObj,
       subtasks_progress: current,
@@ -522,6 +534,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       .update(updateData)
       .eq('id', taskId);
 
+    setAssignedTasks(prev => prev.map(t => String(t.id) === String(taskId) ? { ...t, notes: nextNotes } : t));
 
     // El estado final "Trabajo Completado" lo confirma admin/manager.
     // Aquí solo guardamos progreso por subtarea para mantener evidencia en tiempo real.
@@ -635,12 +648,15 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
 
   // Si el usuario es manager, mostrar todas las tareas de todos los empleados
   const isManager = user.role && user.role.toLowerCase().includes('manager');
+  const isOwnerViewer = ['owner', 'dueno'].includes(String(user.role || '').toLowerCase())
+    || String(user.username || '').trim().toLowerCase() === 'jonathan';
   const canManageAssignments = user.role && (
     user.role.toLowerCase().includes('manager') ||
     user.role.toLowerCase().includes('owner') ||
     user.role.toLowerCase().includes('dueno')
-  );
-  const groupedTasks = isManager
+  ) || isOwnerViewer;
+  const seesAllEmployees = isManager || isOwnerViewer;
+  const groupedTasks = seesAllEmployees
     ? assignedTasks.reduce((acc: any, t: any) => {
         if (!acc[t.employee]) acc[t.employee] = [];
         acc[t.employee].push(t);
@@ -674,8 +690,8 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     <div className="dashboard-assigned-tasks-modal">
       <div className="assigned-tasks-header-v2">
         <div className="assigned-tasks-title-group">
-          <h3 className="assigned-tasks-title-v2">{isManager ? 'Progreso de empleados' : 'Tareas Asignadas'}</h3>
-          <p className="assigned-tasks-subtitle">{isManager ? 'Trabajos activos de cada empleado' : 'Toca una zona para ver solo lo que falta'}</p>
+          <h3 className="assigned-tasks-title-v2">{seesAllEmployees ? 'Progreso de empleados' : 'Tareas Asignadas'}</h3>
+          <p className="assigned-tasks-subtitle">{seesAllEmployees ? 'Trabajos activos de cada empleado' : 'Toca una zona para ver solo lo que falta'}</p>
         </div>
         <span className="assigned-tasks-badge-v2">{Object.values(groupedTasks).flat().length}</span>
       </div>
@@ -696,7 +712,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
       ) : (
         <div className="assigned-tasks-container-v2">
           {Object.entries(groupedTasks).map(([employee, tasks]: any) => (
-            <div key={employee} className="assigned-tasks-card-v2" style={{borderTopColor: isManager ? '#0284c7' : '#0ea5e9'}}>
+            <div key={employee} className="assigned-tasks-card-v2" style={{borderTopColor: seesAllEmployees ? '#0284c7' : '#0ea5e9'}}>
               <div className="assigned-tasks-card-header-v2">
                 <div className="assigned-tasks-card-title-group">
                   <span className="assigned-tasks-card-icon">👤</span>
@@ -710,11 +726,12 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                 {tasks.map((task: any) => {
                   const subtasksMap = getSubtasks(task.type || '', task.house);
                   const allSubtasks = subtasksMap ? Object.values(subtasksMap).flat() : [];
-                  const progressKey = isManager ? `${task.id}_${task.user_id || task.employee_id || task.employee}` : task.id;
+                  const progressKey = seesAllEmployees ? `${task.id}_${task.user_id || task.employee_id || task.employee}` : task.id;
                   const progressArr = subtaskProgress[progressKey] || Array(allSubtasks.length).fill(false);
                   const completedCount = progressArr.filter(Boolean).length;
                   const allComplete = allSubtasks.length > 0 && completedCount === allSubtasks.length;
                   const isCompleted = !!task.completed || allComplete;
+                  const confirmed = employeeConfirmation(task) || (allComplete ? { by: task.employee, at: '' } : null);
                   const assignmentKey = assignmentIdMap[String(task.id)] || String(task.id);
                   const percent = allSubtasks.length > 0 ? Math.round((completedCount / allSubtasks.length) * 100) : 0;
                   
@@ -728,11 +745,27 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                           <div className="assigned-task-date-label">
                             🏠 {task.house} • 📅 {new Date(task.date).toLocaleDateString('es-CO', {month: 'short', day: 'numeric'})} {task.time ? `• 🕐 ${task.time}` : ''}
                           </div>
+                          {confirmed && (
+                            <div className="assigned-task-date-label">Empleado confirmó: {confirmed.by || task.employee}</div>
+                          )}
                         </div>
                         <div className="assigned-task-actions-box">
-                          <span className={`assigned-tasks-status-badge ${isCompleted ? 'status-done' : 'status-pending'}`}>
-                            {isCompleted ? '✅ Hecho' : '⏳ Pendiente'}
+                          <span className={`assigned-tasks-status-badge ${confirmed ? 'status-done' : 'status-pending'}`}>
+                            {confirmed ? 'Confirmado por el empleado' : '⏳ Pendiente'}
                           </span>
+                          {canManageAssignments && confirmed && (
+                            <button className="assigned-task-delete-btn" style={{background:'#dcfce7', color:'#166534', border:'1px solid #86efac'}} onClick={async () => {
+                              const ok = await closeCalendarAssignment(task, user.username);
+                              if (!ok) {
+                                alert('No se pudo pasar el trabajo a completados.');
+                                return;
+                              }
+                              setAssignedTasks(prev => prev.filter(t => t.id !== task.id));
+                              if (onTaskCompleted) onTaskCompleted(String(task.id), String(task.id));
+                            }}>
+                              Completar
+                            </button>
+                          )}
                           {canManageAssignments && (
                             <button className="assigned-task-delete-btn" onClick={() => handleDeleteAssignment(task)}>
                               🗑️ Eliminar
@@ -753,7 +786,7 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
                       </div>
 
                       {/* Zonas/Subtareas para empleados */}
-                      {!isManager && subtasksMap && (
+                      {!seesAllEmployees && subtasksMap && (
                         <div className="assigned-task-zones-wrap">
                           <div className="assigned-task-zones-grid">
                             {Object.entries(subtasksMap).map(([zona, subtasks], zonaIdx) => {
@@ -2735,9 +2768,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         const assignments = isEmpleadoRole(user.role)
           ? await realtimeService.getCalendarAssignments(houseName, { username: user.username, email: user.email })
           : await realtimeService.getCalendarAssignments(houseName);
+        const withConfirmation = isEmpleadoRole(user.role)
+          ? (assignments || [])
+          : await syncPendingEmployeeConfirmations(assignments || []);
         
-        console.log('✅ Asignaciones cargadas:', assignments);
-        setCalendarAssignments(assignments || []);
+        console.log('✅ Asignaciones cargadas:', withConfirmation);
+        setCalendarAssignments(withConfirmation);
         setLoadingCalendar(false);
       } catch (error) {
         console.error('❌ Error loading calendar assignments:', error);
@@ -2799,7 +2835,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             }
           );
         }
-      } else if ((user.role === 'manager' || user.role === 'owner') && houseName) {
+      } else if ((user.role === 'manager' || user.role === 'owner' || user.role === 'dueno' || isJonathanUser) && houseName) {
         // Manager/Owner: suscribirse a TODOS los cambios de la casa
         subscription = realtimeService.subscribeToCalendarAssignmentsByHouse(
           houseName,
@@ -3748,28 +3784,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   
                   {/* Asignaciones actuales */}
                   <div className="subcards-grid">
-                    {calendarAssignments.length > 0 ? (
+                    {calendarAssignments.filter((a: any) => !a.completed).length > 0 ? (
                       <>
                         <div className="modal-stats">
                           <div className="stat-box">
-                            <p className="stat-box-number">{calendarAssignments.length}</p>
-                            <p className="stat-box-label">Asignaciones totales</p>
+                            <p className="stat-box-number">{calendarAssignments.filter((a: any) => !a.completed).length}</p>
+                            <p className="stat-box-label">Pendientes</p>
                           </div>
                           <div className="stat-box">
                             <p className="stat-box-number">
-                              {calendarAssignments.filter(a => a.type === 'Limpieza profunda').length}
+                              {calendarAssignments.filter((a: any) => !a.completed && a.type === 'Limpieza profunda').length}
                             </p>
                             <p className="stat-box-label">Limpiezas profundas</p>
                           </div>
                           <div className="stat-box">
                             <p className="stat-box-number">
-                              {calendarAssignments.filter(a => a.type === 'Limpieza regular').length}
+                              {calendarAssignments.filter((a: any) => !a.completed && a.type === 'Limpieza regular').length}
                             </p>
                             <p className="stat-box-label">Limpiezas regulares</p>
                           </div>
                         </div>
                         
                         {calendarAssignments
+                          .filter((a: any) => !a.completed)
                           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                           .map((assignment, idx) => (
                           <div key={assignment.id || idx} className="assignment-card-v3">
@@ -3814,7 +3851,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               </div>
                             </div>
                             
+                            {employeeConfirmation(assignment) && (
+                              <div className="assignment-card-v3-meta">
+                                <div className="assignment-meta-item">
+                                  <span className="assignment-meta-icon">✅</span>
+                                  <span className="assignment-meta-label">Empleado confirmó:</span>
+                                  <span className="assignment-meta-value">{employeeConfirmation(assignment)?.by || assignment.employee}</span>
+                                </div>
+                              </div>
+                            )}
                             <div className="assignment-card-v3-actions">
+                              {employeeConfirmation(assignment) && canCloseExtraTask(user, assignment) && (
+                                <button
+                                  className="assignment-btn primary"
+                                  onClick={async () => {
+                                    const ok = await closeCalendarAssignment(assignment, user.username);
+                                    if (!ok) {
+                                      alert('No se pudo pasar el trabajo a completados.');
+                                      return;
+                                    }
+                                    const now = new Date().toISOString();
+                                    setCalendarAssignments(prev => prev.map((a: any) => String(a.id) === String(assignment.id)
+                                      ? { ...a, completed: true, completed_at: a.completed_at || now, completed_by: user.username }
+                                      : a));
+                                  }}
+                                >
+                                  <span className="assignment-btn-icon">✅</span>
+                                  <span className="assignment-btn-text">Completar</span>
+                                </button>
+                              )}
                               <button 
                                 className="assignment-btn primary"
                                 onClick={() => {
@@ -3902,7 +3967,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
                 const completedCalendarJobs = calendarAssignments
                   .filter((a: any) => a.completed && a.completed_at && new Date(a.completed_at) >= oneYearAgo)
-                  .map((a: any) => ({ ...a, kind: 'calendar', title: a.title || '' }));
+                  .map((a: any) => ({ ...a, kind: 'calendar', title: a.title || a.type || '', employee_confirmed_by: employeeConfirmation(a)?.by || '' }));
                 const completedExtraJobs = houseExtraTasks
                   .filter((t: any) => !!t.completed && isCompletedWithinOneYear(taskCompletedAt(t)))
                   .map((t: any) => ({
@@ -3924,7 +3989,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
                         <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
                         <p style={{ margin: 0, fontWeight: 600 }}>No hay trabajos completados aún.</p>
-                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.88rem' }}>Las tareas extra aparecen aquí cuando Jonathan o el manager las cierran.</p>
+                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.88rem' }}>Aparecen aquí cuando Jonathan o el manager cierran la tarea extra, la limpieza o el mantenimiento.</p>
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gap: '0.75rem' }}>
@@ -3964,7 +4029,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               {job.title && (
                                 <div style={{ color: '#166534', fontSize: '0.9rem', fontWeight: 600, marginTop: '0.15rem' }}>{job.title}</div>
                               )}
-                              {job.kind === 'extra' && job.employee_confirmed_by && (
+                              {job.employee_confirmed_by && (
                                 <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.25rem' }}>Empleado confirmó: {job.employee_confirmed_by}</div>
                               )}
                               {job.completed_by && (
@@ -4605,12 +4670,39 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                             </div>
                                           </div>
                                           <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem'}}>
-                                            <span className={`assigned-tasks-status-badge ${assignment.completed ? 'status-done' : 'status-pending'}`}>
-                                              {assignment.completed ? '✅ Hecho' : '⏳ Pendiente'}
+                                            <span className={`assigned-tasks-status-badge ${employeeConfirmation(assignment) ? 'status-done' : 'status-pending'}`}>
+                                              {employeeConfirmation(assignment) ? `Confirmó ${employeeConfirmation(assignment)?.by || assignment.employee}` : '⏳ Pendiente'}
                                             </span>
-                                            {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
+                                            {employeeConfirmation(assignment) && canCloseExtraTask(user, assignment) && (
                                               <button
-                                                onClick={async () => {
+                                                onClick={async (e) => {
+                                                  e.stopPropagation();
+                                                  const ok = await closeCalendarAssignment(assignment, user.username);
+                                                  if (!ok) {
+                                                    alert('No se pudo pasar el trabajo a completados.');
+                                                    return;
+                                                  }
+                                                  const now = new Date().toISOString();
+                                                  setCalendarAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || now, completed_by: user.username } : a));
+                                                }}
+                                                style={{
+                                                  background: '#dcfce7',
+                                                  color: '#166534',
+                                                  border: '1px solid #86efac',
+                                                  borderRadius: '0.5rem',
+                                                  padding: '0.35rem 0.6rem',
+                                                  fontSize: '0.8rem',
+                                                  fontWeight: 600,
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                Completar
+                                              </button>
+                                            )}
+                                            {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno' || isJonathanUser) && (
+                                              <button
+                                                onClick={async (e) => {
+                                                  e.stopPropagation();
                                                   if (!confirm(`¿Eliminar la asignación de ${assignment.employee}?`)) return;
                                                   const archive = await shouldArchiveAssignment(assignment);
                                                   const deleted = archive
@@ -6080,7 +6172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </div>
                       
                       {/* Botón para marcar como completado (solo admin/manager) */}
-                      {progress === 100 && (user.role === 'manager' || user.role === 'owner' || user.role === 'dueno') && (
+                      {(progress === 100 || employeeConfirmation(assignment)) && canCloseExtraTask(user, assignment) && (
                         <div className="completion-section">
                           <button 
                             className="btn-mark-completed"
@@ -6098,18 +6190,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                     ? completedAtCandidates.sort().slice(-1)[0]
                                     : new Date().toISOString();
 
-                                  const { error } = await (supabase as any)
-                                    .from('calendar_assignments')
-                                    .update({
-                                      completed: true,
-                                      completed_by: assignmentToComplete.employee,
-                                      completed_at: completionMoment,
+                                  if (!employeeConfirmation(assignmentToComplete)) {
+                                    const confirmer = (checklistItems.find((i: any) => i.completed_by)?.completed_by) || assignmentToComplete.employee;
+                                    const stampedNotes = notesWithEmployeeConfirmation(assignmentToComplete.notes, confirmer, completionMoment);
+                                    await (supabase as any).from('calendar_assignments').update({
+                                      notes: stampedNotes,
                                       updated_at: new Date().toISOString(),
-                                    })
-                                    .eq('id', selectedAssignmentForChecklist);
+                                    }).eq('id', assignmentToComplete.id);
+                                    assignmentToComplete.notes = stampedNotes;
+                                  }
 
-                                  if (error) {
-                                    console.error('❌ Error marcando trabajo completado:', error);
+                                  const closed = await closeCalendarAssignment(
+                                    { ...assignmentToComplete, completed_by: null, completed_at: completionMoment },
+                                    user.username
+                                  );
+                                  if (!closed) {
                                     alert('No se pudo marcar el trabajo como completado.');
                                     return;
                                   }
@@ -6119,9 +6214,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                       ? {
                                           ...a,
                                           completed: true,
-                                          completed_by: assignmentToComplete.employee,
+                                          completed_by: user.username,
                                           completed_at: completionMoment,
                                           updated_at: new Date().toISOString(),
+                                          notes: assignmentToComplete.notes,
                                         }
                                       : a
                                   ));
@@ -6204,13 +6300,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                             console.log('✅ Item actualizado exitosamente:', result);
                                             
                                             // Actualizar estado local del checklist
-                                            setSyncedChecklists(prev => {
-                                              const currentChecklist = prev.get(selectedAssignmentForChecklist) || [];
-                                              const updatedChecklist = currentChecklist.map(i => 
-                                                i.id === item.id ? result : i
-                                              );
-                                              return new Map(prev).set(selectedAssignmentForChecklist, updatedChecklist);
-                                            });
+                                            const currentChecklist = syncedChecklists.get(selectedAssignmentForChecklist) || [];
+                                            const updatedChecklist = currentChecklist.map(i => 
+                                              i.id === item.id ? result : i
+                                            );
+                                            setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, updatedChecklist));
+                                            const allDone = updatedChecklist.length > 0 && updatedChecklist.every((i: any) => !!i.completed);
+                                            if (allDone) {
+                                              const stamped = notesWithEmployeeConfirmation(assignment.notes, user.username, new Date().toISOString());
+                                              await (supabase as any).from('calendar_assignments').update({ notes: stamped, updated_at: new Date().toISOString() }).eq('id', assignment.id);
+                                              setCalendarAssignments(prev => prev.map((a: any) => String(a.id) === String(assignment.id) ? { ...a, notes: stamped } : a));
+                                            } else if (employeeConfirmation(assignment)) {
+                                              const cleared = notesWithoutEmployeeConfirmation(assignment.notes);
+                                              await (supabase as any).from('calendar_assignments').update({ notes: cleared, updated_at: new Date().toISOString() }).eq('id', assignment.id);
+                                              setCalendarAssignments(prev => prev.map((a: any) => String(a.id) === String(assignment.id) ? { ...a, notes: cleared } : a));
+                                            }
                                             
                                             console.log('🔄 Estado local actualizado para item:', item.id);
                                           } else {

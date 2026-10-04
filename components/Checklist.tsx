@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase, checklistTable } from '../utils/supabaseClient';
 import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
+import { employeeConfirmation, notesWithEmployeeConfirmation, notesWithoutEmployeeConfirmation } from '../utils/calendarWork';
 import Inventory from './Inventory';
 import './Checklist.css';
 
@@ -284,6 +285,22 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       return;
     }
 
+    const assignKind = assignmentType ? assignmentKind(assignmentType) : roomKind(item.room);
+    const nextItems = items.map((row) => row.id === item.id ? { ...row, ...payload } : row);
+    const relevant = nextItems.filter((row) => roomKind(row.room) === assignKind);
+    const allDone = relevant.length > 0 && relevant.every((row) => !!row.complete);
+    const sameKind = !assignmentType || roomKind(item.room) === assignmentKind(assignmentType);
+    if (sameKind && activeAssignment?.id && !activeAssignment.completed && supabase) {
+      const stampedNotes = allDone
+        ? notesWithEmployeeConfirmation(activeAssignment.notes, user.username, payload.completed_at || new Date().toISOString())
+        : notesWithoutEmployeeConfirmation(activeAssignment.notes);
+      const { error: noteError } = await (supabase as any)
+        .from('calendar_assignments')
+        .update({ notes: stampedNotes, updated_at: new Date().toISOString() })
+        .eq('id', activeAssignment.id);
+      if (!noteError) setActiveAssignment({ ...activeAssignment, notes: stampedNotes });
+    }
+
     if (supabase && next) {
       await (supabase as any)
         .from('cleaning_checklist')
@@ -317,7 +334,11 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       setNotice('No hay una asignación activa para archivar');
       return;
     }
-    const ok = await archiveCalendarAssignment(activeAssignment, user.username);
+    if (!employeeConfirmation(activeAssignment) && supabase) {
+      const stampedNotes = notesWithEmployeeConfirmation(activeAssignment.notes, activeAssignment.employee || user.username, new Date().toISOString());
+      await (supabase as any).from('calendar_assignments').update({ notes: stampedNotes, updated_at: new Date().toISOString() }).eq('id', activeAssignment.id);
+    }
+    const ok = await archiveCalendarAssignment({ ...activeAssignment, completed_by: null }, user.username);
     if (!ok) {
       setNotice('No se pudo pasar el trabajo a completados');
       return;
@@ -338,6 +359,9 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
         <span className="checklist-live">En vivo</span>
       </header>
       <p className="checklist-progress">{doneCount} de {kindItems.length} hechas</p>
+      {employeeConfirmation(activeAssignment) && (
+        <p className="checklist-progress">Empleado confirmó: {employeeConfirmation(activeAssignment)?.by}. Jonathan o el manager de la casa lo pasan a Trabajos completados.</p>
+      )}
       {notice && <div className="checklist-live">{notice}</div>}
 
       {owner && (
@@ -418,7 +442,7 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       {owner && kindItems.length > 0 && (
         <div className="checklist-filter">
           {activeAssignment && doneCount === kindItems.length && (
-            <button onClick={archiveVisibleWork} className="ultra-reset-btn">Pasar a trabajos completados</button>
+            <button onClick={archiveVisibleWork} className="ultra-reset-btn">Completar y pasar a trabajos completados</button>
           )}
           <button onClick={resetVisible} className="ultra-reset-btn">Reiniciar checklist</button>
         </div>
