@@ -2660,22 +2660,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   }).length;
 
   const pendingShoppingCount = (shoppingList || []).filter((i: any) => !i.is_purchased).length;
-  // Incomplete inventory items alone must NOT turn Inventario red for manager/empleado.
-  // Red only when there is active work: open calendar/cleaning assignment OR open employee task.
+  // Aviso de Inventario (tarjeta en rojo) en TODAS las casas y roles.
+  // Solo si hay trabajo asignado todavía abierto en esta casa:
+  // tarea pendiente, lista para marcar terminada, o asignada a un empleado.
+  // Objetos sin revisar, sin tarea asignada, no generan el aviso.
   const roleLowerForInv = String(user.role || '').toLowerCase();
-  const gateInventoryPendingByAssignment = roleLowerForInv === 'manager' || roleLowerForInv === 'empleado';
+  const assignedOpenTask = (t: any) => {
+    if (!t || t.completed) return false;
+    const assignee = t.assignedTo || t.assigned_to || t.employee;
+    if (!assignee) return false;
+    if (roleLowerForInv === 'empleado') return nameBelongsToEmployee(assignee, user);
+    return true;
+  };
   const hasActiveInventoryAssignmentWork =
-    (calendarAssignments || []).some((a: any) => !a.completed) ||
-    (tasksList || []).some((t: any) => !t.completed && (
+    (calendarAssignments || []).some((a: any) => !a.completed && (
       roleLowerForInv === 'empleado'
-        ? nameBelongsToEmployee(t.assignedTo || t.assigned_to, user)
-        : true
-    ));
+        ? nameBelongsToEmployee(a.employee, user)
+        : !!(a.employee || a.assignedTo || a.assigned_to)
+    )) ||
+    (tasksList || []).some(assignedOpenTask);
   const incompleteInventoryCount = (inventoryList || []).filter((i: any) => !i.complete).length;
-  const pendingInventoryIssuesCount =
-    !gateInventoryPendingByAssignment || hasActiveInventoryAssignmentWork
-      ? incompleteInventoryCount
-      : 0;
+  const pendingInventoryIssuesCount = hasActiveInventoryAssignmentWork
+    ? incompleteInventoryCount
+    : 0;
   const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && !isExtraTask(t) && (
     isEmployeeViewer ? nameBelongsToEmployee(t.assignedTo || t.assigned_to, user) : true
   )).length;
