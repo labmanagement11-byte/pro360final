@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase, checklistTable } from '../utils/supabaseClient';
 import { archiveCalendarAssignment } from '../utils/archiveCompletedAssignment';
-import { employeeConfirmation, notesWithEmployeeConfirmation, notesWithoutEmployeeConfirmation } from '../utils/calendarWork';
+import { employeeConfirmation, notesWithEmployeeConfirmation, notesWithoutEmployeeConfirmation, readAssignmentNotes, closeCalendarAssignment } from '../utils/calendarWork';
+import { buildAssignmentChecklistItems, type AssignmentCheckItem } from '../utils/assignmentChecklistItems';
+import { nameBelongsToEmployee } from '../utils/employeeScope';
+import { canCloseExtraTask } from '../utils/completeExtraTask';
+import { updateCleaningChecklistItem } from '../utils/supabaseRealtimeService';
 import Inventory from './Inventory';
 import './Checklist.css';
 
@@ -26,6 +30,7 @@ interface ChecklistItem {
 interface ChecklistProps {
   user: User;
   assignmentId?: number | string;
+  onAssignmentClosed?: (assignment: any) => void;
 }
 
 const ROOM_ORDER = [
@@ -98,7 +103,7 @@ function formatWhen(value?: string | null) {
   }
 }
 
-const Checklist = ({ user, assignmentId }: ChecklistProps) => {
+const Checklist = ({ user, assignmentId, onAssignmentClosed }: ChecklistProps) => {
   const [resolvedHouse, setResolvedHouse] = useState<string>(() => houseForUser(user));
   const selectedHouse = resolvedHouse;
   const owner = isOwnerRole(user.role);
@@ -109,6 +114,7 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
   const [openRoom, setOpenRoom] = useState<string | null>(null);
   const [assignmentType, setAssignmentType] = useState<string | null>(null);
   const [activeAssignment, setActiveAssignment] = useState<any>(null);
+  const [cleaningRows, setCleaningRows] = useState<any[]>([]);
   const [notice, setNotice] = useState('');
 
   const loadItems = useCallback(async () => {
@@ -198,6 +204,97 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
       channel.unsubscribe();
     };
   }, [user.username, user.role, user.house, assignmentId]);
+
+  useEffect(() => {
+    if (!assignmentId || !supabase) {
+      setCleaningRows([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('cleaning_checklist')
+        .select('*')
+        .eq('calendar_assignment_id', String(assignmentId));
+      if (!cancelled) setCleaningRows(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, [assignmentId, activeAssignment?.updated_at]);
+
+  const assignmentItems = useMemo(() => {
+    if (assignmentId == null || assignmentId === '' || !activeAssignment) return [];
+    if (String(activeAssignment.id) !== String(assignmentId)) return [];
+    if (String(user.role || '').toLowerCase() === 'empleado' && !nameBelongsToEmployee(activeAssignment.employee, user)) return [];
+    return buildAssignmentChecklistItems(activeAssignment, items, cleaningRows);
+  }, [assignmentId, activeAssignment, items, cleaningRows, user]);
+
+  const scopedAssignment = assignmentId != null && assignmentId !== '';
+  const assignmentBlocked = scopedAssignment && activeAssignment && String(user.role || '').toLowerCase() === 'empleado' && !nameBelongsToEmployee(activeAssignment.employee, user);
+
+  const toggleAssignmentItem = async (item: AssignmentCheckItem) => {
+    if (!activeAssignment?.id || activeAssignment.completed) return;
+    const next = !item.completed;
+    const now = new Date().toISOString();
+    const notes = readAssignmentNotes(activeAssignment.notes);
+    const stored = Array.isArray(notes.subtasks_progress) ? notes.subtasks_progress : [];
+    const progress = stored.length > 0 ? [...stored] : assignmentItems.map((row) => row.completed);
+    while (progress.length <= item.progressIndex) progress.push(false);
+    progress[item.progressIndex] = next;
+    const allDone = assignmentItems.length > 0 && assignmentItems.every((row) => row.progressIndex === item.progressIndex ? next : row.completed);
+    if (allDone) {
+      notes.employee_confirmed_by = user.username;
+      notes.employee_confirmed_at = now;
+    } else {
+      delete notes.employee_confirmed_by;
+      delete notes.employee_confirmed_at;
+    }
+    notes.subtasks_progress = progress;
+    notes.progress_updated_by = user.username;
+    notes.progress_updated_at = now;
+    const stamped = JSON.stringify(notes);
+    setActiveAssignment({ ...activeAssignment, notes: stamped, updated_at: now });
+    if (supabase) {
+      const { error } = await (supabase as any)
+        .from('calendar_assignments')
+        .update({ notes: stamped, updated_at: now })
+        .eq('id', activeAssignment.id);
+      if (error) {
+        setActiveAssignment(activeAssignment);
+        setNotice(error.message || 'No se pudo marcar la tarea');
+        return;
+      }
+    }
+    if (item.cleaningId) {
+      const saved = await updateCleaningChecklistItem(item.cleaningId, next, user.username);
+      if (saved) {
+        setCleaningRows((prev) => prev.map((row) => String(row.id) === String(item.cleaningId) ? saved : row));
+      }
+    }
+    setNotice(next ? 'Tarea completada' : 'Tarea reabierta');
+    setTimeout(() => setNotice(''), 1600);
+  };
+
+  const closeThisAssignment = async () => {
+    if (!activeAssignment?.id) return;
+    if (!confirm('¿Marcar esta asignación como completada?')) return;
+    let current = activeAssignment;
+    if (!employeeConfirmation(current) && supabase) {
+      const confirmer = assignmentItems.find((row) => row.completed_by)?.completed_by || current.employee || user.username;
+      const stampedNotes = notesWithEmployeeConfirmation(current.notes, confirmer, new Date().toISOString());
+      await (supabase as any).from('calendar_assignments').update({
+        notes: stampedNotes,
+        updated_at: new Date().toISOString(),
+      }).eq('id', current.id);
+      current = { ...current, notes: stampedNotes };
+    }
+    const closed = await closeCalendarAssignment({ ...current, completed_by: null }, user.username);
+    if (!closed) {
+      setNotice('No se pudo pasar el trabajo a completados');
+      return;
+    }
+    setNotice('Trabajo pasado a completados');
+    if (onAssignmentClosed) onAssignmentClosed(current);
+  };
 
   useEffect(() => {
     loadItems();
@@ -348,6 +445,114 @@ const Checklist = ({ user, assignmentId }: ChecklistProps) => {
     setNotice('Trabajo pasado a completados');
     setTimeout(() => setNotice(''), 1800);
   };
+
+  if (scopedAssignment) {
+    const pendingItems = assignmentItems.filter((item) => !item.completed);
+    const doneItems = assignmentItems.filter((item) => item.completed);
+    const confirmed = employeeConfirmation(activeAssignment);
+    const jobLabel = assignmentType || 'Trabajo';
+    const groupZones = (rows: AssignmentCheckItem[]) => {
+      const map = new Map<string, AssignmentCheckItem[]>();
+      rows.forEach((item) => {
+        const zone = item.zone || 'General';
+        if (!map.has(zone)) map.set(zone, []);
+        map.get(zone)!.push(item);
+      });
+      return Array.from(map.entries());
+    };
+    const renderPendingZones = (rows: AssignmentCheckItem[]) => {
+      if (!rows.length) {
+        return <p className="asheet-empty">No queda nada por hacer.</p>;
+      }
+      return groupZones(rows).map(([zone, zoneItems]) => (
+        <section key={`todo-${zone}`} className="asheet-zone">
+          <div className="asheet-zone-head">
+            <h4>{zone}</h4>
+            <span>{zoneItems.length} por hacer</span>
+          </div>
+          <div className="asheet-items">
+            {zoneItems.map((item) => (
+              <label key={item.id} className="asheet-item">
+                <input
+                  type="checkbox"
+                  checked={item.completed}
+                  onChange={() => toggleAssignmentItem(item)}
+                  disabled={!!activeAssignment?.completed}
+                />
+                <span className="asheet-item-name">{item.task}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+      ));
+    };
+    const renderDoneZones = (rows: AssignmentCheckItem[]) => {
+      if (!rows.length) {
+        return <p className="asheet-empty">Todavía no hay tareas hechas.</p>;
+      }
+      return groupZones(rows).map(([zone, zoneItems]) => (
+        <section key={`done-${zone}`} className="asheet-zone is-done-zone">
+          <div className="asheet-zone-head">
+            <h4>{zone}</h4>
+            <span>{zoneItems.length === 1 ? '1 hecha' : `${zoneItems.length} hechas`}</span>
+          </div>
+          <div className="asheet-done-list">
+            {zoneItems.map((item) => {
+              const who = item.completed_by || activeAssignment?.employee || '';
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="asheet-done-card"
+                  onClick={() => toggleAssignmentItem(item)}
+                  disabled={!!activeAssignment?.completed}
+                >
+                  <span className="asheet-done-top">
+                    <span className="asheet-done-zone">{zone}</span>
+                    <span className="asheet-done-mark" aria-hidden="true">✓</span>
+                  </span>
+                  <span className="asheet-done-task">{item.task}</span>
+                  <span className="asheet-done-who">{who ? `Completó ${who}` : 'Completada'}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ));
+    };
+    return (
+      <div className="asheet">
+        <header className="asheet-head">
+          <div>
+            <h2>{jobLabel}</h2>
+            <p>{activeAssignment?.employee || 'Sin empleado'} · {selectedHouse || 'Sin casa'}</p>
+          </div>
+          <span className={`asheet-pill${confirmed ? ' is-ready' : ''}`}>{confirmed ? 'Empleado confirmó' : 'Pendiente'}</span>
+        </header>
+        {notice && <p className="asheet-note">{notice}</p>}
+        {loading && <p className="asheet-empty">Cargando checklist...</p>}
+        {!loading && !activeAssignment && <p className="asheet-empty">No se encontró esta asignación.</p>}
+        {!loading && assignmentBlocked && <p className="asheet-empty">Este checklist es de otro empleado.</p>}
+        {!loading && activeAssignment && !assignmentBlocked && (
+          <>
+            <p className="asheet-count">{doneItems.length} de {assignmentItems.length} hechas</p>
+            {confirmed && <p className="asheet-note">Empleado confirmó: {confirmed.by}. Jonathan o el manager de la casa lo pasan a Trabajos completados.</p>}
+            <section className="asheet-section">
+              <h3>Por hacer <span>{pendingItems.length}</span></h3>
+              {assignmentItems.length === 0 ? <p className="asheet-empty">No hay tareas de este trabajo.</p> : renderPendingZones(pendingItems)}
+            </section>
+            <section className="asheet-section is-done">
+              <h3>Hechas <span>{doneItems.length}</span></h3>
+              {renderDoneZones(doneItems)}
+            </section>
+            {activeAssignment && !activeAssignment.completed && (confirmed || (assignmentItems.length > 0 && doneItems.length === assignmentItems.length)) && canCloseExtraTask(user, activeAssignment) && (
+              <button type="button" className="asheet-complete" onClick={closeThisAssignment}>Completar</button>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="checklist-list ultra-checklist">

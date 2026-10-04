@@ -203,3 +203,226 @@
   .ultra-task-card { padding: 0.85rem 0.9rem; }
   .ultra-checkbox input { width: 1.3rem; height: 1.3rem; }
 }
+
+.asheet {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: #0f172a;
+}
+.asheet-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-top: 4px solid #0369a1;
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+}
+.asheet-head h2 {
+  margin: 0;
+  color: #0369a1;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.asheet-head p {
+  margin: 0.3rem 0 0;
+  color: #475569;
+  font-weight: 700;
+}
+.asheet-pill {
+  flex: 0 0 auto;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.asheet-pill.is-ready {
+  background: #dcfce7;
+  color: #166534;
+}
+.asheet-count,
+.asheet-note {
+  margin: 0;
+  font-weight: 700;
+  color: #334155;
+}
+.asheet-section h3 {
+  margin: 0 0 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #0369a1;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.asheet-section.is-done h3 { color: #166534; }
+.asheet-section h3 span {
+  min-width: 1.8rem;
+  height: 1.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.85rem;
+}
+.asheet-section.is-done h3 span {
+  background: #dcfce7;
+  color: #166534;
+}
+.asheet-zone {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #0369a1;
+  border-radius: 0.9rem;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.asheet-section.is-done .asheet-zone { border-left-color: #16a34a; }
+.asheet-zone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+.asheet-zone-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.asheet-zone-head span {
+  color: #0369a1;
+  font-weight: 800;
+}
+.asheet-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 56px;
+  padding: 0.75rem 0.9rem;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+  cursor: pointer;
+}
+.asheet-item input {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  accent-color: #0369a1;
+}
+.asheet-item-name {
+  flex: 1;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.asheet-zone.is-done-zone .asheet-zone-head {
+  background: #ecfdf5;
+}
+.asheet-zone.is-done-zone .asheet-zone-head span {
+  color: #166534;
+}
+.asheet-done-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  background: #f0fdf4;
+}
+.asheet-zone.is-done-zone {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+.asheet-done-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  font: inherit;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #86efac;
+  border-radius: 0.9rem;
+  box-shadow: 0 1px 2px rgba(22, 101, 52, 0.06);
+  cursor: pointer;
+}
+.asheet-done-card:disabled {
+  cursor: default;
+}
+.asheet-done-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.asheet-done-zone {
+  color: #166534;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.asheet-done-mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.asheet-done-task {
+  color: #0f172a;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.asheet-done-who {
+  color: #166534;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.asheet-empty {
+  margin: 0 0 0.5rem;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.75rem;
+  color: #475569;
+  font-weight: 600;
+}
+.asheet-complete {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 0.75rem;
+  border: 1px solid #16a34a;
+  background: #ffffff;
+  color: #166534;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}

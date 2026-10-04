@@ -10,7 +10,7 @@ import './RealtimeNotification.css';
 import Tasks from './Tasks';
 import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
 import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee, isCompletedWithinOneYear } from '../utils/completeExtraTask';
-import { closeCalendarAssignment, employeeConfirmation, notesWithEmployeeConfirmation, notesWithoutEmployeeConfirmation, syncPendingEmployeeConfirmations } from '../utils/calendarWork';
+import { closeCalendarAssignment, employeeConfirmation, syncPendingEmployeeConfirmations } from '../utils/calendarWork';
 import { isEmpleadoRole, nameBelongsToEmployee } from '../utils/employeeScope';
 
 // Tarjeta personalizada para tareas asignadas
@@ -2465,6 +2465,101 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [houses, selectedHouseIdx]);
 
+  const openAssignments = (calendarAssignments || [])
+    .filter((a: any) => !a.completed)
+    .slice()
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const pendingAssignments = openAssignments.filter((a: any) => !employeeConfirmation(a));
+  const readyAssignments = openAssignments.filter((a: any) => !!employeeConfirmation(a));
+  const formatAssignedDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = String(dateStr).split('T')[0].split('-');
+    if (parts.length < 3) return String(dateStr);
+    const date = new Date(Number(parts[0]), parseInt(parts[1], 10) - 1, Number(parts[2]));
+    if (Number.isNaN(date.getTime())) return String(dateStr);
+    return date.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+  };
+  const jobTypeLabel = (type: string) => {
+    if (type === 'Limpieza profunda') return 'Limpieza profunda';
+    if (type === 'Mantenimiento') return 'Mantenimiento';
+    return type || 'Limpieza regular';
+  };
+  const renderAssignedJob = (assignment: any, ready = false) => {
+    const confirmed = employeeConfirmation(assignment);
+    const canDelete = user.role === 'owner' || user.role === 'manager' || user.role === 'dueno' || isJonathanUser;
+    return (
+      <article key={assignment.id} className={`job-card${ready ? ' is-ready' : ''}`}>
+        <div className="job-card-top">
+          <h3 className="job-card-name">{assignment.employee || 'Sin empleado'}</h3>
+          <span className={`job-card-status${ready ? ' is-ready' : ''}`}>
+            {ready ? 'Listo para completar' : 'Pendiente'}
+          </span>
+        </div>
+        <p className="job-card-type">{jobTypeLabel(assignment.type)}</p>
+        <dl className="job-card-meta">
+          <div><dt>Fecha</dt><dd>{formatAssignedDate(assignment.date)}</dd></div>
+          {assignment.time ? <div><dt>Hora</dt><dd>{assignment.time}</dd></div> : null}
+          {assignment.house ? <div><dt>Casa</dt><dd>{assignment.house}</dd></div> : null}
+          {ready ? <div><dt>Confirmó</dt><dd>{confirmed?.by || assignment.employee}</dd></div> : null}
+        </dl>
+        <div className="job-card-actions">
+          <button
+            type="button"
+            className="job-card-btn"
+            onClick={() => {
+              setSelectedAssignmentForChecklist(String(assignment.id));
+              setCurrentAssignmentType(assignment.type);
+            }}
+          >
+            Ver checklist
+          </button>
+          {ready && canCloseExtraTask(user, assignment) && (
+            <button
+              type="button"
+              className="job-card-btn is-complete"
+              onClick={async () => {
+                const ok = await closeCalendarAssignment(assignment, user.username);
+                if (!ok) {
+                  alert('No se pudo pasar el trabajo a completados.');
+                  return;
+                }
+                const now = new Date().toISOString();
+                setCalendarAssignments(prev => prev.map((a: any) => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || now, completed_by: user.username } : a));
+              }}
+            >
+              Completar
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              className="job-card-btn is-danger"
+              onClick={async () => {
+                if (!confirm(`¿Eliminar la asignación de ${assignment.employee}?`)) return;
+                const archive = await shouldArchiveAssignment(assignment);
+                const deleted = archive
+                  ? await archiveCalendarAssignment(assignment, user.username)
+                  : await realtimeService.deleteCalendarAssignmentCascade(String(assignment.id));
+                if (deleted) {
+                  setCalendarAssignments(prev => archive
+                    ? prev.map((a: any) => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || new Date().toISOString(), completed_by: a.completed_by || user.username } : a)
+                    : prev.filter((a: any) => a.id !== assignment.id));
+                  setSyncedChecklists(prev => {
+                    const next = new Map(prev);
+                    next.delete(String(assignment.id));
+                    return next;
+                  });
+                }
+              }}
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
+      </article>
+    );
+  };
+
   const cards = [
     {
       key: 'tasks',
@@ -2485,7 +2580,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'checklist',
       title: 'Checklist Limpieza',
-      desc: 'Verifica y gestiona la limpieza y mantenimiento.',
+      desc: 'Aquí se ven los trabajos asignados y su checklist.',
       show: user.role === 'owner' || user.role === 'manager',
     },
     {
@@ -2503,7 +2598,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'calendar',
       title: 'Calendario',
-      desc: 'Gestiona eventos y tareas programadas.',
+      desc: 'Solo para agregar limpiezas y mantenimiento.',
       show: user.role === 'owner' || user.role === 'manager',
     },
     {
@@ -2591,7 +2686,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     reminders: pendingRemindersCount,
     tasks: pendingTasksCount,
     assignedTasks: pendingAssignmentsCount,
-    checklist: 0,
+    checklist: pendingAssignmentsCount,
     extraTasks: extraTasksPending.length,
   };
 
@@ -3138,7 +3233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             )}
             {cards.filter(card => card.show).map(card => {
               const pendingN = pendingCardCounts[card.key] || 0;
-              const showPending = pendingN > 0 && ['shopping', 'inventory', 'reminders', 'tasks', 'extraTasks'].includes(card.key);
+              const showPending = pendingN > 0 && ['shopping', 'inventory', 'reminders', 'tasks', 'extraTasks', 'checklist'].includes(card.key);
               return (
               <button
                 key={card.key}
@@ -3782,165 +3877,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </div>
                   )}
                   
-                  {/* Asignaciones actuales */}
-                  <div className="subcards-grid">
-                    {calendarAssignments.filter((a: any) => !a.completed).length > 0 ? (
-                      <>
-                        <div className="modal-stats">
-                          <div className="stat-box">
-                            <p className="stat-box-number">{calendarAssignments.filter((a: any) => !a.completed).length}</p>
-                            <p className="stat-box-label">Pendientes</p>
-                          </div>
-                          <div className="stat-box">
-                            <p className="stat-box-number">
-                              {calendarAssignments.filter((a: any) => !a.completed && a.type === 'Limpieza profunda').length}
-                            </p>
-                            <p className="stat-box-label">Limpiezas profundas</p>
-                          </div>
-                          <div className="stat-box">
-                            <p className="stat-box-number">
-                              {calendarAssignments.filter((a: any) => !a.completed && a.type === 'Limpieza regular').length}
-                            </p>
-                            <p className="stat-box-label">Limpiezas regulares</p>
-                          </div>
-                        </div>
-                        
-                        {calendarAssignments
-                          .filter((a: any) => !a.completed)
-                          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                          .map((assignment, idx) => (
-                          <div key={assignment.id || idx} className="assignment-card-v3">
-                            <div className="assignment-card-v3-header">
-                              <div className="assignment-card-v3-type-badge">
-                                {assignment.type === 'Limpieza profunda' ? '🧹 Profunda' : 
-                                 assignment.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
-                              </div>
-                              <div className="assignment-card-v3-id">ID: {assignment.id}</div>
-                            </div>
-                            
-                            <div className="assignment-card-v3-title">
-                              <span className="assignment-card-v3-emoji">
-                                {assignment.type === 'Limpieza profunda' ? '🧹' : 
-                                 assignment.type === 'Limpieza regular' ? '✨' : '🔧'}
-                              </span>
-                              <h3>{assignment.employee}</h3>
-                            </div>
-                            
-                            <div className="assignment-card-v3-meta">
-                              <div className="assignment-meta-item">
-                                <span className="assignment-meta-icon">📅</span>
-                                <span className="assignment-meta-label">Fecha:</span>
-                                <span className="assignment-meta-value">{
-                                  (() => {
-                                    const dateStr = assignment.date;
-                                    const dateParts = dateStr.split('T')[0].split('-');
-                                    const date = new Date(dateParts[0], parseInt(dateParts[1]) - 1, dateParts[2]);
-                                    return date.toLocaleDateString('es-CO', { 
-                                      weekday: 'short', 
-                                      year: 'numeric', 
-                                      month: 'short', 
-                                      day: 'numeric' 
-                                    });
-                                  })()
-                                }</span>
-                              </div>
-                              <div className="assignment-meta-item">
-                                <span className="assignment-meta-icon">🕐</span>
-                                <span className="assignment-meta-label">Hora:</span>
-                                <span className="assignment-meta-value">{assignment.time}</span>
-                              </div>
-                            </div>
-                            
-                            {employeeConfirmation(assignment) && (
-                              <div className="assignment-card-v3-meta">
-                                <div className="assignment-meta-item">
-                                  <span className="assignment-meta-icon">✅</span>
-                                  <span className="assignment-meta-label">Empleado confirmó:</span>
-                                  <span className="assignment-meta-value">{employeeConfirmation(assignment)?.by || assignment.employee}</span>
-                                </div>
-                              </div>
-                            )}
-                            <div className="assignment-card-v3-actions">
-                              {employeeConfirmation(assignment) && canCloseExtraTask(user, assignment) && (
-                                <button
-                                  className="assignment-btn primary"
-                                  onClick={async () => {
-                                    const ok = await closeCalendarAssignment(assignment, user.username);
-                                    if (!ok) {
-                                      alert('No se pudo pasar el trabajo a completados.');
-                                      return;
-                                    }
-                                    const now = new Date().toISOString();
-                                    setCalendarAssignments(prev => prev.map((a: any) => String(a.id) === String(assignment.id)
-                                      ? { ...a, completed: true, completed_at: a.completed_at || now, completed_by: user.username }
-                                      : a));
-                                  }}
-                                >
-                                  <span className="assignment-btn-icon">✅</span>
-                                  <span className="assignment-btn-text">Completar</span>
-                                </button>
-                              )}
-                              <button 
-                                className="assignment-btn primary"
-                                onClick={() => {
-                                  console.log('🧹 Abriendo modal para asignación:', assignment.id, 'Tipo:', assignment.type);
-                                  setSelectedAssignmentForChecklist(String(assignment.id));
-                                  setCurrentAssignmentType(assignment.type);
-                                }}
-                              >
-                                <span className="assignment-btn-icon">✅</span>
-                                <span className="assignment-btn-text">Ver Checklist</span>
-                              </button>
-                              {(assignment.type === 'Limpieza profunda' || assignment.type === 'Limpieza regular') && (
-                                <button 
-                                  className="assignment-btn secondary"
-                                  onClick={() => {
-                                    console.log('📦 Abriendo inventario para asignación:', assignment.id);
-                                    setSelectedAssignmentForInventory(String(assignment.id));
-                                  }}
-                                >
-                                  <span className="assignment-btn-icon">📦</span>
-                                  <span className="assignment-btn-text">Inventario</span>
-                                </button>
-                              )}
-                              {(user.role === 'owner' || user.role === 'manager') && (
-                                <button 
-                                  className="assignment-btn danger"
-                                  onClick={async () => {
-                                    if (!confirm(`¿Eliminar la asignación de ${assignment.employee} para ${assignment.type}?`)) return;
-                                    console.log('🗑️ Eliminando asignación del calendario:', assignment.id);
-                                    const deleted = await realtimeService.deleteCalendarAssignmentCascade(String(assignment.id), { resetHouseInventory: false });
-                                    if (!deleted) {
-                                      alert('No se pudo eliminar la asignación. Intenta de nuevo.');
-                                      return;
-                                    }
-                                    setCalendarAssignments(prev => prev.filter(a => String(a.id) !== String(assignment.id)));
-                                    setSyncedChecklists(prev => {
-                                      const next = new Map(prev);
-                                      next.delete(String(assignment.id));
-                                      return next;
-                                    });
-                                    setSyncedInventories(prev => {
-                                      const next = new Map(prev);
-                                      next.delete(String(assignment.id));
-                                      return next;
-                                    });
-                                  }}
-                                >
-                                  <span className="assignment-btn-icon">🗑️</span>
-                                  <span className="assignment-btn-text">Eliminar</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="modal-body-empty">
-                        <p>📭 No hay asignaciones programadas</p>
-                      </div>
-                    )}
-                  </div>
+                  <p className="calendar-add-only-note">
+                    El calendario solo sirve para agregar. Los trabajos asignados se ven en Checklist de limpieza.
+                  </p>
                 </>
               )}
               
@@ -4576,179 +4515,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </p>
                     </div>
                   )}
-                  <div style={{marginBottom: '2rem', textAlign: 'center', color: '#6b7280'}}>
-                    Lista completa de limpieza regular, profunda y mantenimiento.
-                  </div>
+                  <p className="job-board-lead">
+                    Los trabajos asignados están aquí. El calendario solo sirve para agregarlos.
+                  </p>
 
-                  {/* Sección: Tareas Asignadas por Tipo - MEJORADO */}
-                  {calendarAssignments && calendarAssignments.filter(a => !a.completed).length > 0 && (
-                    <div className="assigned-tasks-section-v2">
-                      <div className="assigned-tasks-header-v2">
-                        <div className="assigned-tasks-title-group">
-                          <h3 className="assigned-tasks-title-v2">📋 Tareas Asignadas</h3>
-                          <p className="assigned-tasks-subtitle">Resumen de actividades por tipo</p>
-                        </div>
-                        <span className="assigned-tasks-badge-v2">{calendarAssignments.filter(a => !a.completed).length}</span>
+                  <div className="job-board">
+                    <div className="job-board-head">
+                      <div>
+                        <h3 className="job-board-title">Trabajos asignados</h3>
+                        <p className="job-board-sub">Se completan aquí. El calendario no muestra esta lista.</p>
                       </div>
-                      
-                      {(() => {
-                        const byType = new Map<string, any[]>();
-                        const typeConfig: {[key: string]: {icon: string, color: string, borderColor: string}} = {
-                          'Limpieza regular': {icon: '✨', color: '#7c3aed', borderColor: '#c4b5fd'},
-                          'Limpieza profunda': {icon: '🧹', color: '#dc2626', borderColor: '#fecaca'},
-                          'Mantenimiento': {icon: '🔧', color: '#0891b2', borderColor: '#67e8f9'}
-                        };
-                        
-                        calendarAssignments.filter(a => !a.completed).forEach(assignment => {
-                          const type = assignment.type || 'Limpieza regular';
-                          if (!byType.has(type)) byType.set(type, []);
-                          byType.get(type)!.push(assignment);
-                        });
-
-                        return (
-                          <div className="assigned-tasks-container-v2">
-                            {Array.from(byType.entries()).map(([type, assignments]) => {
-                              const config = typeConfig[type] || {icon: '📋', color: '#6366f1', borderColor: '#c7d2fe'};
-                              return (
-                                <div key={type} className="assigned-tasks-card-v2" style={{borderTopColor: config.color}}>
-                                  <div className="assigned-tasks-card-header-v2">
-                                    <div className="assigned-tasks-card-title-group">
-                                      <span className="assigned-tasks-card-icon" style={{color: config.color}}>{config.icon}</span>
-                                      <div>
-                                        <h4 className="assigned-tasks-card-title" style={{color: config.color}}>{type}</h4>
-                                        <span className="assigned-tasks-card-count">{assignments.length} {assignments.length === 1 ? 'tarea' : 'tareas'}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="assigned-tasks-items-v2">
-                                    {assignments.map((assignment, idx) => (
-                                      <div 
-                                        key={assignment.id || idx} 
-                                        className="assigned-tasks-item-v2"
-                                        style={{cursor: 'pointer', transition: 'all 0.2s ease'}}
-                                        onClick={async () => {
-                                          console.log('📊 Abriendo progreso del empleado:', assignment.employee);
-                                          setLoadingEmployeeProgress(true);
-                                          setSelectedEmployeeForProgress({
-                                            assignment,
-                                            employee: assignment.employee,
-                                            type: assignment.type
-                                          });
-                                          
-                                          // Cargar inventario de la casa
-                                          try {
-                                            const houseName = houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406';
-                                            const inventoryItems = await realtimeService.getInventoryItems(houseName);
-                                            setEmployeeInventoryProgress(inventoryItems || []);
-                                            
-                                            // Cargar checklist del assignment
-                                            const checklistItems = syncedChecklists.get(String(assignment.id)) || [];
-                                            setEmployeeChecklistProgress(checklistItems);
-                                          } catch (e) {
-                                            console.error('Error cargando progreso:', e);
-                                          } finally {
-                                            setLoadingEmployeeProgress(false);
-                                          }
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          (e.currentTarget as HTMLDivElement).style.transform = 'translateX(4px)';
-                                          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          (e.currentTarget as HTMLDivElement).style.transform = 'translateX(0)';
-                                          (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-                                        }}
-                                      >
-                                        <div className="assigned-tasks-item-header-v2">
-                                          <div className="assigned-tasks-employee-info">
-                                            <div className="assigned-tasks-employee-avatar">👤</div>
-                                            <div className="assigned-tasks-employee-details">
-                                              <div className="assigned-tasks-employee-name">{assignment.employee}</div>
-                                              <div className="assigned-tasks-employee-date">
-                                                📅 {new Date(assignment.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem'}}>
-                                            <span className={`assigned-tasks-status-badge ${employeeConfirmation(assignment) ? 'status-done' : 'status-pending'}`}>
-                                              {employeeConfirmation(assignment) ? `Confirmó ${employeeConfirmation(assignment)?.by || assignment.employee}` : '⏳ Pendiente'}
-                                            </span>
-                                            {employeeConfirmation(assignment) && canCloseExtraTask(user, assignment) && (
-                                              <button
-                                                onClick={async (e) => {
-                                                  e.stopPropagation();
-                                                  const ok = await closeCalendarAssignment(assignment, user.username);
-                                                  if (!ok) {
-                                                    alert('No se pudo pasar el trabajo a completados.');
-                                                    return;
-                                                  }
-                                                  const now = new Date().toISOString();
-                                                  setCalendarAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || now, completed_by: user.username } : a));
-                                                }}
-                                                style={{
-                                                  background: '#dcfce7',
-                                                  color: '#166534',
-                                                  border: '1px solid #86efac',
-                                                  borderRadius: '0.5rem',
-                                                  padding: '0.35rem 0.6rem',
-                                                  fontSize: '0.8rem',
-                                                  fontWeight: 600,
-                                                  cursor: 'pointer'
-                                                }}
-                                              >
-                                                Completar
-                                              </button>
-                                            )}
-                                            {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno' || isJonathanUser) && (
-                                              <button
-                                                onClick={async (e) => {
-                                                  e.stopPropagation();
-                                                  if (!confirm(`¿Eliminar la asignación de ${assignment.employee}?`)) return;
-                                                  const archive = await shouldArchiveAssignment(assignment);
-                                                  const deleted = archive
-                                                    ? await archiveCalendarAssignment(assignment, user.username)
-                                                    : await realtimeService.deleteCalendarAssignmentCascade(String(assignment.id));
-                                                  if (deleted) {
-                                                    setCalendarAssignments(prev => archive
-                                                      ? prev.map(a => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || new Date().toISOString(), completed_by: a.completed_by || user.username } : a)
-                                                      : prev.filter(a => a.id !== assignment.id));
-                                                    setSyncedChecklists(prev => {
-                                                      const next = new Map(prev);
-                                                      next.delete(String(assignment.id));
-                                                      return next;
-                                                    });
-                                                  }
-                                                }}
-                                                style={{
-                                                  background: '#fee2e2',
-                                                  color: '#b91c1c',
-                                                  border: '1px solid #fecaca',
-                                                  borderRadius: '0.5rem',
-                                                  padding: '0.35rem 0.6rem',
-                                                  fontSize: '0.8rem',
-                                                  fontWeight: 600,
-                                                  cursor: 'pointer'
-                                                }}
-                                              >
-                                                🗑️ Eliminar
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-                                        {assignment.time && (
-                                          <div className="assigned-tasks-time-info">🕐 {assignment.time}</div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
+                      <span className="job-board-count">{openAssignments.length}</span>
                     </div>
-                  )}
+                    {openAssignments.length === 0 ? (
+                      <p className="job-board-empty">No hay trabajos asignados. Agrégalos en Calendario.</p>
+                    ) : (
+                      <>
+                        <section className="job-board-section">
+                          <h4 className="job-board-section-title">Pendientes</h4>
+                          {pendingAssignments.length === 0 ? (
+                            <p className="job-board-empty">No hay trabajos esperando al empleado.</p>
+                          ) : (
+                            <div className="job-board-list">
+                              {pendingAssignments.map((assignment: any) => renderAssignedJob(assignment))}
+                            </div>
+                          )}
+                        </section>
+                        <section className="job-board-section is-ready">
+                          <h4 className="job-board-section-title">Empleado confirmó</h4>
+                          {readyAssignments.length === 0 ? (
+                            <p className="job-board-empty">Nadie ha terminado el checklist todavía.</p>
+                          ) : (
+                            <div className="job-board-list">
+                              {readyAssignments.map((assignment: any) => renderAssignedJob(assignment, true))}
+                            </div>
+                          )}
+                        </section>
+                      </>
+                    )}
+                  </div>
 
                   {/* Formulario para agregar/editar tarea (solo manager/owner) */}
                   {(user.role === 'owner' || user.role === 'manager' || user.role === 'dueno') && (
@@ -6041,315 +5846,41 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         </div>
       )}
       
-      {/* Modal para Checklist (Limpieza Regular y Mantenimiento) */}
+      {/* Modal para el checklist de una sola asignación */}
       {selectedAssignmentForChecklist && (
         <div className="modal-overlay" onClick={() => {
           setSelectedAssignmentForChecklist(null);
           setCurrentAssignmentType(null);
         }}>
-          <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-content large-modal job-sheet-modal" onClick={e => e.stopPropagation()}>
             {backRow}
             <div className="modal-header">
-              <h2>
-                {currentAssignmentType?.toLowerCase().includes('mantenimiento')
-                  ? '🔧 Tareas de Mantenimiento'
-                  : currentAssignmentType?.toLowerCase().includes('profunda')
-                  ? '🧹 Checklist de Limpieza Profunda'
-                  : '✨ Checklist de Limpieza Regular'}
-              </h2>
-              {(() => {
-                const a = calendarAssignments.find((x: any) => String(x.id) === String(selectedAssignmentForChecklist));
-                return a?.house ? <p className="modal-house-subtitle" style={{margin:'0.25rem 0 0', fontSize:'0.95rem', color:'#475569'}}>🏠 {a.house}</p> : null;
-              })()}
+              <h2>Checklist</h2>
               <button className="modal-close" onClick={() => {
                 setSelectedAssignmentForChecklist(null);
                 setCurrentAssignmentType(null);
               }}>✕</button>
             </div>
             <div className="modal-body">
-              {syncedChecklists.get(selectedAssignmentForChecklist) ? (
-                (() => {
-                  const assignment = calendarAssignments.find(a => String(a.id) === String(selectedAssignmentForChecklist));
-                  const checklistItems = (syncedChecklists.get(selectedAssignmentForChecklist) || []).filter((item: any) =>
-                    !isEmployeeViewer || !item?.employee || nameBelongsToEmployee(item.employee, user)
-                  );
-                  
-                  if (!assignment || (isEmployeeViewer && !nameBelongsToEmployee(assignment.employee, user))) {
-                    return <div className="modal-body-empty"><p>Asignación no encontrada</p></div>;
-                  }
-                  
-                  // Agrupar por zona
-                  const zones = new Map<string, any[]>();
-                  checklistItems.forEach(item => {
-                    if (!zones.has(item.zone)) {
-                      zones.set(item.zone, []);
-                    }
-                    zones.get(item.zone)!.push(item);
-                  });
-                  
-                  const totalItems = checklistItems.length;
-                  const completedItems = checklistItems.filter(i => i.completed).length;
-                  const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-                  
-                  return (
-                    <>
-                      {/* Header Mejorado */}
-                      <div className="assignment-header-modern">
-                        <div className="assignment-header-left">
-                          <div className="assignment-type-badge-modern">
-                            {assignment.type === 'Limpieza profunda' ? '🧹 Profunda' : 
-                             assignment.type === 'Limpieza regular' ? '✨ Regular' : '🔧 Mantenimiento'}
-                          </div>
-                          <div className="assignment-info">
-                            <h3 className="assignment-employee-name">{assignment.employee}</h3>
-                            <p className="assignment-date-time">
-                              🏠 {assignment.house} • 📅 {(() => {
-                                const dateStr = assignment.date;
-                                const dateParts = dateStr.split('T')[0].split('-');
-                                const date = new Date(dateParts[0], parseInt(dateParts[1]) - 1, dateParts[2]);
-                                return date.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
-                              })()} • 🕐 {assignment.time}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="assignment-progress-circular">
-                          <svg className="progress-ring" style={{transform: 'rotate(-90deg)'}}>
-                            <circle className="progress-ring-circle-bg" cx="50" cy="50" r="45" />
-                            <circle 
-                              className="progress-ring-circle" 
-                              cx="50" 
-                              cy="50" 
-                              r="45"
-                              style={{
-                                strokeDashoffset: 282 - (282 * progress / 100)
-                              }}
-                            />
-                          </svg>
-                          <div className="progress-text">
-                            <span className="progress-number">{progress}%</span>
-                            <span className="progress-label">Progreso</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Stats Mejoradas */}
-                      <div className="assignment-stats-modern">
-                        <div className="stat-card-modern completed">
-                          <div className="stat-icon">✅</div>
-                          <div className="stat-content">
-                            <span className="stat-number">{completedItems}</span>
-                            <span className="stat-text">Completadas</span>
-                          </div>
-                        </div>
-                        <div className="stat-card-modern pending">
-                          <div className="stat-icon">⏳</div>
-                          <div className="stat-content">
-                            <span className="stat-number">{totalItems - completedItems}</span>
-                            <span className="stat-text">Pendientes</span>
-                          </div>
-                        </div>
-                        <div className="stat-card-modern total">
-                          <div className="stat-icon">📋</div>
-                          <div className="stat-content">
-                            <span className="stat-number">{totalItems}</span>
-                            <span className="stat-text">Total</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Barra de progreso mejorada */}
-                      <div className="progress-bar-modern">
-                        <div className="progress-bar-modern-label">
-                          <span className="progress-bar-modern-text">Progreso General</span>
-                          <span className="progress-bar-modern-percentage">{progress}%</span>
-                        </div>
-                        <div className="progress-bar-modern-container">
-                          <div 
-                            className={`progress-bar-modern-fill ${progress === 100 ? 'complete' : ''}`} 
-                            style={{width: `${progress}%`}}
-                          ></div>
-                        </div>
-                      </div>
-                      
-                      {/* Botón para marcar como completado (solo admin/manager) */}
-                      {(progress === 100 || employeeConfirmation(assignment)) && canCloseExtraTask(user, assignment) && (
-                        <div className="completion-section">
-                          <button 
-                            className="btn-mark-completed"
-                            onClick={async () => {
-                              if (confirm(`¿Marcar esta asignación como completada?`)) {
-                                try {
-                                  const assignmentToComplete = calendarAssignments.find((a: any) => String(a.id) === String(selectedAssignmentForChecklist));
-                                  if (!assignmentToComplete) return;
-
-                                  const checklistItems = syncedChecklists.get(selectedAssignmentForChecklist) || [];
-                                  const completedAtCandidates = checklistItems
-                                    .filter((i: any) => i.completed && i.completed_at)
-                                    .map((i: any) => i.completed_at);
-                                  const completionMoment = completedAtCandidates.length > 0
-                                    ? completedAtCandidates.sort().slice(-1)[0]
-                                    : new Date().toISOString();
-
-                                  if (!employeeConfirmation(assignmentToComplete)) {
-                                    const confirmer = (checklistItems.find((i: any) => i.completed_by)?.completed_by) || assignmentToComplete.employee;
-                                    const stampedNotes = notesWithEmployeeConfirmation(assignmentToComplete.notes, confirmer, completionMoment);
-                                    await (supabase as any).from('calendar_assignments').update({
-                                      notes: stampedNotes,
-                                      updated_at: new Date().toISOString(),
-                                    }).eq('id', assignmentToComplete.id);
-                                    assignmentToComplete.notes = stampedNotes;
-                                  }
-
-                                  const closed = await closeCalendarAssignment(
-                                    { ...assignmentToComplete, completed_by: null, completed_at: completionMoment },
-                                    user.username
-                                  );
-                                  if (!closed) {
-                                    alert('No se pudo marcar el trabajo como completado.');
-                                    return;
-                                  }
-
-                                  setCalendarAssignments(prev => prev.map((a: any) =>
-                                    String(a.id) === String(selectedAssignmentForChecklist)
-                                      ? {
-                                          ...a,
-                                          completed: true,
-                                          completed_by: user.username,
-                                          completed_at: completionMoment,
-                                          updated_at: new Date().toISOString(),
-                                          notes: assignmentToComplete.notes,
-                                        }
-                                      : a
-                                  ));
-
-                                  addRealtimeNotification(
-                                    `Trabajo completado: ${assignmentToComplete.employee} (${assignmentToComplete.type})`,
-                                    'success'
-                                  );
-                                  setSelectedAssignmentForChecklist(null);
-                                } catch (err) {
-                                  console.error('❌ Error en Trabajo Completado:', err);
-                                  alert('Ocurrió un error al completar el trabajo.');
-                                }
-                              }
-                            }}
-                          >
-                            <span className="btn-icon">✨</span>
-                            <span className="btn-text">Trabajo Completado</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Tarjeta extra para admin/manager: Trabajos Completados */}
-                      {(user.role === 'manager' || user.role === 'owner' || user.role === 'dueno') && (
-                        <div style={{ marginBottom: '1.25rem', background: '#f8fafc', border: '1px solid #dbeafe', borderRadius: '0.9rem', padding: '1rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, color: '#1e40af', fontSize: '1rem' }}>✅ Trabajos Completados</h3>
-                            <span style={{ background: '#1e40af', color: 'white', borderRadius: '1rem', padding: '0.2rem 0.6rem', fontSize: '0.8rem', fontWeight: 700 }}>
-                              {calendarAssignments.filter((a: any) => a.house === assignment.house && a.completed && a.completed_at).length}
-                            </span>
-                          </div>
-                          {calendarAssignments.filter((a: any) => a.house === assignment.house && a.completed && a.completed_at).length === 0 ? (
-                            <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Aun no hay trabajos completados para esta casa.</p>
-                          ) : (
-                            <div style={{ display: 'grid', gap: '0.6rem' }}>
-                              {calendarAssignments
-                                .filter((a: any) => a.house === assignment.house && a.completed && a.completed_at)
-                                .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
-                                .slice(0, 6)
-                                .map((job: any) => (
-                                  <div key={`done-${job.id}`} style={{ background: 'white', border: '1px solid #bfdbfe', borderRadius: '0.7rem', padding: '0.7rem 0.85rem' }}>
-                                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>{job.employee} - {job.type}</div>
-                                    <div style={{ color: '#475569', fontSize: '0.88rem' }}>
-                                      📅 {new Date(job.completed_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })} • 🕐 {new Date(job.completed_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      <div className="checklist-zones">
-                        {Array.from(zones.entries()).map(([zone, items]) => {
-                          const zoneCompleted = items.filter(i => i.completed).length;
-                          const zoneTotal = items.length;
-                          const zoneProgress = Math.round((zoneCompleted / zoneTotal) * 100);
-                          
-                          return (
-                            <div key={zone} className="checklist-zone-card">
-                              <div className="checklist-zone-header">
-                                <h3>{zone}</h3>
-                                <span className="zone-progress">{zoneCompleted}/{zoneTotal}</span>
-                              </div>
-                              <div className="checklist-items">
-                                {items.map(item => (
-                                  <label key={item.id} className="checklist-item">
-                                    <input
-                                      type="checkbox"
-                                      checked={item.completed}
-                                      onChange={async (e) => {
-                                        console.log('📝 Actualizando item:', item.id, 'a', e.target.checked);
-                                        try {
-                                          const result = await realtimeService.updateCleaningChecklistItem(
-                                            item.id,
-                                            e.target.checked,
-                                            user.username
-                                          );
-                                          if (result) {
-                                            console.log('✅ Item actualizado exitosamente:', result);
-                                            
-                                            // Actualizar estado local del checklist
-                                            const currentChecklist = syncedChecklists.get(selectedAssignmentForChecklist) || [];
-                                            const updatedChecklist = currentChecklist.map(i => 
-                                              i.id === item.id ? result : i
-                                            );
-                                            setSyncedChecklists(prev => new Map(prev).set(selectedAssignmentForChecklist, updatedChecklist));
-                                            const allDone = updatedChecklist.length > 0 && updatedChecklist.every((i: any) => !!i.completed);
-                                            if (allDone) {
-                                              const stamped = notesWithEmployeeConfirmation(assignment.notes, user.username, new Date().toISOString());
-                                              await (supabase as any).from('calendar_assignments').update({ notes: stamped, updated_at: new Date().toISOString() }).eq('id', assignment.id);
-                                              setCalendarAssignments(prev => prev.map((a: any) => String(a.id) === String(assignment.id) ? { ...a, notes: stamped } : a));
-                                            } else if (employeeConfirmation(assignment)) {
-                                              const cleared = notesWithoutEmployeeConfirmation(assignment.notes);
-                                              await (supabase as any).from('calendar_assignments').update({ notes: cleared, updated_at: new Date().toISOString() }).eq('id', assignment.id);
-                                              setCalendarAssignments(prev => prev.map((a: any) => String(a.id) === String(assignment.id) ? { ...a, notes: cleared } : a));
-                                            }
-                                            
-                                            console.log('🔄 Estado local actualizado para item:', item.id);
-                                          } else {
-                                            console.error('❌ updateCleaningChecklistItem retornó null');
-                                          }
-                                        } catch (err) {
-                                          console.error('❌ Error en onChange:', err);
-                                        }
-                                      }}
-                                      disabled={user.role === 'manager' && user.username !== assignment.employee}
-                                    />
-                                    <span className={item.completed ? 'completed' : ''}>{item.task}</span>
-                                    {item.completed && item.completed_by && (
-                                      <span className="completed-by">✓ por {item.completed_by}</span>
-                                    )}
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                  })()
-                ) : (
-                  <div className="modal-body-empty">
-                    <p>Cargando checklist...</p>
-                  </div>
-                )}
+              <Checklist
+                user={user}
+                assignmentId={selectedAssignmentForChecklist}
+                onAssignmentClosed={() => {
+                  const now = new Date().toISOString();
+                  setCalendarAssignments(prev => prev.map((a: any) =>
+                    String(a.id) === String(selectedAssignmentForChecklist)
+                      ? { ...a, completed: true, completed_at: a.completed_at || now, completed_by: user.username }
+                      : a
+                  ));
+                  setSelectedAssignmentForChecklist(null);
+                  setCurrentAssignmentType(null);
+                }}
+              />
             </div>
           </div>
         </div>
       )}
-      
+
       {/* Modal para Inventario Sincronizado */}
       {selectedAssignmentForInventory && (
         <div className="modal-overlay" onClick={() => setSelectedAssignmentForInventory(null)}>
