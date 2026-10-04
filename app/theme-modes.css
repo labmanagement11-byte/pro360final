@@ -370,3 +370,284 @@ html[data-theme="dark"] .users-list-empty {
   color: #cbd5e1;
   border-color: #334155;
 }
+
+/* Contraste en todo el modo oscuro.
+   El CSS de cada pantalla pinta letras oscuras (a veces con !important)
+   sobre fondos que este archivo vuelve azul oscuro. Estas reglas ganan
+   por especificidad. El modo claro no entra aquí. */
+
+html[data-theme="dark"] .subcard,
+html[data-theme="dark"] .subcard:hover,
+html[data-theme="dark"] .assignment-card-v3,
+html[data-theme="dark"] .assignment-card-v3:hover,
+html[data-theme="dark"] .assigned-subtasks,
+html[data-theme="dark"] .assigned-tasks-card-header-v2,
+html[data-theme="dark"] .assigned-task-zone-head,
+html[data-theme="dark"] .cl-zone-btn,
+html[data-theme="dark"] .inv-zone-head,
+html[data-theme="dark"] .cl-admin-zone-btn,
+html[data-theme="dark"] .checklist-zone-header,
+html[data-theme="dark"] .job-sheet-zone-head,
+html[data-theme="dark"] .checklist-zone-count,
+html[data-theme="dark"] .cl-admin-zone-count,
+html[data-theme="dark"] .cl-admin-task-list,
+html[data-theme="dark"] .users-list-empty,
+html[data-theme="dark"] .inv-empty,
+html[data-theme="dark"] .inv-progress,
+html[data-theme="dark"] .checklist-empty,
+html[data-theme="dark"] .extra-task-summary-counts span,
+html[data-theme="dark"] .job-card-meta div,
+html[data-theme="dark"] .assignment-card-v3-id,
+html[data-theme="dark"] .assignment-card-v3-meta,
+html[data-theme="dark"] .assigned-inventory-item,
+html[data-theme="dark"] .inv-btn.ghost,
+html[data-theme="dark"] .subtask-toggle-button,
+html[data-theme="dark"] .checklist-zone-progress {
+  background: #243044 !important;
+  background-image: none !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+html[data-theme="dark"] .assigned-task-zone-card.open .assigned-task-zone-head,
+html[data-theme="dark"] .checklist-zone.open .cl-zone-btn,
+html[data-theme="dark"] .inv-zone.open .inv-zone-head,
+html[data-theme="dark"] .cl-admin-zone.open .cl-admin-zone-btn {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .checklist-zone.open .checklist-zone-count,
+html[data-theme="dark"] .cl-admin-zone.open .cl-admin-zone-count {
+  background: #1e3a8a !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] body :is(
+  h1, h2, h3, h4, h5, h6,
+  p, span, label, li, dt, dd,
+  small, strong, em, td, th, div, legend, figcaption, a, caption
+) {
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select:not(.dashboard-house-selector) {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc;
+  caret-color: #f8fafc;
+  border-color: #64748b !important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0;
+  opacity: 1;
+}
+
+html[data-theme="dark"] input[type="date"],
+html[data-theme="dark"] input[type="time"],
+html[data-theme="dark"] input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] input:-webkit-autofill,
+html[data-theme="dark"] textarea:-webkit-autofill,
+html[data-theme="dark"] select:-webkit-autofill {
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc;
+  box-shadow: 0 0 0 1000px #0f172a inset !important;
+}
+
+html[data-theme="dark"] select option,
+html[data-theme="dark"] select optgroup {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .dashboard-house-selector,
+html[data-theme="dark"] .dashboard-house-selector option {
+  background: #047857;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+/* Pastillas y estados: fondo oscuro y letra clara, no gris sobre azul */
+html[data-theme="dark"] .inv-status.wait,
+html[data-theme="dark"] .assigned-tasks-status-badge.status-pending,
+html[data-theme="dark"] .extra-task-status.is-pending,
+html[data-theme="dark"] .tasks-complete-label,
+html[data-theme="dark"] .checklist-zone-progress.partial {
+  background: #7c2d12 !important;
+  color: #ffedd5 !important;
+}
+
+html[data-theme="dark"] .inv-status.ok,
+html[data-theme="dark"] .assigned-tasks-status-badge.status-done,
+html[data-theme="dark"] .extra-task-status.is-done,
+html[data-theme="dark"] .job-card-status.is-ready,
+html[data-theme="dark"] .asheet-pill.is-ready,
+html[data-theme="dark"] .checklist-live,
+html[data-theme="dark"] .tasks-completed-label,
+html[data-theme="dark"] .checklist-zone-progress.complete,
+html[data-theme="dark"] .assigned-task-subtask-text.is-completed,
+html[data-theme="dark"] .checklist-done-meta {
+  background: #14532d !important;
+  color: #dcfce7 !important;
+}
+
+html[data-theme="dark"] .assigned-task-subtask-text.is-completed,
+html[data-theme="dark"] .checklist-done-meta,
+html[data-theme="dark"] .asheet-done-who,
+html[data-theme="dark"] .job-sheet-item-by {
+  background: transparent !important;
+  color: #86efac !important;
+}
+
+html[data-theme="dark"] .inv-status.issue,
+html[data-theme="dark"] .assigned-task-delete-btn,
+html[data-theme="dark"] .cl-admin-task-actions button.danger,
+html[data-theme="dark"] .job-card-btn.is-danger,
+html[data-theme="dark"] .assignment-btn.danger {
+  background: #7f1d1d !important;
+  color: #fee2e2 !important;
+  border-color: #f87171 !important;
+}
+
+html[data-theme="dark"] .extra-task-status.is-waiting,
+html[data-theme="dark"] .job-card-status,
+html[data-theme="dark"] .asheet-pill,
+html[data-theme="dark"] .users-list-item-role,
+html[data-theme="dark"] .users-house,
+html[data-theme="dark"] .subcard-badge,
+html[data-theme="dark"] .inv-notice,
+html[data-theme="dark"] .asheet-section h3 span,
+html[data-theme="dark"] .job-sheet-section h3 span {
+  background: #1e3a8a !important;
+  color: #e0f2fe !important;
+}
+
+html[data-theme="dark"] .subcard-badge.success,
+html[data-theme="dark"] .asheet-section.is-done h3 span,
+html[data-theme="dark"] .job-sheet-section.is-done h3 span {
+  background: #14532d !important;
+  color: #dcfce7 !important;
+}
+
+html[data-theme="dark"] .subcard-badge.warning {
+  background: #7c2d12 !important;
+  color: #ffedd5 !important;
+}
+
+html[data-theme="dark"] .subcard-badge.danger,
+html[data-theme="dark"] .dashboard-card.has-pending .dashboard-card-title,
+html[data-theme="dark"] .dashboard-card.has-pending .dashboard-card-desc {
+  background: transparent !important;
+  color: #fecaca !important;
+}
+
+html[data-theme="dark"] .subcard-badge.danger {
+  background: #7f1d1d !important;
+  color: #fee2e2 !important;
+}
+
+html[data-theme="dark"] .dashboard-card.has-pending {
+  background: linear-gradient(180deg, #3f1d24 0%, #2a1218 100%) !important;
+}
+
+html[data-theme="dark"] .inv-issue-box,
+html[data-theme="dark"] .users-error {
+  background: #3b2414 !important;
+  color: #ffedd5 !important;
+  border-color: #fb923c !important;
+}
+
+html[data-theme="dark"] .users-error {
+  background: #450a0a !important;
+  color: #fecaca !important;
+  border-color: #f87171 !important;
+}
+
+html[data-theme="dark"] .inv-issue-box :is(h1, h2, h3, h4, p, span, label, div, strong),
+html[data-theme="dark"] .users-error :is(p, span, strong) {
+  color: #ffedd5 !important;
+}
+
+html[data-theme="dark"] .users-error,
+html[data-theme="dark"] .users-error :is(p, span, strong) {
+  color: #fecaca !important;
+}
+
+/* Avisos: se quedan como están (letra clara sobre color, o oscura sobre amarillo) */
+html[data-theme="dark"] .realtime-notification-success,
+html[data-theme="dark"] .realtime-notification-success :is(div, span, p, strong, button),
+html[data-theme="dark"] .realtime-notification-info,
+html[data-theme="dark"] .realtime-notification-info :is(div, span, p, strong, button),
+html[data-theme="dark"] .realtime-notification-error,
+html[data-theme="dark"] .realtime-notification-error :is(div, span, p, strong, button),
+html[data-theme="dark"] .realtime-sync-indicator,
+html[data-theme="dark"] .realtime-sync-indicator :is(div, span, p, strong) {
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .realtime-notification-warning,
+html[data-theme="dark"] .realtime-notification-warning :is(div, span, p, strong, button) {
+  color: #1f2937 !important;
+}
+
+html[data-theme="dark"] .reminder-due-banner,
+html[data-theme="dark"] .reminder-due-banner :is(div, span, p, strong, li, button) {
+  color: #7f1d1d !important;
+}
+
+html[data-theme="dark"] .reminder-due-banner {
+  background: #fef2f2 !important;
+  border-color: #dc2626 !important;
+}
+
+html[data-theme="dark"] .subcard.reminder-urgent,
+html[data-theme="dark"] .subcard.reminder-urgent :is(h1, h2, h3, h4, p, span, li, div, strong, label, dd, dt) {
+  background: #450a0a !important;
+  color: #fecaca !important;
+  border-color: #f87171 !important;
+}
+
+html[data-theme="dark"] .dashboard-back-btn,
+html[data-theme="dark"] .dashboard-back-btn :is(span, strong),
+html[data-theme="dark"] .dashboard-logout-btn,
+html[data-theme="dark"] .login-submit-btn,
+html[data-theme="dark"] .users-btn,
+html[data-theme="dark"] .users-btn :is(span, strong),
+html[data-theme="dark"] .inv-btn.main,
+html[data-theme="dark"] .inv-btn.ok,
+html[data-theme="dark"] .inv-btn.warn,
+html[data-theme="dark"] .inv-btn.danger,
+html[data-theme="dark"] .at-tabs button.on,
+html[data-theme="dark"] .cl-tabs button.on,
+html[data-theme="dark"] .inv-tabs button.on,
+html[data-theme="dark"] .checklist-filter button.active,
+html[data-theme="dark"] .cl-admin-type-tabs button.on,
+html[data-theme="dark"] .job-card-btn,
+html[data-theme="dark"] .extra-task-complete,
+html[data-theme="dark"] .assigned-task-subtask-btn,
+html[data-theme="dark"] .theme-btn.dark,
+html[data-theme="dark"] .theme-btn.dark :is(span, strong) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+html[data-theme="dark"] .job-card-btn.is-complete,
+html[data-theme="dark"] .asheet-complete {
+  background: #14532d !important;
+  color: #dcfce7 !important;
+  -webkit-text-fill-color: #dcfce7;
+}
+
+html[data-theme="dark"] div.checklist-live {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid #475569;
+}
