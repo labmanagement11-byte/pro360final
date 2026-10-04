@@ -2,11 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpushModule from "npm:web-push@3.6.7";
 
-// Sends a Web Push for a new calendar assignment or extra task,
-// and for the owner plus that house's manager when a reminder is
-// due soon or overdue, inventory is perdido or danado, or a shopping
-// item is added. Not deployed. Reads VAPID_PRIVATE_KEY from the
-// function env, never from source.
+// Sends a Web Push to the assigned employee for a new calendar
+// assignment or extra task (match username, email, or the part
+// before @). Also tells the owner and that house's manager when the
+// employee confirms a checklist or extra task, and for reminders,
+// perdido/danado inventory, and shopping items.
+// REMINDER_SWEEP covers reminders that become due with no row change.
+// Reads VAPID_PRIVATE_KEY from the function env, never from source.
 // Needs public.subscriptions (SQL not applied yet).
 // Deploy later with JWT verification off (--no-verify-jwt); the webhook is not a user session.
 
@@ -42,6 +44,32 @@ function assigneeOf(record: Record<string, unknown>): string {
   return text(record.employee) || text(record.assigned_to) || text(record.assignedTo);
 }
 
+function notesObject(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch {
+      /* plain text */
+    }
+  }
+  return {};
+}
+
+function confirmationStamp(record: Record<string, unknown>): string {
+  const direct = text(record.employee_confirmed_at) || text(record.employeeConfirmedAt);
+  if (direct) return direct;
+  return text(notesObject(record.notes).employee_confirmed_at);
+}
+
+function confirmationBy(record: Record<string, unknown>): string {
+  const direct = text(record.employee_confirmed_by) || text(record.employeeConfirmedBy);
+  if (direct) return direct;
+  return text(notesObject(record.notes).employee_confirmed_by) || assigneeOf(record);
+}
+
 function messageFor(table: string, record: Record<string, unknown>) {
   const house = text(record.house);
   const when = [text(record.date), text(record.time)].filter(Boolean).join(" ");
@@ -56,7 +84,7 @@ function messageFor(table: string, record: Record<string, unknown>) {
       tag: `cal:${id}`,
     };
   }
-  const taskText = text(record.task) || text(record.title) || "Tarea extra";
+  const taskText = text(record.task) || text(record.title) || text(record.description) || "Tarea extra";
   const extra = [house && `Casa ${house}`, when].filter(Boolean).join(" · ");
   return {
     title: "Nueva tarea extra",
@@ -151,7 +179,7 @@ function staffActor(table: string, record: Record<string, unknown>): string {
   return "";
 }
 
-type ProfileRow = { id: string; username?: string | null; role?: string | null; house?: string | null };
+type ProfileRow = { id: string; username?: string | null; email?: string | null; role?: string | null; house?: string | null };
 
 function staffRecipient(row: ProfileRow, house: string, actorKeys: Set<string>): boolean {
   const role = text(row.role).toLowerCase();
@@ -191,6 +219,59 @@ function staffSkip(
   return null;
 }
 
+function finishedMessage(table: string, record: Record<string, unknown>) {
+  const house = text(record.house);
+  const who = confirmationBy(record) || "El empleado";
+  const id = text(record.id) || "nuevo";
+  if (table === "calendar_assignments") {
+    const type = text(record.type) || "el trabajo";
+    return {
+      title: "El empleado terminó el trabajo",
+      body: `${who} confirmó ${type}${house ? ` en ${house}` : ""}.`,
+      url: "/",
+      tag: `fin:cal:${id}`,
+    };
+  }
+  const taskText = text(record.title) || text(record.task) || "la tarea extra";
+  return {
+    title: "El empleado terminó la tarea extra",
+    body: `${who} confirmó ${taskText}${house ? ` en ${house}` : ""}.`,
+    url: "/",
+    tag: `fin:task:${id}`,
+  };
+}
+
+type AuthLike = { id?: string; email?: string | null; user_metadata?: Record<string, unknown> | null };
+
+function personKeys(username: string, email: string): string[] {
+  return Array.from(new Set([...nameKeys(username), ...nameKeys(email)]));
+}
+
+function matchesWanted(keys: string[], wanted: Set<string>): boolean {
+  return keys.some((key) => wanted.has(key));
+}
+
+/** Profile id and auth id. Subscriptions are stored with the auth user id. */
+function employeeRecipientIds(
+  profiles: ProfileRow[],
+  authUsers: AuthLike[],
+  wanted: Set<string>,
+): string[] {
+  const ids = new Set<string>();
+  for (const row of profiles) {
+    const keys = personKeys(text(row.username), text(row.email));
+    if (!matchesWanted(keys, wanted)) continue;
+    if (row.id) ids.add(row.id);
+  }
+  for (const user of authUsers) {
+    const meta = user.user_metadata || {};
+    const keys = personKeys(text(meta.username), text(user.email));
+    if (!matchesWanted(keys, wanted) || !user.id) continue;
+    ids.add(user.id);
+  }
+  return Array.from(ids);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
@@ -211,16 +292,22 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !serviceKey) return json({ error: "Faltan variables de Supabase" }, 500);
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
-  const payload = (body?.record ? body : (body?.payload as Record<string, unknown> | undefined)) || {};
-  const table = text(payload.table || body?.table);
-  const eventType = text(payload.type || body?.type || "INSERT").toUpperCase();
-  const record = (payload.record || body?.record) as Record<string, unknown> | undefined;
-  const oldRecord = (payload.old_record || body?.old_record) as Record<string, unknown> | undefined;
-  if (!record) return json({ ok: true, skipped: "sin registro" });
+  const nested = body?.payload && typeof body.payload === "object"
+    ? body.payload as Record<string, unknown>
+    : null;
+  const source = (body?.record ? body : nested) || body || {};
+  const rawTable = text(source.table || body?.table || nested?.table);
+  const table = rawTable.includes(".") ? rawTable.slice(rawTable.lastIndexOf(".") + 1) : rawTable;
+  const eventType = text(source.type || body?.type || nested?.type || "INSERT").toUpperCase();
+  let record = (source.record || body?.record || nested?.record || source.new || body?.new) as Record<string, unknown> | undefined;
+  const oldRecord = (source.old_record || body?.old_record || nested?.old_record || source.old || body?.old) as Record<string, unknown> | undefined;
+  if (!record && body && (body.employee || body.assigned_to || body.assignedTo)) record = body;
+  const isSweep = eventType === "REMINDER_SWEEP";
+  if (!record && !isSweep) return json({ ok: true, skipped: "sin registro" });
 
   const employeeTable = table === "calendar_assignments" || table === "tasks";
   const staffTable = table === "reminders" || table === "inventory" || table === "shopping_list";
-  if (!employeeTable && !staffTable) return json({ ok: true, skipped: "tabla no avisada" });
+  if (!isSweep && !employeeTable && !staffTable) return json({ ok: true, skipped: "tabla no avisada" });
 
   let note: Record<string, string> | null = null;
   let userIds: string[] = [];
@@ -229,17 +316,94 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  if (employeeTable) {
-    if (eventType !== "INSERT") return json({ ok: true, skipped: "no es un alta" });
-    if (record.completed === true) return json({ ok: true, skipped: "ya completada" });
-    const wanted = new Set(nameKeys(assigneeOf(record)));
-    if (wanted.size === 0) return json({ ok: true, skipped: "sin empleado" });
-    const { data: profiles, error: profileError } = await admin.from("profiles").select("id, username");
+  let authUsers: AuthLike[] = [];
+  try {
+    const { data: listed } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    authUsers = (listed?.users || []) as AuthLike[];
+  } catch {
+    authUsers = [];
+  }
+
+  if (isSweep) {
+    const { data: dueRows, error: dueError } = await admin.from("reminders").select("*").eq("paid", false);
+    if (dueError) return json({ error: dueError.message }, 500);
+    const { data: profiles, error: profileError } = await admin
+      .from("profiles")
+      .select("id, username, role, house");
     if (profileError) return json({ error: profileError.message }, 500);
-    userIds = (profiles || [])
-      .filter((row) => nameKeys(text((row as ProfileRow).username)).some((key) => wanted.has(key)))
-      .map((row) => (row as ProfileRow).id);
-    note = messageFor(table, record);
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+    let sent = 0;
+    const gone: string[] = [];
+    for (const row of (dueRows || []) as Record<string, unknown>[]) {
+      const sweepNote = staffMessage("reminders", row);
+      if (!sweepNote) continue;
+      const house = text(row.house);
+      const ids = ((profiles || []) as ProfileRow[])
+        .filter((profile) => staffRecipient(profile, house, new Set()))
+        .map((profile) => profile.id);
+      if (ids.length === 0) continue;
+      const { data: subs, error: subError } = await admin
+        .from("subscriptions")
+        .select("endpoint, p256dh, auth")
+        .in("user_id", ids);
+      if (subError) return json({ error: subError.message }, 500);
+      const bodyText = JSON.stringify(sweepNote);
+      for (const sub of (subs || []) as Array<{ endpoint: string; p256dh: string; auth: string }>) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            bodyText,
+          );
+          sent += 1;
+        } catch (err) {
+          const statusCode = (err as { statusCode?: number }).statusCode;
+          if (statusCode === 404 || statusCode === 410) gone.push(sub.endpoint);
+        }
+      }
+    }
+    if (gone.length > 0) await admin.from("subscriptions").delete().in("endpoint", gone);
+    return json({ ok: true, sweep: true, sent });
+  }
+
+  if (!record) return json({ ok: true, skipped: "sin registro" });
+
+  if (employeeTable) {
+    const confirmedNow = confirmationStamp(record);
+    const confirmedBefore = oldRecord ? confirmationStamp(oldRecord) : "";
+    const justConfirmed = eventType === "UPDATE" && Boolean(confirmedNow) && !confirmedBefore;
+    if (justConfirmed) {
+      note = finishedMessage(table, record);
+      const { data: profiles, error: profileError } = await admin
+        .from("profiles")
+        .select("id, username, role, house");
+      if (profileError) return json({ error: profileError.message }, 500);
+      const actorKeys = new Set(nameKeys(confirmationBy(record)));
+      const house = text(record.house);
+      userIds = ((profiles || []) as ProfileRow[])
+        .filter((row) => staffRecipient(row, house, actorKeys))
+        .map((row) => row.id);
+      const staffKeys = new Set<string>();
+      for (const row of (profiles || []) as ProfileRow[]) {
+        if (!userIds.includes(row.id)) continue;
+        personKeys(text(row.username), text(row.email)).forEach((key) => staffKeys.add(key));
+      }
+      for (const user of authUsers) {
+        if (!user.id || userIds.includes(user.id)) continue;
+        const meta = user.user_metadata || {};
+        const keys = personKeys(text(meta.username), text(user.email));
+        if (keys.some((key) => staffKeys.has(key))) userIds.push(user.id);
+      }
+    } else if (eventType === "INSERT") {
+      if (record.completed === true) return json({ ok: true, skipped: "ya completada" });
+      const wanted = new Set(nameKeys(assigneeOf(record)));
+      if (wanted.size === 0) return json({ ok: true, skipped: "sin empleado" });
+      const { data: profiles, error: profileError } = await admin.from("profiles").select("id, username");
+      if (profileError) return json({ error: profileError.message }, 500);
+      userIds = employeeRecipientIds((profiles || []) as ProfileRow[], authUsers, wanted);
+      note = messageFor(table, record);
+    } else {
+      return json({ ok: true, skipped: "no es un alta ni una confirmación" });
+    }
   } else {
     const reason = staffSkip(table, eventType, record, oldRecord);
     if (reason) return json({ ok: true, skipped: reason });

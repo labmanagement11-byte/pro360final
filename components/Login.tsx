@@ -168,6 +168,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
       const user: User = {
         username: record.username || record.full_name || localPart,
+        email: authData.user.email || normalizedEmail,
         password: '',
         role: userRole,
         house: userHouse,

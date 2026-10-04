@@ -272,9 +272,41 @@ function shoppingAlert(row: any, identity: WorkAlertUser): AlertRow | null {
 
 
 
+function assigneeText(row: any): string {
+  return String(row?.employee || row?.assigned_to || row?.assignedTo || "").trim();
+}
+
+function notesObject(raw: unknown): Record<string, any> {
+  if (!raw) return {};
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, any>;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch {
+      /* plain text notes */
+    }
+  }
+  return {};
+}
+
+/** Extra tasks store the person in assigned_to. Checklist confirmation lives in notes. */
+function confirmationStamp(row: any): string {
+  const direct = String(row?.employee_confirmed_at || row?.employeeConfirmedAt || "").trim();
+  if (direct) return direct;
+  return String(notesObject(row?.notes).employee_confirmed_at || "").trim();
+}
+
+function confirmationBy(row: any): string {
+  const direct = String(row?.employee_confirmed_by || row?.employeeConfirmedBy || "").trim();
+  if (direct) return direct;
+  const fromNotes = String(notesObject(row?.notes).employee_confirmed_by || "").trim();
+  return fromNotes || assigneeText(row);
+}
+
 function assignmentRow(row: any, identity: WorkAlertUser): AlertRow | null {
   if (!row || row.id == null) return null;
-  if (!nameBelongsToEmployee(row.employee, identity)) return null;
+  if (!nameBelongsToEmployee(assigneeText(row), identity)) return null;
   if (row.completed === true) return null;
   const type = String(row.type || "Trabajo").trim();
   const house = String(row.house || "").trim();
@@ -289,11 +321,12 @@ function assignmentRow(row: any, identity: WorkAlertUser): AlertRow | null {
 
 function taskRow(row: any, identity: WorkAlertUser): AlertRow | null {
   if (!row || row.id == null) return null;
-  if (!nameBelongsToEmployee(row.employee, identity)) return null;
+  // Tareas extra guardan al empleado en assigned_to, no en employee.
+  if (!nameBelongsToEmployee(assigneeText(row), identity)) return null;
   if (row.completed === true) return null;
   const house = String(row.house || "").trim();
   const when = [row.date, row.time].filter(Boolean).join(" ");
-  const text = String(row.task || "Tarea extra").trim();
+  const text = String(row.task || row.title || row.description || "Tarea extra").trim();
   const extra = [house && `Casa ${house}`, when].filter(Boolean).join(" · ");
   return {
     key: `task:${row.id}`,
@@ -302,18 +335,65 @@ function taskRow(row: any, identity: WorkAlertUser): AlertRow | null {
   };
 }
 
+function finishedRow(row: any, identity: WorkAlertUser, kind: "cal" | "task"): AlertRow | null {
+  if (!row || row.id == null || !staffScope(identity)) return null;
+  if (!seesHouse(identity, row.house)) return null;
+  const stamp = confirmationStamp(row);
+  if (!stamp) return null;
+  const who = confirmationBy(row);
+  if (nameBelongsToEmployee(who, identity)) return null;
+  const house = String(row.house || "").trim();
+  const what = kind === "cal"
+    ? String(row.type || "el trabajo").trim()
+    : String(row.title || row.task || row.description || "la tarea extra").trim();
+  return {
+    key: `fin:${kind}:${row.id}`,
+    title: kind === "cal" ? "El empleado terminó el trabajo" : "El empleado terminó la tarea extra",
+    body: `${who || "El empleado"} confirmó ${what}${house ? ` en ${house}` : ""}.`,
+  };
+}
+
+function quoteFilter(column: string, key: string): string {
+  return `${column}.ilike."${key.replace(/"/g, "")}"`;
+}
+
 async function loadMine(table: "calendar_assignments" | "tasks", identity: WorkAlertUser): Promise<any[] | null> {
   if (!supabase) return null;
-  const keys = employeeMatchKeys(identity).map((key) => key.replace(/[",.()]/g, "")).filter(Boolean);
+  const keys = employeeMatchKeys(identity).map((key) => key.replace(/"/g, "")).filter(Boolean);
   if (keys.length === 0) return [];
-  const orFilter = keys.map((key) => `employee.ilike.${key}`).join(",");
-  const { data, error } = await (supabase.from(table) as any)
-    .select("*")
-    .or(orFilter)
-    .order("id", { ascending: false })
-    .limit(40);
+  // Tasks use assigned_to. Older rows and the calendar use employee.
+  const columns = table === "tasks" ? ["assigned_to", "employee"] : ["employee", "assigned_to"];
+  const run = async (cols: string[]) => {
+    const orFilter = cols.flatMap((column) => keys.map((key) => quoteFilter(column, key))).join(",");
+    return (supabase!.from(table) as any).select("*").or(orFilter).order("id", { ascending: false }).limit(40);
+  };
+  let { data, error } = await run(columns);
+  if (error) {
+    const fallback = await run([columns[0]]);
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error || !data) return null;
-  return data as any[];
+  return (data as any[]).filter((row) => nameBelongsToEmployee(assigneeText(row), identity));
+}
+
+async function loadConfirmed(table: "calendar_assignments" | "tasks", identity: WorkAlertUser): Promise<any[] | null> {
+  if (!supabase || !staffScope(identity)) return null;
+  const houseOnly = staffScope(identity) === "house";
+  const house = String(identity.house || "").trim();
+  const scoped = () => {
+    let query = (supabase!.from(table) as any).select("*");
+    if (houseOnly) query = query.eq("house", house);
+    return query;
+  };
+  const filtered = table === "tasks"
+    ? scoped().not("employee_confirmed_at", "is", null)
+    : scoped().ilike("notes", "%employee_confirmed_at%");
+  const { data, error } = await filtered.order("id", { ascending: false }).limit(40);
+  if (!error && data) return data as any[];
+  const fallback = await scoped().order("id", { ascending: false }).limit(60);
+  if (fallback.error || !fallback.data) return null;
+  return (fallback.data as any[]).filter((row) => Boolean(confirmationStamp(row)));
 }
 
 export function startWorkWatch(identity: WorkAlertUser): () => void {
@@ -324,6 +404,8 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
   let primedReminders = false;
   let primedInventory = false;
   let primedShopping = false;
+  let primedFinishCal = false;
+  let primedFinishTasks = false;
   let stopped = false;
 
   const consider = async (rows: AlertRow[], allowNotify: boolean) => {
@@ -400,6 +482,24 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
         await consider(rows, primedShopping);
         primedShopping = true;
       }
+      const [doneCal, doneTasks] = await Promise.all([
+        loadConfirmed("calendar_assignments", identity),
+        loadConfirmed("tasks", identity),
+      ]);
+      if (doneCal !== null) {
+        const rows = doneCal
+          .map((row) => finishedRow(row, identity, "cal"))
+          .filter((row): row is AlertRow => Boolean(row));
+        await consider(rows, primedFinishCal);
+        primedFinishCal = true;
+      }
+      if (doneTasks !== null) {
+        const rows = doneTasks
+          .map((row) => finishedRow(row, identity, "task"))
+          .filter((row): row is AlertRow => Boolean(row));
+        await consider(rows, primedFinishTasks);
+        primedFinishTasks = true;
+      }
     }
   };
 
@@ -416,12 +516,24 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
   const channel = supabase
     .channel(`work-alerts-${Date.now()}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "calendar_assignments" }, (payload: any) => {
-      const row = assignmentRow(payload.new, identity);
+      const incoming = payload.new || payload.record;
+      const row = assignmentRow(incoming, identity);
       if (row && primedCal) consider([row], true);
     })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "tasks" }, (payload: any) => {
-      const row = taskRow(payload.new, identity);
+      const incoming = payload.new || payload.record;
+      const row = taskRow(incoming, identity);
       if (row && primedTasks) consider([row], true);
+    })
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "calendar_assignments" }, (payload: any) => {
+      const incoming = payload.new || payload.record;
+      const row = finishedRow(incoming, identity, "cal");
+      if (row && primedFinishCal) consider([row], true);
+    })
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tasks" }, (payload: any) => {
+      const incoming = payload.new || payload.record;
+      const row = finishedRow(incoming, identity, "task");
+      if (row && primedFinishTasks) consider([row], true);
     });
   if (staffScope(identity)) {
     channel

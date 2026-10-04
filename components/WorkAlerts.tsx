@@ -8,6 +8,7 @@ import {
   subscribePushIfConfigured,
   type WorkAlertUser,
 } from "../utils/workNotifications";
+import { supabase } from "../utils/supabaseClient";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -36,6 +37,20 @@ export default function WorkAlerts({ user }: { user: WorkAlertUser }) {
     stopRef.current = startWorkWatch(identity);
   };
 
+  // The session often only has the username. The account email (and the
+  // part before @) is what the assignment may have stored.
+  const withAccountEmail = async (base: WorkAlertUser): Promise<WorkAlertUser> => {
+    if (base.email || !supabase) return base;
+    try {
+      const { data } = await supabase.auth.getUser();
+      const email = data?.user?.email;
+      if (email) return { ...base, email };
+    } catch {
+      /* username still matches on its own */
+    }
+    return base;
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -45,10 +60,12 @@ export default function WorkAlerts({ user }: { user: WorkAlertUser }) {
       const perm = await ensureNotificationPermission(false);
       if (cancelled) return;
       setPermission(perm);
+      const identity = await withAccountEmail(user);
+      if (cancelled) return;
       if (perm === "granted") {
         await subscribePushIfConfigured(reg);
         if (cancelled) return;
-        watch(user);
+        watch(identity);
       }
     };
 
@@ -83,7 +100,7 @@ export default function WorkAlerts({ user }: { user: WorkAlertUser }) {
     if (perm !== "granted") return;
     const reg = await registerAppWorker();
     await subscribePushIfConfigured(reg);
-    watch(user);
+    watch(await withAccountEmail(user));
   };
 
   const install = async () => {
