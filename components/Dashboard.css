@@ -4120,6 +4120,13 @@ body,
   color: #065f46;
   background: #d1fae5;
 }
+.extra-task-status.is-waiting {
+  color: #1e40af;
+  background: #dbeafe;
+}
+.extra-task-card.is-waiting {
+  border-color: #93c5fd;
+}
 .extra-task-desc {
   margin: 0;
   font-size: 0.9375rem;

@@ -9,7 +9,7 @@ import './RealtimeNotification.css';
 
 import Tasks from './Tasks';
 import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
-import { completeExtraTask } from '../utils/completeExtraTask';
+import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee, isCompletedWithinOneYear } from '../utils/completeExtraTask';
 import { isEmpleadoRole, nameBelongsToEmployee } from '../utils/employeeScope';
 
 // Tarjeta personalizada para tareas asignadas
@@ -1280,8 +1280,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     // SIEMPRE limpiar localStorage de casas para forzar que cargue desde Supabase con valores correctos
     if (typeof window !== 'undefined') {
       localStorage.removeItem('dashboard_houses');
-      localStorage.removeItem('dashboard_selected_house_idx');
-      console.log('🧹 localStorage limpiado completamente al iniciar (casas + índice)');
+      console.log('🧹 localStorage de la lista de casas limpiado al iniciar');
     }
     // Iniciar con las dos casas correctas (para evitar Hydration errors)
     // Estos valores serán reemplazados por getHouses() tan pronto cargue desde Supabase
@@ -1315,9 +1314,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   
   const [selectedHouseIdx, setSelectedHouseIdx] = useState(() => {
     if (employeeHouseIdx >= 0) return employeeHouseIdx;
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('dashboard_selected_house_idx') : null;
-    return saved ? parseInt(saved, 10) : 0;
+    return 0;
   });
+  // Última casa que el dueño estaba viendo. El índice no sirve: Armenia queda
+  // primera al ordenar por nombre y un refresh la volvía a elegir.
+  const selectedHouseStorageKey = `limpieza360_selected_house:${String((user as any)?.id || user?.username || 'anon').trim().toLowerCase()}`;
+  const houseChoiceReady = useRef(false);
 
   const markTaskComplete = async (task: any, completed: boolean) => {
     const assignmentId = await resolveAssignmentIdForTask(task);
@@ -1346,12 +1348,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
   }, [houses, user.house, isRestrictedUser, selectedHouseIdx]);
   
-  // Guardar casa seleccionada en localStorage
+  // Guardar la casa por nombre, solo después de restaurar la lista real de Supabase.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboard_selected_house_idx', selectedHouseIdx.toString());
-    }
-  }, [selectedHouseIdx]);
+    if (typeof window === 'undefined' || !houseChoiceReady.current || isRestrictedUser) return;
+    const name = houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name;
+    if (!name) return;
+    localStorage.setItem(selectedHouseStorageKey, String(name));
+  }, [selectedHouseIdx, houses, isRestrictedUser, selectedHouseStorageKey]);
 
   // LIMPIEZA SELECTIVA de localStorage para usuario - SOLO keys de casas
   // No tocamos SESSION_KEY para mantener el usuario logueado
@@ -1360,7 +1363,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       console.log('🧹 Limpieza selectiva de localStorage para:', user?.username);
       
       // Limpiar SOLO los keys relacionados con casas
-      const keysToDelete = ['dashboard_houses', 'dashboard_selected_house_idx'];
+      const keysToDelete = ['dashboard_houses'];
       
       keysToDelete.forEach(key => {
         if (localStorage.getItem(key)) {
@@ -1722,6 +1725,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     };
   }, [allowedHouseIdx, houses]);
 
+  const restoreOwnerHouse = (list: any[]) => {
+    if (houseChoiceReady.current) return;
+    houseChoiceReady.current = true;
+    if (isRestrictedUser || typeof window === 'undefined') return;
+    const saved = localStorage.getItem(selectedHouseStorageKey);
+    if (!saved) return;
+    const idx = list.findIndex((h) => normalizeHouseName(h?.name || h?.houseName) === normalizeHouseName(saved));
+    if (idx >= 0) setSelectedHouseIdx(idx);
+  };
+
   // Cargar casas y usuarios desde Supabase con suscripción en tiempo real (para todos, especialmente para sincronizar nombres correctos)
   useEffect(() => {
     const loadHousesAndUsers = async () => {
@@ -1742,6 +1755,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           console.log('🏠 [mapeo] Casas después de mapear:', JSON.stringify(mappedHouses, null, 2));
           console.log('🏠 [setHouses] Estableciendo state con:', mappedHouses.map((h: any) => h.name));
           setHouses(mappedHouses);
+          restoreOwnerHouse(mappedHouses);
           
           // Guardar en localStorage con los nombres correctos de Supabase
           if (typeof window !== 'undefined') {
@@ -1781,6 +1795,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           }));
           console.log('🏠 [realtime.mapeo] Casas mapeadas desde realtime:', mappedHouses);
           setHouses(mappedHouses);
+          restoreOwnerHouse(mappedHouses);
           // Guardar en localStorage con los nombres correctos
           if (typeof window !== 'undefined') {
             localStorage.setItem('dashboard_houses', JSON.stringify(mappedHouses));
@@ -2266,6 +2281,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const taskAssignee = (t: any) => t?.assignedTo || t?.assigned_to || '';
   const taskCompletedBy = (t: any) => t?.completedBy || t?.completed_by || '';
   const taskCompletedAt = (t: any) => t?.completedAt || t?.completed_at || '';
+  const taskEmployeeConfirmedAt = (t: any) => t?.employeeConfirmedAt || t?.employee_confirmed_at || '';
+  const taskEmployeeConfirmedBy = (t: any) => t?.employeeConfirmedBy || t?.employee_confirmed_by || '';
   const isEmployeeViewer = isEmpleadoRole(user.role);
   // Empleado: solo tareas cuyo asignado es su usuario o la parte local de su correo.
   // Manager y dueño siguen viendo todas las de la casa.
@@ -2273,9 +2290,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     !isEmployeeViewer || nameBelongsToEmployee(taskAssignee(t), user)
   );
   const houseExtraTasks = tasksVisibleToViewer.filter(isExtraTask);
-  const extraTasksPending = houseExtraTasks.filter((t: any) => !t.completed);
-  const extraTasksDone = houseExtraTasks.filter((t: any) => !!t.completed);
-  const extraTasksForUser = extraTasksPending;
+  // Abiertas: el empleado confirma y después Jonathan o el manager cierran.
+  // completed=true ya no vive aquí; pasa a Trabajos completados.
+  const extraTasksOpen = houseExtraTasks.filter((t: any) => !t.completed);
+  const extraTasksAwaitingEmployee = extraTasksOpen.filter((t: any) => !taskEmployeeConfirmedAt(t));
+  const extraTasksAwaitingClose = extraTasksOpen.filter((t: any) => !!taskEmployeeConfirmedAt(t));
+  const extraTasksPending = extraTasksOpen;
+  const extraTasksForUser = extraTasksOpen;
   const formatExtraTaskWhen = (value: string | null | undefined) => {
     if (!value) return '';
     const date = new Date(value);
@@ -2343,6 +2364,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 ...payload.new,
                 completedBy: payload.new.completedBy || payload.new.completed_by || t.completedBy || '',
                 completedAt: payload.new.completedAt || payload.new.completed_at || t.completedAt || null,
+                employeeConfirmedBy: payload.new.employeeConfirmedBy || payload.new.employee_confirmed_by || t.employeeConfirmedBy || '',
+                employeeConfirmedAt: payload.new.employeeConfirmedAt || payload.new.employee_confirmed_at || t.employeeConfirmedAt || null,
               } : t)
             : [payload.new]);
         } else if (payload?.eventType === 'DELETE' && payload.old) {
@@ -2420,11 +2443,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       key: 'extraTasks',
       title: 'Tareas Extra',
       desc: isEmployeeViewer
-        ? 'Solo tus tareas extra, pendientes y completadas.'
-        : 'Pendientes y completadas de esta casa. Todos ven quién las terminó.',
+        ? 'Solo tus tareas extra. Tú confirmas y Jonathan o el manager cierran.'
+        : 'El empleado confirma. Jonathan o el manager de la casa cierran.',
       show: (isEmployeeViewer
-        ? houseExtraTasks.length > 0
-        : ['owner', 'manager', 'empleado', 'admin'].includes(user.role) && houseExtraTasks.length > 0),
+        ? extraTasksOpen.length > 0
+        : ['owner', 'manager', 'empleado', 'admin', 'dueno'].includes(String(user.role || '').toLowerCase()) && extraTasksOpen.length > 0),
     },
     {
       key: 'checklist',
@@ -2472,7 +2495,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'completedJobs',
       title: '✅ Trabajos Completados',
-      desc: 'Historial de trabajos completados por empleados. Guardados por 1 año.',
+      desc: 'Trabajos y tareas extra cerradas. Se muestran por un año, sin borrarse.',
       show: user.role === 'owner' || user.role === 'manager' || user.role === 'dueno',
     },
   ];
@@ -2525,7 +2548,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     !gateInventoryPendingByAssignment || hasActiveInventoryAssignmentWork
       ? incompleteInventoryCount
       : 0;
-  const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && (
+  const pendingTasksCount = (tasksList || []).filter((t: any) => !t.completed && !isExtraTask(t) && (
     isEmployeeViewer ? nameBelongsToEmployee(t.assignedTo || t.assigned_to, user) : true
   )).length;
   const pendingAssignmentsCount = (calendarAssignments || []).filter((a: any) => !a.completed).length;
@@ -3819,16 +3842,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 <button 
                                   className="assignment-btn danger"
                                   onClick={async () => {
-                                    if (confirm(`¿Eliminar la asignación de ${assignment.employee} para ${assignment.type}?`)) {
-                                      console.log('🗑️ Cerrando o eliminando asignación del calendario:', assignment.id);
-                                      if (await shouldArchiveAssignment(assignment)) {
-                                        await archiveCalendarAssignment(assignment, user.username);
-                                        setCalendarAssignments(calendarAssignments.map(a => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || new Date().toISOString(), completed_by: a.completed_by || user.username } : a));
-                                      } else {
-                                        await realtimeService.deleteCalendarAssignment(assignment.id);
-                                        setCalendarAssignments(calendarAssignments.filter(a => a.id !== assignment.id));
-                                      }
+                                    if (!confirm(`¿Eliminar la asignación de ${assignment.employee} para ${assignment.type}?`)) return;
+                                    console.log('🗑️ Eliminando asignación del calendario:', assignment.id);
+                                    const deleted = await realtimeService.deleteCalendarAssignmentCascade(String(assignment.id), { resetHouseInventory: false });
+                                    if (!deleted) {
+                                      alert('No se pudo eliminar la asignación. Intenta de nuevo.');
+                                      return;
                                     }
+                                    setCalendarAssignments(prev => prev.filter(a => String(a.id) !== String(assignment.id)));
+                                    setSyncedChecklists(prev => {
+                                      const next = new Map(prev);
+                                      next.delete(String(assignment.id));
+                                      return next;
+                                    });
+                                    setSyncedInventories(prev => {
+                                      const next = new Map(prev);
+                                      next.delete(String(assignment.id));
+                                      return next;
+                                    });
                                   }}
                                 >
                                   <span className="assignment-btn-icon">🗑️</span>
@@ -3869,8 +3900,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               {selectedModalCard === 'completedJobs' && (() => {
                 const oneYearAgo = new Date();
                 oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-                const completedJobs = calendarAssignments
+                const completedCalendarJobs = calendarAssignments
                   .filter((a: any) => a.completed && a.completed_at && new Date(a.completed_at) >= oneYearAgo)
+                  .map((a: any) => ({ ...a, kind: 'calendar', title: a.title || '' }));
+                const completedExtraJobs = houseExtraTasks
+                  .filter((t: any) => !!t.completed && isCompletedWithinOneYear(taskCompletedAt(t)))
+                  .map((t: any) => ({
+                    id: t.id,
+                    kind: 'extra',
+                    employee: taskAssignee(t) || 'Sin asignar',
+                    type: 'Tarea extra',
+                    house: t.house || '',
+                    completed_at: taskCompletedAt(t),
+                    completed_by: taskCompletedBy(t),
+                    employee_confirmed_by: taskEmployeeConfirmedBy(t),
+                    title: t.title || 'Tarea extra',
+                  }));
+                const completedJobs = [...completedCalendarJobs, ...completedExtraJobs]
                   .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime());
                 return (
                   <div style={{ padding: '0.5rem 0' }}>
@@ -3878,12 +3924,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
                         <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
                         <p style={{ margin: 0, fontWeight: 600 }}>No hay trabajos completados aún.</p>
-                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.88rem' }}>Aquí aparecerán los trabajos marcados como completados.</p>
+                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.88rem' }}>Las tareas extra aparecen aquí cuando Jonathan o el manager las cierran.</p>
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gap: '0.75rem' }}>
                         {completedJobs.map((job: any) => (
-                          <div key={`cj-${job.id}`} style={{
+                          <div key={`cj-${job.kind || "job"}-${job.id}`} style={{
                             background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                             border: '1.5px solid #86efac',
                             borderRadius: '1rem',
@@ -3915,11 +3961,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 <span>📅 {new Date(job.completed_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                                 <span>🕐 {new Date(job.completed_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
+                              {job.title && (
+                                <div style={{ color: '#166534', fontSize: '0.9rem', fontWeight: 600, marginTop: '0.15rem' }}>{job.title}</div>
+                              )}
+                              {job.kind === 'extra' && job.employee_confirmed_by && (
+                                <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.25rem' }}>Empleado confirmó: {job.employee_confirmed_by}</div>
+                              )}
                               {job.completed_by && (
-                                <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.25rem' }}>Confirmado por: {job.completed_by}</div>
+                                <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.25rem' }}>Cerrado por: {job.completed_by}</div>
                               )}
                             </div>
-                            <button
+                            {job.kind !== 'extra' && <button
                               onClick={async () => {
                                 if (!confirm(`¿Eliminar el registro de trabajo completado de ${job.employee}?`)) return;
                                 if (!supabase) return;
@@ -3938,12 +3990,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 flexShrink: 0,
                                 whiteSpace: 'nowrap'
                               }}
-                            >🗑️ Eliminar</button>
+                            >🗑️ Eliminar</button>}
                           </div>
                         ))}
                       </div>
                     )}
-                    <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem', marginTop: '1.25rem' }}>Los registros se guardan por 1 año desde la fecha de completado.</p>
+                    <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem', marginTop: '1.25rem' }}>Se muestran por 1 año desde el cierre. Las más viejas dejan de verse y no se borran.</p>
                   </div>
                 );
               })()}
@@ -5531,14 +5583,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         e.preventDefault();
                         
                         if (editingTaskIdx >= 0) {
-                          // Editar tarea existente
-                          await realtimeService.updateTask(tasksList[editingTaskIdx].id, {
+                          const existing = tasksList[editingTaskIdx];
+                          const updated = await realtimeService.updateTask(existing.id, {
                             title: newTask.title,
                             description: newTask.description,
                             assignedTo: newTask.assignedTo,
                             type: newTask.type
                           });
+                          if (!updated) {
+                            alert('No se pudo actualizar la tarea. Intenta de nuevo.');
+                            return;
+                          }
+                          setTasksList(prev => prev.map((t: any) => t.id === existing.id ? { ...t, ...updated } : t));
                           setEditingTaskIdx(-1);
+                          if (isExtraTask(updated)) setSelectedModalCard('extraTasks');
                         } else {
                           // Agregar nueva tarea
                           console.log('📝 Creando nueva tarea:', {
@@ -5557,6 +5615,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             createdBy: user.username
                           });
                           console.log('✅ Tarea creada con resultado:', result);
+                          if (!result) {
+                            alert('No se pudo crear la tarea. Intenta de nuevo.');
+                            return;
+                          }
+                          setTasksList(prev => {
+                            const list = Array.isArray(prev) ? prev : [];
+                            if (list.some((t: any) => t.id === result.id)) return list;
+                            return [result, ...list];
+                          });
+                          // La tarea vive en Tareas Extra, no queda en esta lista.
+                          setSelectedModalCard('extraTasks');
                         }
                         setNewTask({ title: '', description: '', assignedTo: '', type: 'Tarea extra' });
                       }}>
@@ -5637,32 +5706,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     </div>
                   )}
                   
-                  {/* Lista de tareas */}
+                  {/* Lista de tareas. Las extras no se quedan aquí: se completan en Tareas Extra. */}
                   <div className="subcards-grid">
                     {loadingTasks ? (
                       <div className="modal-body-empty"><p>Cargando tareas...</p></div>
-                    ) : tasksVisibleToViewer.length > 0 ? (
+                    ) : tasksVisibleToViewer.filter((t: any) => !isExtraTask(t)).length > 0 ? (
                       <>
                         <div className="modal-stats">
                           <div className="stat-box">
-                            <p className="stat-box-number">{tasksVisibleToViewer.length}</p>
+                            <p className="stat-box-number">{tasksVisibleToViewer.filter((t: any) => !isExtraTask(t)).length}</p>
                             <p className="stat-box-label">Tareas totales</p>
                           </div>
                           <div className="stat-box">
                             <p className="stat-box-number">
-                              {tasksList.filter((t: any) => t.completed).length}
+                              {tasksVisibleToViewer.filter((t: any) => !isExtraTask(t) && t.completed).length}
                             </p>
                             <p className="stat-box-label">Completadas</p>
                           </div>
                           <div className="stat-box">
                             <p className="stat-box-number">
-                              {tasksList.filter((t: any) => !t.completed).length}
+                              {tasksVisibleToViewer.filter((t: any) => !isExtraTask(t) && !t.completed).length}
                             </p>
                             <p className="stat-box-label">Pendientes</p>
                           </div>
                         </div>
                         
-                        {tasksList.map((task: any, idx: number) => (
+                        {tasksVisibleToViewer.filter((t: any) => !isExtraTask(t)).map((task: any, idx: number) => (
                           <div key={task.id} className="subcard">
                             <div className="subcard-header">
                               <div className="subcard-icon">
@@ -5725,7 +5794,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                         assignedTo: task.assignedTo || '',
                                         type: 'Tarea extra'
                                       });
-                                      setEditingTaskIdx(idx);
+                                      setEditingTaskIdx(tasksList.findIndex((t: any) => t.id === task.id));
                                     }}
                                   >
                                     ✏️ Editar
@@ -5748,7 +5817,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       </>
                     ) : (
                       <div className="modal-body-empty">
-                        <p>🎉 No hay tareas asignadas</p>
+                        <p>Las tareas extra se asignan aquí y se completan en Tareas Extra. Esta lista no guarda ese trabajo.</p>
                       </div>
                     )}
                   </div>
@@ -5762,28 +5831,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       Casa: {houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || houses[allowedHouseIdx]?.name || 'Esta casa'}
                     </p>
                     <p className="extra-task-summary-counts">
-                      <span>{extraTasksPending.length} pendiente{extraTasksPending.length === 1 ? '' : 's'}</span>
-                      <span>{extraTasksDone.length} completada{extraTasksDone.length === 1 ? '' : 's'}</span>
+                      <span>{extraTasksAwaitingEmployee.length} por confirmar</span>
+                      <span>{extraTasksAwaitingClose.length} por cerrar</span>
                     </p>
                   </div>
-                  {houseExtraTasks.length === 0 ? (
-                    <p className="extra-task-empty">{isEmployeeViewer ? 'No tienes tareas extra.' : 'No hay tareas extra en esta casa.'}</p>
+                  {extraTasksOpen.length === 0 ? (
+                    <p className="extra-task-empty">
+                      {isEmployeeViewer
+                        ? 'No tienes tareas extra abiertas.'
+                        : 'No hay tareas extra abiertas. Las cerradas están en Trabajos completados.'}
+                    </p>
                   ) : (
                     <>
                       <section className="extra-task-section">
-                        <h3 className="extra-task-section-title">Pendientes</h3>
-                        {extraTasksPending.length === 0 ? (
-                          <p className="extra-task-empty">No hay tareas extra pendientes.</p>
+                        <h3 className="extra-task-section-title">Por confirmar</h3>
+                        {extraTasksAwaitingEmployee.length === 0 ? (
+                          <p className="extra-task-empty">No hay tareas esperando al empleado.</p>
                         ) : (
                           <div className="extra-task-list">
-                            {extraTasksPending.map((task: any) => {
+                            {extraTasksAwaitingEmployee.map((task: any) => {
                               const houseLabel = task.house || houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || '';
-                              const canComplete = isEmployeeViewer && nameBelongsToEmployee(taskAssignee(task), user);
+                              const canConfirm = isEmployeeViewer && nameBelongsToEmployee(taskAssignee(task), user);
                               return (
                                 <article key={task.id} className="extra-task-card is-pending">
                                   <header className="extra-task-card-head">
                                     <h3 className="extra-task-title">{task.title || 'Sin título'}</h3>
-                                    <span className="extra-task-status is-pending">Pendiente</span>
+                                    <span className="extra-task-status is-pending">Por confirmar</span>
                                   </header>
                                   <p className="extra-task-desc">{task.description || 'Sin descripción'}</p>
                                   <dl className="extra-task-meta">
@@ -5791,23 +5864,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                     <div><dt>Asignada a</dt><dd>{taskAssignee(task) || 'Sin asignar'}</dd></div>
                                     <div><dt>Asignada por</dt><dd>{task.createdBy || task.created_by || 'Manager'}</dd></div>
                                   </dl>
-                                  {canComplete && (
+                                  {canConfirm ? (
                                     <button
                                       type="button"
                                       className="extra-task-complete"
                                       onClick={async () => {
-                                        const result = await completeExtraTask(task, user.username);
+                                        const result = await confirmExtraTaskByEmployee(task, user);
                                         if (!result.ok) {
-                                          alert(result.error || 'No se pudo completar la tarea. Intenta de nuevo.');
+                                          alert(result.error || 'No se pudo confirmar la tarea. Intenta de nuevo.');
                                           return;
                                         }
                                         setTasksList(prev => prev.map(t =>
-                                          t.id === task.id ? { ...t, ...result.task, completed: true } : t
+                                          t.id === task.id ? { ...t, ...result.task, completed: false } : t
                                         ));
                                       }}
                                     >
-                                      Completar
+                                      Confirmar
                                     </button>
+                                  ) : (
+                                    <p className="extra-task-empty">Falta la confirmación del empleado. Todavía no se puede cerrar.</p>
                                   )}
                                 </article>
                               );
@@ -5816,28 +5891,49 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         )}
                       </section>
                       <section className="extra-task-section">
-                        <h3 className="extra-task-section-title">Completadas</h3>
-                        {extraTasksDone.length === 0 ? (
-                          <p className="extra-task-empty">{isEmployeeViewer ? 'Todavía no tienes tareas extra completadas.' : 'Todavía no hay tareas extra completadas en esta casa.'}</p>
+                        <h3 className="extra-task-section-title">Por cerrar</h3>
+                        {extraTasksAwaitingClose.length === 0 ? (
+                          <p className="extra-task-empty">Nadie ha confirmado una tarea extra todavía.</p>
                         ) : (
                           <div className="extra-task-list">
-                            {extraTasksDone.map((task: any) => {
-                              const houseLabel = task.house || houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || '';
-                              const who = taskCompletedBy(task) || taskAssignee(task) || 'Sin registro';
-                              const when = formatExtraTaskWhen(taskCompletedAt(task));
+                            {extraTasksAwaitingClose.map((task: any) => {
+                              const houseLabel = task.house || houses[selectedHouseIdx]?.houseName || houses[selectedHouseIdx]?.name || houses[allowedHouseIdx]?.name || '';
+                              const taskWithHouse = { ...task, house: houseLabel };
+                              const when = formatExtraTaskWhen(taskEmployeeConfirmedAt(task));
+                              const canClose = canCloseExtraTask(user, taskWithHouse);
                               return (
-                                <article key={task.id} className="extra-task-card is-done">
+                                <article key={task.id} className="extra-task-card is-waiting">
                                   <header className="extra-task-card-head">
                                     <h3 className="extra-task-title">{task.title || 'Sin título'}</h3>
-                                    <span className="extra-task-status is-done">Completada</span>
+                                    <span className="extra-task-status is-waiting">Esperando cierre</span>
                                   </header>
                                   <p className="extra-task-desc">{task.description || 'Sin descripción'}</p>
                                   <dl className="extra-task-meta">
                                     <div><dt>Casa</dt><dd>{houseLabel || 'Esta casa'}</dd></div>
                                     <div><dt>Asignada a</dt><dd>{taskAssignee(task) || 'Sin asignar'}</dd></div>
-                                    <div><dt>Completada por</dt><dd>{who}</dd></div>
-                                    {when && <div><dt>Cuándo</dt><dd>{when}</dd></div>}
+                                    <div><dt>Empleado</dt><dd>{taskEmployeeConfirmedBy(task) || taskAssignee(task) || 'Sin registro'}</dd></div>
+                                    {when && <div><dt>Confirmó</dt><dd>{when}</dd></div>}
                                   </dl>
+                                  {canClose ? (
+                                    <button
+                                      type="button"
+                                      className="extra-task-complete"
+                                      onClick={async () => {
+                                        const result = await closeExtraTaskByAdmin(taskWithHouse, user);
+                                        if (!result.ok) {
+                                          alert(result.error || 'No se pudo cerrar la tarea. Intenta de nuevo.');
+                                          return;
+                                        }
+                                        setTasksList(prev => prev.map(t =>
+                                          t.id === task.id ? { ...t, ...result.task, completed: true } : t
+                                        ));
+                                      }}
+                                    >
+                                      Cerrar y pasar a completadas
+                                    </button>
+                                  ) : (
+                                    <p className="extra-task-empty">Esperando que Jonathan o el manager de la casa la cierren.</p>
+                                  )}
                                 </article>
                               );
                             })}
