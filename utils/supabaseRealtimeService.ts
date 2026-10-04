@@ -285,6 +285,8 @@ function normalizeTask(row: any) {
     createdBy: row.created_by ?? row.createdBy ?? '',
     completedBy: row.completed_by ?? row.completedBy ?? '',
     completedAt: row.completed_at ?? row.completedAt ?? null,
+    employeeConfirmedBy: row.employee_confirmed_by ?? row.employeeConfirmedBy ?? '',
+    employeeConfirmedAt: row.employee_confirmed_at ?? row.employeeConfirmedAt ?? null,
   };
 }
 
@@ -352,6 +354,14 @@ export async function updateTask(taskId: string, updates: any) {
   if ('completedAt' in mappedUpdates) {
     mappedUpdates.completed_at = mappedUpdates.completedAt;
     delete mappedUpdates.completedAt;
+  }
+  if ('employeeConfirmedBy' in mappedUpdates) {
+    mappedUpdates.employee_confirmed_by = mappedUpdates.employeeConfirmedBy;
+    delete mappedUpdates.employeeConfirmedBy;
+  }
+  if ('employeeConfirmedAt' in mappedUpdates) {
+    mappedUpdates.employee_confirmed_at = mappedUpdates.employeeConfirmedAt;
+    delete mappedUpdates.employeeConfirmedAt;
   }
 
   const { data, error } = await (supabase
@@ -783,54 +793,55 @@ export async function deleteCalendarAssignment(assignmentId: string) {
   return true;
 }
 
-export async function deleteCalendarAssignmentCascade(assignmentId: string) {
+export async function deleteCalendarAssignmentCascade(
+  assignmentId: string,
+  options?: { resetHouseInventory?: boolean }
+) {
   console.log('🗑️ [DELETE] Iniciando eliminación de asignación:', assignmentId);
   const supabase = getSupabaseClient();
   const assignmentIdStr = String(assignmentId);
-  const isNumericId = /^\d+$/.test(assignmentIdStr);
-  console.log('🗑️ [DELETE] ID string:', assignmentIdStr, 'Es numérico:', isNumericId);
+  const resetHouseInventory = options?.resetHouseInventory !== false;
+  console.log('🗑️ [DELETE] ID string:', assignmentIdStr, 'reset inventario casa:', resetHouseInventory);
 
-  // Primero obtener la casa de la asignación para reiniciar el inventario
-  let houseName: string | null = null;
-  try {
-    const { data: assignmentData, error: fetchError } = await (supabase
-      .from('calendar_assignments') as any)
-      .select('house')
-      .eq('id', assignmentIdStr)
-      .single();
+  // La casa solo se usa si hay que reiniciar el inventario compartido.
+  // El borrado del calendario NO reinicia el inventario: eso afectaría a otros empleados.
+  if (resetHouseInventory) {
+    try {
+      const { data: assignmentData, error: fetchError } = await (supabase
+        .from('calendar_assignments') as any)
+        .select('house')
+        .eq('id', assignmentIdStr)
+        .single();
 
-    console.log('🗑️ [DELETE] Asignación encontrada:', assignmentData, 'Error:', fetchError);
+      console.log('🗑️ [DELETE] Asignación encontrada:', assignmentData, 'Error:', fetchError);
 
-    if (assignmentData?.house) {
-      houseName = assignmentData.house;
-      console.log('🏠 Reiniciando inventario de la casa:', houseName);
+      if (assignmentData?.house) {
+        const houseName = assignmentData.house;
+        console.log('🏠 Reiniciando inventario de la casa:', houseName);
 
-      // Reiniciar el inventario de la casa (solo complete existe)
-      const { error: resetError } = await (supabase
-        .from('inventory') as any)
-        .update({ complete: false })
-        .eq('house', houseName);
+        const { error: resetError } = await (supabase
+          .from('inventory') as any)
+          .update({ complete: false })
+          .eq('house', houseName);
 
-      if (resetError) {
-        console.error('Error reiniciando inventario:', resetError);
-      } else {
-        console.log('✅ Inventario reiniciado exitosamente');
+        if (resetError) {
+          console.error('Error reiniciando inventario:', resetError);
+        } else {
+          console.log('✅ Inventario reiniciado exitosamente');
+        }
       }
+    } catch (error) {
+      console.error('Error obteniendo casa de la asignación:', error);
     }
-  } catch (error) {
-    console.error('Error obteniendo casa de la asignación:', error);
   }
 
-  // Eliminar checklist asociado
+  // Solo filas de cleaning_checklist creadas para ESTA asignación.
+  // No existe calendar_assignment_id_bigint; un .or() con esa columna hacía fallar el delete.
   try {
-    const checklistFilter = isNumericId
-      ? `calendar_assignment_id.eq.${assignmentIdStr},calendar_assignment_id_bigint.eq.${assignmentIdStr}`
-      : `calendar_assignment_id.eq.${assignmentIdStr}`;
-
     const { error: checklistError } = await (supabase
       .from('cleaning_checklist') as any)
       .delete()
-      .or(checklistFilter);
+      .eq('calendar_assignment_id', assignmentIdStr);
 
     if (checklistError) {
       console.error('Error deleting cleaning checklist items:', checklistError);
@@ -864,8 +875,8 @@ export async function deleteCalendarAssignmentCascade(assignmentId: string) {
 
   console.log('🗑️ [DELETE] Resultado eliminación:', deletedData, 'Error:', assignmentError);
 
-  if (assignmentError) {
-    console.error('❌ Error deleting calendar assignment:', assignmentError);
+  if (assignmentError || !deletedData || deletedData.length === 0) {
+    console.error('❌ Error deleting calendar assignment:', assignmentError || 'ninguna fila borrada');
     return false;
   }
 
