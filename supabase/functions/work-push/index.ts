@@ -2,16 +2,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpushModule from "npm:web-push@3.6.7";
 
-// Sends a Web Push to the assigned employee for a new calendar
-// assignment or extra task (match username, email, or the part
-// before @). Also tells the owner and that house's manager when the
-// employee confirms a checklist or extra task, and for reminders,
-// perdido/danado inventory, and shopping items.
-// REMINDER_SWEEP covers reminders that become due with no row change.
-// Reads VAPID_PRIVATE_KEY from the function env, never from source.
-// Needs public.subscriptions (SQL not applied yet).
-// Deploy later with JWT verification off (--no-verify-jwt); the webhook is not a user session.
-
 const webpush = (webpushModule as { default?: typeof webpushModule }).default ?? webpushModule;
 
 const corsHeaders = {
@@ -278,18 +268,57 @@ Deno.serve(async (req) => {
 
   const secret = Deno.env.get("WORK_PUSH_SECRET") || "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const headerSecret = req.headers.get("x-work-push-secret") || "";
   const authHeader = req.headers.get("Authorization") || "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const allowed = (secret && headerSecret === secret) || (serviceKey && bearer === serviceKey);
+  let allowed = (secret && headerSecret === secret) || (serviceKey && bearer === serviceKey);
+  if (!allowed && headerSecret && serviceKey && supabaseUrl) {
+    try {
+      const probe = createClient(supabaseUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: expected } = await probe.rpc("work_push_expected_secret");
+      if (typeof expected === "string" && expected && headerSecret === expected) allowed = true;
+    } catch {
+      /* keep denied */
+    }
+  }
   if (!allowed) return json({ error: "No autorizado" }, 401);
 
-  const publicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "";
-  const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") || "";
-  const subject = Deno.env.get("VAPID_SUBJECT") || "mailto:avisos@360pro.com";
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  if (!publicKey || !privateKey) return json({ error: "Faltan las claves VAPID en el entorno de la función" }, 500);
+  const sanitizeVapidKey = (value: string) =>
+    value
+      .trim()
+      .replace(/^["']+|["']+$/g, "")
+      .replace(/\s+/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  const vapidLooksValid = (value: string) => /^[A-Za-z0-9\-_]+$/.test(value);
+  let publicKey = sanitizeVapidKey(Deno.env.get("VAPID_PUBLIC_KEY") || "");
+  let privateKey = sanitizeVapidKey(Deno.env.get("VAPID_PRIVATE_KEY") || "");
+  let subject = (Deno.env.get("VAPID_SUBJECT") || "mailto:avisos@360pro.com").trim().replace(/^["']+|["']+$/g, "");
   if (!supabaseUrl || !serviceKey) return json({ error: "Faltan variables de Supabase" }, 500);
+  if (!vapidLooksValid(publicKey) || !vapidLooksValid(privateKey)) {
+    try {
+      const probe = createClient(supabaseUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: vapid } = await probe.rpc("work_push_vapid_keys");
+      if (vapid && typeof vapid === "object") {
+        const row = vapid as Record<string, unknown>;
+        publicKey = sanitizeVapidKey(String(row.publicKey ?? ""));
+        privateKey = sanitizeVapidKey(String(row.privateKey ?? ""));
+        const fromVault = String(row.subject ?? "").trim();
+        if (fromVault) subject = fromVault.replace(/^["']+|["']+$/g, "");
+      }
+    } catch {
+      /* keep env keys */
+    }
+  }
+  if (!publicKey || !privateKey || !vapidLooksValid(publicKey) || !vapidLooksValid(privateKey)) {
+    return json({ error: "Faltan las claves VAPID en el entorno de la función" }, 500);
+  }
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   const nested = body?.payload && typeof body.payload === "object"
@@ -331,7 +360,26 @@ Deno.serve(async (req) => {
       .from("profiles")
       .select("id, username, role, house");
     if (profileError) return json({ error: profileError.message }, 500);
-    webpush.setVapidDetails(subject, publicKey, privateKey);
+    try {
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+    } catch (err) {
+      try {
+        const { data: vapidRetry } = await admin.rpc("work_push_vapid_keys");
+        if (vapidRetry && typeof vapidRetry === "object") {
+          const row = vapidRetry as Record<string, unknown>;
+          publicKey = sanitizeVapidKey(String(row.publicKey ?? ""));
+          privateKey = sanitizeVapidKey(String(row.privateKey ?? ""));
+          const fromVault = String(row.subject ?? "").trim();
+          if (fromVault) subject = fromVault.replace(/^["']+|["']+$/g, "");
+          webpush.setVapidDetails(subject, publicKey, privateKey);
+        } else {
+          throw err;
+        }
+      } catch (err2) {
+        const message = err2 instanceof Error ? err2.message : (err instanceof Error ? err.message : "clave VAPID inválida");
+        return json({ error: "VAPID inválida", detail: message }, 500);
+      }
+    }
     let sent = 0;
     const gone: string[] = [];
     for (const row of (dueRows || []) as Record<string, unknown>[]) {
@@ -429,7 +477,26 @@ Deno.serve(async (req) => {
   if (subError) return json({ error: subError.message }, 500);
   if (!subs || subs.length === 0) return json({ ok: true, sent: 0 });
 
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  try {
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+    } catch (err) {
+      try {
+        const { data: vapidRetry } = await admin.rpc("work_push_vapid_keys");
+        if (vapidRetry && typeof vapidRetry === "object") {
+          const row = vapidRetry as Record<string, unknown>;
+          publicKey = sanitizeVapidKey(String(row.publicKey ?? ""));
+          privateKey = sanitizeVapidKey(String(row.privateKey ?? ""));
+          const fromVault = String(row.subject ?? "").trim();
+          if (fromVault) subject = fromVault.replace(/^["']+|["']+$/g, "");
+          webpush.setVapidDetails(subject, publicKey, privateKey);
+        } else {
+          throw err;
+        }
+      } catch (err2) {
+        const message = err2 instanceof Error ? err2.message : (err instanceof Error ? err.message : "clave VAPID inválida");
+        return json({ error: "VAPID inválida", detail: message }, 500);
+      }
+    }
   const bodyText = JSON.stringify(note);
   let sent = 0;
   const gone: string[] = [];
