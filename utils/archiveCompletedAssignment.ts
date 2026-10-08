@@ -112,9 +112,12 @@ export async function archiveCalendarAssignment(assignment: any, closedBy: strin
 /**
  * Botón Eliminar de un trabajo activo: NO borra. Lo pasa a Trabajos completados
  * (completed=true, completed_at = ahora, completed_by = quien lo pasó), así empieza el reloj
- * de 6 meses. Solo cambia la fila del trabajo: no toca el checklist base de la casa
- * (checklist), inventory_template ni inventory, y no cambia notes, así que no dispara el
- * aviso push de "trabajo terminado" (ese aviso solo sale cuando el empleado confirma).
+ * de 6 meses. Después reinicia la casa igual que Completar (archiveCalendarAssignment):
+ * resetHouseChecklistForType (desmarca el checklist base de esa casa solo en las zonas de ese
+ * tipo de trabajo) y resetHouseInventoryStatus (reinicia el estado del inventario de esa casa).
+ * Son solo UPDATE: nunca borra ni crea filas en checklist, inventory_template ni inventory, y no
+ * cambia nombres, zonas ni orden. No cambia notes, así que no dispara el aviso push de
+ * "trabajo terminado" (ese aviso solo sale cuando el empleado confirma).
  * El borrado definitivo se hace desde Trabajos completados.
  */
 export async function moveCalendarAssignmentToCompleted(assignment: any, closedBy: string): Promise<boolean> {
@@ -129,11 +132,18 @@ export async function moveCalendarAssignmentToCompleted(assignment: any, closedB
       updated_at: now,
     })
     .eq('id', assignment.id)
-    .select('id');
+    .select('id, house, type');
 
   if (error) {
     console.error('No se pudo pasar el trabajo a Trabajos completados', error);
     return false;
   }
-  return Array.isArray(data) && data.length > 0;
+  if (!Array.isArray(data) || data.length === 0) return false;
+
+  // Mismo reinicio que Completar, con la casa y el tipo guardados en la base.
+  const house = data[0]?.house || assignment.house;
+  const type = data[0]?.type || assignment.type;
+  await resetHouseChecklistForType(house, type);
+  await resetHouseInventoryStatus(house);
+  return true;
 }
