@@ -850,19 +850,22 @@ export async function deleteCalendarAssignmentCascade(
     console.error('Error deleting cleaning checklist items:', error);
   }
 
-  // Eliminar inventario asociado
-  try {
-    const { error: inventoryError } = await (supabase
-      .from('assignment_inventory') as any)
-      .delete()
-      .eq('calendar_assignment_id', assignmentIdStr);
+  // Eliminar inventario asociado.
+  // assignment_inventory.calendar_assignment_id es uuid y calendar_assignments.id es bigint:
+  // con un id numérico no hay filas ahí y el .eq fallaba con "invalid input syntax for type uuid".
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentIdStr)) {
+    try {
+      const { error: inventoryError } = await (supabase
+        .from('assignment_inventory') as any)
+        .delete()
+        .eq('calendar_assignment_id', assignmentIdStr);
 
-    console.log('🗑️ [DELETE] Inventario de asignación eliminado, error:', inventoryError);
-    if (inventoryError) {
-      console.error('Error deleting assignment inventory items:', inventoryError);
+      if (inventoryError) {
+        console.error('Error deleting assignment inventory items:', inventoryError);
+      }
+    } catch (error) {
+      console.error('Error deleting assignment inventory items:', error);
     }
-  } catch (error) {
-    console.error('Error deleting assignment inventory items:', error);
   }
 
   // Eliminar la asignación del calendario

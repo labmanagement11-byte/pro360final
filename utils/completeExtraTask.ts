@@ -30,22 +30,6 @@ export function isEmployeeConfirmed(task: ExtraTaskRow | null | undefined): bool
   return Boolean(employeeConfirmedAtOf(task));
 }
 
-/**
- * Trabajos completados shows a row for one year after completed_at.
- * Older rows stay in the database and are only hidden.
- */
-export function isCompletedWithinOneYear(
-  completedAt: string | null | undefined,
-  now: Date = new Date()
-): boolean {
-  if (!completedAt) return false;
-  const when = new Date(completedAt);
-  if (Number.isNaN(when.getTime())) return false;
-  const cutoff = new Date(now.getTime());
-  cutoff.setFullYear(cutoff.getFullYear() - 1);
-  return when.getTime() >= cutoff.getTime();
-}
-
 function normalizeHouse(value?: string | null): string {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }

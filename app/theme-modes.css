@@ -651,3 +651,45 @@ html[data-theme="dark"] div.checklist-live {
   color: #f8fafc !important;
   border: 1px solid #475569;
 }
+
+/* Trabajos completados: tarjeta verde oscuro con letras claras */
+html[data-theme="dark"] .completed-job-card {
+  background: #14291f !important;
+  background-image: none !important;
+  border-color: #166534 !important;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .completed-job-card .completed-job-employee,
+html[data-theme="dark"] .completed-job-card .completed-job-title {
+  color: #86efac !important;
+}
+
+html[data-theme="dark"] .completed-job-card .completed-job-type {
+  background: #14532d !important;
+  color: #dcfce7 !important;
+  border-color: #22c55e !important;
+}
+
+html[data-theme="dark"] .completed-job-card .completed-job-meta,
+html[data-theme="dark"] .completed-job-card .completed-job-meta span,
+html[data-theme="dark"] .completed-job-card .completed-job-note {
+  color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] .completed-job-card .completed-job-note.is-muted,
+html[data-theme="dark"] .completed-jobs .completed-jobs-footnote,
+html[data-theme="dark"] .completed-jobs .completed-jobs-empty p {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .completed-job-delete {
+  background: #7f1d1d !important;
+  color: #fee2e2 !important;
+  -webkit-text-fill-color: #fee2e2;
+  border-color: #f87171 !important;
+}
+
+html[data-theme="dark"] .completed-job-delete:hover {
+  background: #991b1b !important;
+}

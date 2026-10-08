@@ -9,7 +9,8 @@ import './RealtimeNotification.css';
 
 import Tasks from './Tasks';
 import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
-import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee, isCompletedWithinOneYear } from '../utils/completeExtraTask';
+import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee } from '../utils/completeExtraTask';
+import { canDeleteCompletedJob, deleteCompletedJob, isCompletedWithinRetention } from '../utils/deleteCompletedJob';
 import { closeCalendarAssignment, employeeConfirmation, syncPendingEmployeeConfirmations } from '../utils/calendarWork';
 import { isEmpleadoRole, nameBelongsToEmployee } from '../utils/employeeScope';
 
@@ -2623,7 +2624,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     {
       key: 'completedJobs',
       title: '✅ Trabajos Completados',
-      desc: 'Trabajos y tareas extra cerradas. Se muestran por un año, sin borrarse.',
+      desc: 'Trabajos y tareas extra cerradas. Se guardan 6 meses y después se borran solos.',
       show: user.role === 'owner' || user.role === 'manager' || user.role === 'dueno',
     },
   ];
@@ -3909,13 +3910,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               )}
 
               {selectedModalCard === 'completedJobs' && (() => {
-                const oneYearAgo = new Date();
-                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
                 const completedCalendarJobs = calendarAssignments
-                  .filter((a: any) => a.completed && a.completed_at && new Date(a.completed_at) >= oneYearAgo)
+                  .filter((a: any) => a.completed && isCompletedWithinRetention(a.completed_at))
                   .map((a: any) => ({ ...a, kind: 'calendar', title: a.title || a.type || '', employee_confirmed_by: employeeConfirmation(a)?.by || '' }));
                 const completedExtraJobs = houseExtraTasks
-                  .filter((t: any) => !!t.completed && isCompletedWithinOneYear(taskCompletedAt(t)))
+                  .filter((t: any) => !!t.completed && isCompletedWithinRetention(taskCompletedAt(t)))
                   .map((t: any) => ({
                     id: t.id,
                     kind: 'extra',
@@ -3929,84 +3928,66 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   }));
                 const completedJobs = [...completedCalendarJobs, ...completedExtraJobs]
                   .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime());
+                const removeCompletedJob = async (job: any) => {
+                  const what = job.kind === 'extra' ? 'esta tarea extra completada' : 'este trabajo completado';
+                  if (!confirm(`¿Eliminar ${what}?\n\n${job.title || job.type} — ${job.employee}\n\nSe borra para siempre. La plantilla de la casa no se toca.`)) return;
+                  const result = await deleteCompletedJob(job.kind === 'extra' ? 'extra' : 'calendar', job.id);
+                  if (!result.ok) {
+                    alert(result.error);
+                    return;
+                  }
+                  if (job.kind === 'extra') {
+                    setTasksList(prev => (Array.isArray(prev) ? prev : []).filter((t: any) => String(t.id) !== String(job.id)));
+                  } else {
+                    setCalendarAssignments(prev => prev.filter((a: any) => String(a.id) !== String(job.id)));
+                  }
+                };
                 return (
-                  <div style={{ padding: '0.5rem 0' }}>
+                  <div className="completed-jobs">
                     {completedJobs.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
-                        <p style={{ margin: 0, fontWeight: 600 }}>No hay trabajos completados aún.</p>
-                        <p style={{ margin: '0.4rem 0 0', fontSize: '0.88rem' }}>Aparecen aquí cuando Jonathan o el manager cierran la tarea extra, la limpieza o el mantenimiento.</p>
+                      <div className="completed-jobs-empty">
+                        <div className="completed-jobs-empty-icon">📋</div>
+                        <p className="completed-jobs-empty-title">No hay trabajos completados aún.</p>
+                        <p className="completed-jobs-empty-text">Aparecen aquí cuando Jonathan o el manager cierran la tarea extra, la limpieza o el mantenimiento.</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      <div className="completed-jobs-list">
                         {completedJobs.map((job: any) => (
-                          <div key={`cj-${job.kind || "job"}-${job.id}`} style={{
-                            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                            border: '1.5px solid #86efac',
-                            borderRadius: '1rem',
-                            padding: '1rem 1.1rem',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            gap: '0.75rem',
-                            boxShadow: '0 2px 8px rgba(34,197,94,0.08)'
-                          }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                                <span style={{ fontSize: '1.1rem' }}>👤</span>
-                                <span style={{ fontWeight: 700, color: '#15803d', fontSize: '0.97rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                  {job.employee}
-                                </span>
-                                <span style={{
-                                  background: '#dcfce7',
-                                  color: '#166534',
-                                  border: '1px solid #86efac',
-                                  borderRadius: '0.5rem',
-                                  padding: '0.1rem 0.55rem',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 600
-                                }}>{job.type}</span>
+                          <div key={`cj-${job.kind || "job"}-${job.id}`} className="completed-job-card">
+                            <div className="completed-job-info">
+                              <div className="completed-job-head">
+                                <span className="completed-job-icon">👤</span>
+                                <span className="completed-job-employee">{job.employee}</span>
+                                <span className="completed-job-type">{job.type}</span>
                               </div>
-                              <div style={{ color: '#475569', fontSize: '0.88rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              <div className="completed-job-meta">
                                 <span>🏠 {job.house}</span>
                                 <span>📅 {new Date(job.completed_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                                 <span>🕐 {new Date(job.completed_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
                               {job.title && (
-                                <div style={{ color: '#166534', fontSize: '0.9rem', fontWeight: 600, marginTop: '0.15rem' }}>{job.title}</div>
+                                <div className="completed-job-title">{job.title}</div>
                               )}
                               {job.employee_confirmed_by && (
-                                <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.25rem' }}>Empleado confirmó: {job.employee_confirmed_by}</div>
+                                <div className="completed-job-note">Empleado confirmó: {job.employee_confirmed_by}</div>
                               )}
                               {job.completed_by && (
-                                <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.25rem' }}>Cerrado por: {job.completed_by}</div>
+                                <div className="completed-job-note is-muted">Cerrado por: {job.completed_by}</div>
                               )}
                             </div>
-                            {job.kind !== 'extra' && <button
-                              onClick={async () => {
-                                if (!confirm(`¿Eliminar el registro de trabajo completado de ${job.employee}?`)) return;
-                                if (!supabase) return;
-                                await (supabase as any).from('calendar_assignments').update({ completed: false, completed_by: null, completed_at: null }).eq('id', job.id);
-                                setCalendarAssignments(prev => prev.map((a: any) => a.id === job.id ? { ...a, completed: false, completed_by: null, completed_at: null } : a));
-                              }}
-                              style={{
-                                background: '#fee2e2',
-                                color: '#b91c1c',
-                                border: '1px solid #fecaca',
-                                borderRadius: '0.6rem',
-                                padding: '0.4rem 0.65rem',
-                                fontSize: '0.82rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                flexShrink: 0,
-                                whiteSpace: 'nowrap'
-                              }}
-                            >🗑️ Eliminar</button>}
+                            {canDeleteCompletedJob(user, job) && (
+                              <button
+                                type="button"
+                                className="completed-job-delete"
+                                onClick={() => removeCompletedJob(job)}
+                                aria-label={`Eliminar ${job.kind === 'extra' ? 'tarea extra' : 'trabajo'} completado de ${job.employee}`}
+                              >🗑️ Eliminar</button>
+                            )}
                           </div>
                         ))}
                       </div>
                     )}
-                    <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem', marginTop: '1.25rem' }}>Se muestran por 1 año desde el cierre. Las más viejas dejan de verse y no se borran.</p>
+                    <p className="completed-jobs-footnote">Se guardan 6 meses desde el cierre. Después se borran solos.</p>
                   </div>
                 );
               })()}
