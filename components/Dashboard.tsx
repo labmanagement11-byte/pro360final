@@ -1178,6 +1178,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       }, [user, calendarAssignments, tasksList]);
   const [view, setView] = useState('home');
   const [selectedModalCard, setSelectedModalCard] = useState<string | null>(null);
+  // Trabajos completados borrados en esta sesión: una recarga vieja no los vuelve a mostrar.
+  const [deletedCompletedKeys, setDeletedCompletedKeys] = useState<Set<string>>(() => new Set());
+  // Botón Eliminar: trabajo que se está borrando y trabajo esperando el segundo toque
+  // (solo cuando el navegador bloquea la ventana de confirmar).
+  const [deletingCompletedKey, setDeletingCompletedKey] = useState<string | null>(null);
+  const [armedCompletedKey, setArmedCompletedKey] = useState<string | null>(null);
   
   // Estado para recordatorios - AHORA CON SUPABASE
   const [reminders, setReminders] = useState<any[]>([]);
@@ -4069,20 +4075,47 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                     employee_confirmed_by: taskEmployeeConfirmedBy(t),
                     title: t.title || 'Tarea extra',
                   }));
+                const completedJobKey = (job: any) => `${job.kind === 'extra' ? 'extra' : 'calendar'}:${job.id}`;
                 const completedJobs = [...completedCalendarJobs, ...completedExtraJobs]
+                  .filter((job: any) => !deletedCompletedKeys.has(completedJobKey(job)))
                   .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime());
                 const removeCompletedJob = async (job: any) => {
-                  const what = job.kind === 'extra' ? 'esta tarea extra completada' : 'este trabajo completado';
-                  if (!confirm(`¿Eliminar ${what}?\n\n${job.title || job.type} — ${job.employee}\n\nSe borra para siempre. La plantilla de la casa no se toca.`)) return;
-                  const result = await deleteCompletedJob(job.kind === 'extra' ? 'extra' : 'calendar', job.id);
-                  if (!result.ok) {
-                    alert(result.error);
-                    return;
+                  const key = completedJobKey(job);
+                  if (deletingCompletedKey) return;
+                  if (armedCompletedKey !== key) {
+                    const what = job.kind === 'extra' ? 'esta tarea extra completada' : 'este trabajo completado';
+                    const askedAt = Date.now();
+                    const accepted = confirm(`¿Eliminar ${what}?\n\n${job.title || job.type} — ${job.employee}\n\nSe borra para siempre con su checklist. La plantilla de la casa no se toca.`);
+                    if (!accepted) {
+                      // Si el navegador bloqueó la ventana, confirm() vuelve al instante sin mostrar nada.
+                      // Entonces el botón pide un segundo toque para confirmar.
+                      if (Date.now() - askedAt < 60) {
+                        setArmedCompletedKey(key);
+                        window.setTimeout(() => setArmedCompletedKey(prev => (prev === key ? null : prev)), 6000);
+                      }
+                      return;
+                    }
                   }
-                  if (job.kind === 'extra') {
-                    setTasksList(prev => (Array.isArray(prev) ? prev : []).filter((t: any) => String(t.id) !== String(job.id)));
-                  } else {
-                    setCalendarAssignments(prev => prev.filter((a: any) => String(a.id) !== String(job.id)));
+                  setArmedCompletedKey(null);
+                  setDeletingCompletedKey(key);
+                  try {
+                    const result = await deleteCompletedJob(job.kind === 'extra' ? 'extra' : 'calendar', job.id);
+                    if (!result.ok) {
+                      alert(result.error);
+                      return;
+                    }
+                    setDeletedCompletedKeys(prev => {
+                      const next = new Set(prev);
+                      next.add(key);
+                      return next;
+                    });
+                    if (job.kind === 'extra') {
+                      setTasksList(prev => (Array.isArray(prev) ? prev : []).filter((t: any) => String(t.id) !== String(job.id)));
+                    } else {
+                      setCalendarAssignments(prev => prev.filter((a: any) => String(a.id) !== String(job.id)));
+                    }
+                  } finally {
+                    setDeletingCompletedKey(prev => (prev === key ? null : prev));
                   }
                 };
                 return (
@@ -4123,8 +4156,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                 type="button"
                                 className="completed-job-delete"
                                 onClick={() => removeCompletedJob(job)}
+                                disabled={deletingCompletedKey === completedJobKey(job)}
+                                aria-busy={deletingCompletedKey === completedJobKey(job)}
                                 aria-label={`Eliminar ${job.kind === 'extra' ? 'tarea extra' : 'trabajo'} completado de ${job.employee}`}
-                              >🗑️ Eliminar</button>
+                              >
+                                {deletingCompletedKey === completedJobKey(job)
+                                  ? 'Eliminando…'
+                                  : armedCompletedKey === completedJobKey(job)
+                                    ? '🗑️ Toca otra vez para eliminar'
+                                    : '🗑️ Eliminar'}
+                              </button>
                             )}
                           </div>
                         ))}
