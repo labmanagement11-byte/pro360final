@@ -1,4 +1,4 @@
--- Limpieza única de copias huérfanas (NO es migración, NO aplicada).
+-- Limpieza única de copias huérfanas (NO es migración). Corrida una vez el 2026-10-08.
 -- Huérfana = fila por trabajo cuyo trabajo ya no existe en calendar_assignments.
 -- Nunca toca checklist, inventory_template ni inventory.
 

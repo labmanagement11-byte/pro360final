@@ -1,5 +1,4 @@
 -- Limpieza360 — Trabajos completados: borrar a mano y retención de 6 meses.
--- NO APLICADA. Se aplica solo cuando Jonathan apruebe.
 --
 -- PLANTILLAS POR CASA (este archivo NUNCA las borra):
 --   public.checklist           checklist base por casa (house, room, item). Se copia a
