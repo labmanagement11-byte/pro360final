@@ -4785,3 +4785,8 @@ body,
 .subcard.reminder-subcard:hover {
   transform: none;
 }
+
+.completed-job-delete:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
