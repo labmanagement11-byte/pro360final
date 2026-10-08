@@ -134,7 +134,7 @@ function staffMessage(table: string, record: Record<string, unknown>) {
       title: level === "overdue" ? "Recordatorio vencido" : "Recordatorio por vencer",
       body: [name, house && `Casa ${house}`, when, dueText && `(${dueText})`].filter(Boolean).join(". "),
       url: "/",
-      tag: `rem:${id}:${level}`,
+      tag: `rem:${id}:${dueText}:${level}`,
     };
   }
   if (table === "inventory") {
@@ -195,6 +195,14 @@ function staffSkip(
   }
   if (eventType !== "INSERT" && eventType !== "UPDATE") return "evento no avisado";
   if (table === "reminders") {
+    // "Ya lo hice" reinicia el vencimiento: no avisar en ese mismo momento.
+    // El barrido diario (pg_cron work-push-recordatorios) avisará con la nueva fecha.
+    if (
+      eventType === "UPDATE" && oldRecord && text(record.last_done_at) &&
+      text(record.last_done_at) !== text(oldRecord.last_done_at)
+    ) {
+      return "recién marcado como hecho";
+    }
     if (!reminderLevel(record)) return "no está por vencer ni vencido";
     if (eventType === "UPDATE" && oldRecord && reminderLevel(oldRecord) === reminderLevel(record)) {
       return "el aviso de ese recordatorio no cambió";

@@ -13,6 +13,18 @@ import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee } 
 import { canDeleteCompletedJob, deleteCompletedJob, isCompletedWithinRetention } from '../utils/deleteCompletedJob';
 import { closeCalendarAssignment, employeeConfirmation, syncPendingEmployeeConfirmations } from '../utils/calendarWork';
 import { isEmpleadoRole, nameBelongsToEmployee } from '../utils/employeeScope';
+import {
+  REMINDER_FREQUENCY_OPTIONS,
+  canMarkReminderDone,
+  dedupeRemindersById,
+  doneByLabel,
+  formatShortDate,
+  frequencyLabel,
+  isRecurring,
+  nextDueDate,
+  upsertReminderById,
+  type ReminderFrequency,
+} from '../utils/reminderRecurrence';
 
 // Tarjeta personalizada para tareas asignadas
 const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resolveAssignmentIdForTask, assignmentIdMap }: { 
@@ -1191,10 +1203,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     bank: '',
     account: '',
     invoiceNumber: '',
-    frequency: 'once' as 'once' | 'monthly' | 'yearly',
+    frequency: 'once' as ReminderFrequency,
+    interval_days: '',
     amount: '',
   });
   const [editingReminderIdx, setEditingReminderIdx] = useState(-1);
+  // Evita doble envío al crear/editar y doble toque en "Ya lo hice"
+  const [savingReminder, setSavingReminder] = useState(false);
+  const savingReminderRef = useRef(false);
+  const [doneBusyId, setDoneBusyId] = useState<string | null>(null);
 
   // Estado para inventario en modal - AHORA CON SUPABASE
   const [inventoryList, setInventoryList] = useState<any[]>([]);
@@ -1706,14 +1723,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
       ? user.house
       : (houses[allowedHouseIdx]?.name || 'HYNTIBA2 APTO 406');
     
+    let cancelled = false;
     const loadReminders = async () => {
       try {
         setLoadingReminders(true);
         const items = await realtimeService.getReminders(selectedHouse);
+        if (cancelled) return;
         console.log('✅ Recordatorios cargados para', selectedHouse, ':', items);
-        setReminders(items || []);
+        setReminders(dedupeRemindersById(items || []));
         setLoadingReminders(false);
       } catch (error) {
+        if (cancelled) return;
         console.error('❌ Error loading reminders:', error);
         setReminders([]);
         setLoadingReminders(false);
@@ -1731,11 +1751,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
         if (payload?.eventType === 'INSERT') {
           console.log('➕ Nuevo recordatorio insertado:', payload.new);
           addRealtimeNotification(`Nuevo recordatorio: ${payload.new?.name || 'Sin nombre'}`, 'info');
-          setReminders(prev => [...prev, payload.new]);
+          // El que lo crea ya lo agregó con la respuesta del insert: reemplazar por id, no duplicar.
+          setReminders(prev => upsertReminderById(prev, payload.new));
         } else if (payload?.eventType === 'UPDATE') {
           console.log('✏️ Recordatorio actualizado:', payload.new);
           addRealtimeNotification('Recordatorio actualizado', 'info');
-          setReminders(prev => prev.map(r => r.id === payload.new?.id ? payload.new : r));
+          setReminders(prev => prev.map(r => r.id === payload.new?.id ? { ...r, ...payload.new } : r));
         } else if (payload?.eventType === 'DELETE') {
           console.log('🗑️ Recordatorio eliminado:', payload.old);
           addRealtimeNotification('Recordatorio eliminado', 'warning');
@@ -1748,6 +1769,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     }
 
     return () => {
+      cancelled = true;
       try {
         console.log('🔌 Desconectando suscripción de recordatorios...');
         if (subscription) {
@@ -2239,6 +2261,55 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   const isOwnerLike = user.role === 'owner' || user.role === 'dueno';
   const canManageReminders = isOwnerLike || user.role === 'manager';
   const showReminders = canManageReminders;
+
+  // "Ya lo hice": marca hecho y reinicia el recordatorio (Jonathan/dueño o manager de la casa)
+  const [reminderDoneError, setReminderDoneError] = useState<{ id: string; text: string } | null>(null);
+  const handleReminderDone = async (item: any) => {
+    if (!item?.id || doneBusyId) return;
+    if (!canMarkReminderDone(user as any, item, isJonathanUser)) return;
+    const id = String(item.id);
+    setDoneBusyId(id);
+    setReminderDoneError(null);
+    try {
+      const result = await realtimeService.markReminderDone(id);
+      if (result.ok) {
+        setReminders(prev => upsertReminderById(prev, result.row));
+      } else {
+        setReminderDoneError({ id, text: result.error });
+      }
+    } finally {
+      setDoneBusyId(null);
+    }
+  };
+
+  const renderReminderDone = (item: any) => {
+    const allowed = canMarkReminderDone(user as any, item, isJonathanUser);
+    const doneText = doneByLabel(item);
+    const finished = !isRecurring(item) && item.paid;
+    const busy = doneBusyId === String(item.id);
+    return (
+      <div className="reminder-done-block">
+        {doneText && <p className="reminder-done-by">✅ {doneText}</p>}
+        {allowed && !finished && (
+          <button
+            type="button"
+            className="reminder-done-btn"
+            disabled={busy || !!doneBusyId}
+            aria-busy={busy}
+            onClick={(e) => { e.stopPropagation(); handleReminderDone(item); }}
+          >
+            {busy ? 'Guardando…' : '✔️ Ya lo hice'}
+          </button>
+        )}
+        {allowed && !finished && isRecurring(item) && nextDueDate(item) !== String(item.due || '').slice(0, 10) && (
+          <p className="reminder-done-hint">Si lo marcas hoy, vuelve a vencer el {formatShortDate(nextDueDate(item))}.</p>
+        )}
+        {reminderDoneError?.id === String(item.id) && (
+          <p className="reminder-done-error" role="alert">{reminderDoneError.text}</p>
+        )}
+      </div>
+    );
+  };
 
   // Alertas de recordatorios vencidos o próximos (7 días antes del vencimiento)
   useEffect(() => {
@@ -3469,6 +3540,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
           <h2 className="dashboard-reminders-title redesigned-reminders-title">Recordatorios</h2>
           <form className="dashboard-reminders-form redesigned-reminders-form" onSubmit={async e => {
             e.preventDefault();
+            if (savingReminderRef.current) return;
             const form = e.target as HTMLFormElement;
             const name = (form.elements.namedItem('name') as HTMLInputElement).value;
             const due = (form.elements.namedItem('due') as HTMLInputElement).value;
@@ -3477,16 +3549,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
             const invoiceNumber = (form.elements.namedItem('invoiceNumber') as HTMLInputElement)?.value || '';
             const frequency = (form.elements.namedItem('frequency') as HTMLSelectElement)?.value || 'once';
             const amount = (form.elements.namedItem('amount') as HTMLInputElement)?.value || '';
+            const intervalDays = (form.elements.namedItem('interval_days') as HTMLInputElement)?.value || '';
             const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
+            savingReminderRef.current = true;
+            setSavingReminder(true);
             try {
-              const created = await realtimeService.createReminder({ name, due, bank, account, invoiceNumber, frequency, amount, house: selectedHouse });
+              const created = await realtimeService.createReminder({ name, due, bank, account, invoiceNumber, frequency, interval_days: intervalDays, amount, house: selectedHouse, created_by: (user as any)?.username || null });
               if (created) {
-                setReminders(prev => prev.some(r => r.id === created.id) ? prev : [...prev, created]);
+                setReminders(prev => upsertReminderById(prev, created));
               }
+              form.reset();
             } catch (err) {
               console.error('❌ Error creando recordatorio:', err);
+            } finally {
+              savingReminderRef.current = false;
+              setSavingReminder(false);
             }
-            form.reset();
           }}>
             <div className="reminders-form-row">
               <label htmlFor="reminder-name">Nombre del pago</label>
@@ -3501,18 +3579,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               <input id="reminder-account" name="account" type="text" placeholder="N° de cuenta" required />
               <label htmlFor="reminder-frequency">Frecuencia</label>
               <select id="reminder-frequency" name="frequency" defaultValue="once" required>
-                <option value="once">Única vez</option>
-                <option value="monthly">Mensual</option>
-                <option value="yearly">Anual</option>
+                {REMINDER_FREQUENCY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
+              <label htmlFor="reminder-interval-days">Cada cuántos días (solo si eliges "Cada N días")</label>
+              <input id="reminder-interval-days" name="interval_days" type="number" min="1" step="1" inputMode="numeric" placeholder="Ej: 15" />
               <label htmlFor="reminder-amount">Monto (opcional)</label>
               <input id="reminder-amount" name="amount" type="number" min="0" step="any" placeholder="Monto" />
-              <button type="submit" className="dashboard-btn main">Agregar</button>
+              <button type="submit" className="dashboard-btn main" disabled={savingReminder} aria-busy={savingReminder}>{savingReminder ? 'Guardando…' : 'Agregar'}</button>
             </div>
           </form>
           <ul className="dashboard-reminders-list redesigned-reminders-list">
             {reminders.map((r, idx) => (
-              <li key={idx} className="dashboard-reminder-item redesigned-reminder-item">
+              <li key={r.id ?? idx} className="dashboard-reminder-item redesigned-reminder-item">
                 {editIdx === idx ? (
                   <form className="dashboard-reminders-edit-form redesigned-reminders-edit-form" onSubmit={async e => {
                     e.preventDefault();
@@ -3549,12 +3629,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                   <div className="reminder-card">
                     <div className="reminder-card-main">
                       <span className="dashboard-reminder-name">{r.name}</span>
-                      <span className="dashboard-reminder-due">{r.due}</span>
+                      <span className="dashboard-reminder-due">Vence: {formatShortDate(r.due)}{isRecurring(r) ? ` · ${frequencyLabel(r)}` : ''}</span>
                       {r.invoiceNumber ? (
                         <span className="dashboard-reminder-invoice">Factura: {r.invoiceNumber}</span>
                       ) : null}
                       <span className="dashboard-reminder-bank">{r.bank}</span>
                       <span className="dashboard-reminder-account">{r.account}</span>
+                      {renderReminderDone(r)}
                     </div>
                     <div className="reminder-card-actions">
                       <button className="dashboard-btn" onClick={() => setEditIdx(idx)}>Editar</button>
@@ -4242,6 +4323,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                       <h3>🔔 {editingReminderIdx >= 0 ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h3>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
+                        if (savingReminderRef.current) return;
+                        savingReminderRef.current = true;
+                        setSavingReminder(true);
+                        try {
                         const selectedHouse = houses[allowedHouseIdx]?.name || 'EPIC D1';
                         if (editingReminderIdx >= 0) {
                           // Editar recordatorio existente
@@ -4253,6 +4338,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             account: newReminder.account,
                             invoiceNumber: newReminder.invoiceNumber,
                             frequency: newReminder.frequency,
+                            interval_days: newReminder.frequency === 'custom' ? newReminder.interval_days : null,
                             amount: newReminder.amount ? parseFloat(newReminder.amount) : null
                           });
                           if (updated) {
@@ -4268,14 +4354,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             account: newReminder.account,
                             invoiceNumber: newReminder.invoiceNumber,
                             frequency: newReminder.frequency,
+                            interval_days: newReminder.frequency === 'custom' ? newReminder.interval_days : null,
                             amount: newReminder.amount ? parseFloat(newReminder.amount) : null,
-                            house: selectedHouse
+                            house: selectedHouse,
+                            created_by: (user as any)?.username || null
                           });
                           if (created) {
-                            setReminders(prev => [...prev, created]);
+                            // El evento realtime INSERT también llega: upsert por id para no duplicar.
+                            setReminders(prev => upsertReminderById(prev, created));
                           }
                         }
-                        setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '', frequency: 'once', amount: '' });
+                        setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '', frequency: 'once', interval_days: '', amount: '' });
+                        } catch (err) {
+                          console.error('❌ Error guardando recordatorio:', err);
+                          addRealtimeNotification('No se pudo guardar el recordatorio', 'error');
+                        } finally {
+                          savingReminderRef.current = false;
+                          setSavingReminder(false);
+                        }
                       }}>
                         <div className="assignment-form-grid">
                           <div className="form-group">
@@ -4352,20 +4448,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                             <label>🔄 Frecuencia</label>
                             <select
                               value={newReminder.frequency}
-                              onChange={(e) => setNewReminder({...newReminder, frequency: e.target.value as 'once' | 'monthly' | 'yearly'})}
+                              onChange={(e) => setNewReminder({...newReminder, frequency: e.target.value as ReminderFrequency})}
                               title="Frecuencia del pago"
                               style={{padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', fontSize: '1rem', width: '100%'}}
                             >
-                              <option value="once">📅 Una vez</option>
-                              <option value="monthly">🔁 Mensual</option>
-                              <option value="yearly">📆 Anual</option>
+                              {REMINDER_FREQUENCY_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
                             </select>
                           </div>
+
+                          {newReminder.frequency === 'custom' && (
+                            <div className="form-group">
+                              <label>⏱️ Cada cuántos días</label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                inputMode="numeric"
+                                value={newReminder.interval_days}
+                                onChange={(e) => setNewReminder({...newReminder, interval_days: e.target.value})}
+                                required
+                                placeholder="Ej: 15"
+                                title="Cada cuántos días se repite"
+                              />
+                            </div>
+                          )}
                         </div>
                         
                         <div style={{display: 'flex', gap: '1rem'}}>
-                          <button type="submit" className="dashboard-btn main" style={{flex: 1}}>
-                            {editingReminderIdx >= 0 ? '✏️ Actualizar' : '➕ Agregar Recordatorio'}
+                          <button type="submit" className="dashboard-btn main" style={{flex: 1}} disabled={savingReminder} aria-busy={savingReminder}>
+                            {savingReminder ? 'Guardando…' : editingReminderIdx >= 0 ? '✏️ Actualizar' : '➕ Agregar Recordatorio'}
                           </button>
                           {editingReminderIdx >= 0 && (
                             <button 
@@ -4373,7 +4486,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                               className="dashboard-btn danger" 
                               onClick={() => {
                                 setEditingReminderIdx(-1);
-                                setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '', frequency: 'once', amount: '' });
+                                setNewReminder({ name: '', due: '', bank: '', account: '', invoiceNumber: '', frequency: 'once', interval_days: '', amount: '' });
                               }}
                             >
                               ❌ Cancelar
@@ -4411,32 +4524,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                           }
                         }
                         return (
-                        <div key={idx} className={`subcard${urgency !== 'ok' ? ' reminder-urgent' : ''}`} style={urgency === 'overdue' ? {borderColor:'#dc2626', background:'#fef2f2'} : urgency === 'soon' ? {borderColor:'#f59e0b', background:'#fffbeb'} : undefined}>
+                        <div key={item.id ?? idx} className={`subcard reminder-subcard${urgency !== 'ok' ? ' reminder-urgent' : ''}`} style={urgency === 'overdue' ? {borderColor:'#dc2626', background:'#fef2f2'} : urgency === 'soon' ? {borderColor:'#f59e0b', background:'#fffbeb'} : undefined}>
                           <div className="subcard-header">
                             <div className="subcard-icon">{urgency === 'overdue' ? '🚨' : urgency === 'soon' ? '⚠️' : '🔔'}</div>
                             <h3>{item.name}{urgency === 'overdue' ? ' (VENCIDO)' : urgency === 'soon' ? ' (por vencer)' : ''}</h3>
-                            {item.frequency && item.frequency !== 'once' && (
-                              <span style={{
-                                background: item.frequency === 'monthly' ? '#3b82f6' : '#8b5cf6',
-                                color: 'white',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '1rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                marginLeft: 'auto'
-                              }}>
-                                {item.frequency === 'monthly' ? '🔁 Mensual' : '📆 Anual'}
-                              </span>
+                            {isRecurring(item) && (
+                              <span className="reminder-freq-pill">🔁 {frequencyLabel(item)}</span>
                             )}
                           </div>
                           <div className="subcard-content">
-                            <p><strong>📅 Fecha:</strong> {item.due}</p>
+                            <p><strong>📅 Vence:</strong> {formatShortDate(item.due)}</p>
                             {item.amount && <p><strong>💰 Monto:</strong> ${parseFloat(item.amount).toFixed(2)}</p>}
                             <p><strong>🏦 Banco:</strong> {item.bank}</p>
                             <p><strong>🔢 Cuenta:</strong> {item.account}</p>
                             {item.invoiceNumber && <p><strong>📄 Factura:</strong> {item.invoiceNumber}</p>}
                             <span className="subcard-badge">{item.bank}</span>
                           </div>
+                          {renderReminderDone(item)}
                           {(user.role === 'owner' || user.role === 'manager') && (
                             <div className="subcard-actions">
                               <button 
@@ -4444,6 +4548,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                                   setNewReminder({
                                     ...item,
                                     frequency: item.frequency || 'once',
+                                    interval_days: item.interval_days ? String(item.interval_days) : '',
                                     amount: item.amount ? String(item.amount) : ''
                                   });
                                   setEditingReminderIdx(idx);

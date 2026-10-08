@@ -208,7 +208,8 @@ function reminderAlert(row: any, identity: WorkAlertUser): AlertRow | null {
     when = `vence en ${daysLeft} día${daysLeft === 1 ? "" : "s"}`;
   }
   return {
-    key: `rem:${row.id}:${level}`,
+    // Incluye la fecha: tras "Ya lo hice" el nuevo vencimiento vuelve a avisar.
+    key: `rem:${row.id}:${dueText}:${level}`,
     title: level === "overdue" ? "Recordatorio vencido" : "Recordatorio por vencer",
     body: [name, house && `Casa ${house}`, when, dueText && `(${dueText})`].filter(Boolean).join(". "),
   };
@@ -539,6 +540,12 @@ export function startWorkWatch(identity: WorkAlertUser): () => void {
     channel
       .on("postgres_changes", { event: "*", schema: "public", table: "reminders" }, (payload: any) => {
         const row = reminderAlert(payload.new, identity);
+        const doneAt = Date.parse(String(payload.new?.last_done_at || ""));
+        if (row && payload.eventType === "UPDATE" && Number.isFinite(doneAt) && Date.now() - doneAt < 5 * 60 * 1000) {
+          // Recién marcado con "Ya lo hice": no avisar ahora; el aviso diario lo hará.
+          rememberReminder(row.key);
+          return;
+        }
         if (row && primedReminders && !readReminderSeen().has(row.key)) {
           consider([row], true);
           rememberReminder(row.key);
