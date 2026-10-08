@@ -4559,3 +4559,159 @@ body,
     flex: 1 1 160px;
   }
 }
+
+/* ============================================
+   TRABAJOS COMPLETADOS
+   Tarjeta en el flujo: el botón Eliminar nunca flota encima del texto.
+   ============================================ */
+.completed-jobs {
+  padding: 0.5rem 0;
+}
+
+.completed-jobs-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.completed-job-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1.5px solid #86efac;
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.08);
+  min-width: 0;
+}
+
+.completed-job-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.completed-job-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.completed-job-icon {
+  font-size: 1.1rem;
+}
+
+.completed-job-employee {
+  font-weight: 700;
+  color: #15803d;
+  font-size: 0.97rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+
+.completed-job-type {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+  border-radius: 0.5rem;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.completed-job-meta {
+  color: #475569;
+  font-size: 0.88rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.completed-job-title {
+  color: #166534;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 0.15rem;
+  overflow-wrap: anywhere;
+}
+
+.completed-job-note {
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.completed-job-note.is-muted {
+  color: #94a3b8;
+}
+
+.completed-job-delete {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.completed-job-delete:hover {
+  background: #fecaca;
+}
+
+.completed-job-delete:focus-visible {
+  outline: 3px solid #f87171;
+  outline-offset: 2px;
+}
+
+.completed-jobs-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #64748b;
+}
+
+.completed-jobs-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.completed-jobs-empty-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.completed-jobs-empty-text {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+}
+
+.completed-jobs-footnote {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  margin-top: 1.25rem;
+}
+
+/* Teléfono: una sola columna, el botón va abajo y a lo ancho */
+@media (max-width: 600px) {
+  .completed-job-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.9rem;
+  }
+
+  .completed-job-delete {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.95rem;
+    white-space: normal;
+  }
+}
