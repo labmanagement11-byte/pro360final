@@ -97,27 +97,6 @@ function wasEdited(entry: HouseCardEntry): boolean {
 
 export type HouseEmployeeOption = { id: string; username: string };
 
-/** Quién ve la tarjeta, en palabras. */
-function audienceLabel(card: HouseCustomCard, viewerIsTarget: boolean, readOnly: boolean): string {
-  if (readOnly) return 'Puedes leer y agregar notas';
-  if (!card.target_user_id) {
-    return card.visible_to_employees
-      ? 'Jonathan, el manager y los empleados de la casa (ellos solo agregan notas)'
-      : 'Jonathan y el manager de la casa';
-  }
-  if (viewerIsTarget) return 'Tarjeta para ti · la ven Jonathan y el manager';
-  return `Para ${card.target_name || 'el empleado'}, el manager y Jonathan`;
-}
-
-function contentLabel(c?: HouseCardCounts): string {
-  const steps = c?.steps || 0;
-  const notes = c?.notes || 0;
-  const parts: string[] = [];
-  if (steps) parts.push(steps === 1 ? '1 paso' : `${steps} pasos`);
-  if (notes) parts.push(notes === 1 ? '1 nota' : `${notes} notas`);
-  return parts.length ? parts.join(' · ') : 'Vacía todavía';
-}
-
 function formatSize(bytes: number): string {
   const mb = bytes / (1024 * 1024);
   if (mb >= 1) return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1).replace('.', ',')} MB`;
@@ -216,7 +195,6 @@ export function HouseCustomCardTiles({
   house,
   user,
   cards,
-  counts,
   employees,
   authUid,
   onOpen,
@@ -225,7 +203,8 @@ export function HouseCustomCardTiles({
   house: string;
   user: HouseActor;
   cards: HouseCustomCard[];
-  counts: Record<string, HouseCardCounts>;
+  /** Ya no se muestra en la tarjeta; se mantiene para no cambiar quien la usa. */
+  counts?: Record<string, HouseCardCounts>;
   /** Empleados reales de esta casa (para tarjetas de un empleado). */
   employees: HouseEmployeeOption[];
   authUid?: string | null;
@@ -297,9 +276,6 @@ export function HouseCustomCardTiles({
             {!card.target_user_id && card.visible_to_employees && !readOnly && (
               <span className="hcc-visible-chip">👀 Visible para empleados</span>
             )}
-            <span className="dashboard-card-desc">
-              {contentLabel(counts[card.id])} · {audienceLabel(card, forMe, readOnly)}
-            </span>
           </button>
         );
       })}
@@ -1075,19 +1051,6 @@ export function HouseCustomCardPanel({
     );
   }
 
-  let who: string;
-  if (card.target_user_id) {
-    who = viewerIsTarget
-      ? 'La ven Jonathan, el manager de la casa y tú. Puedes leer los pasos y agregar notas.'
-      : `La ven Jonathan, el manager de la casa y ${card.target_name || 'el empleado'}. ${card.target_name || 'El empleado'} puede leer y agregar notas, pero no editar ni borrar. Ningún otro empleado la ve.`;
-  } else if (readOnly) {
-    who = 'Tarjeta de la casa. Puedes leer los pasos y agregar notas. Solo Jonathan y el manager cambian o borran.';
-  } else if (card.visible_to_employees) {
-    who = 'Jonathan y el manager manejan todo aquí. Los empleados de la casa la leen y pueden agregar notas, pero no editar ni borrar.';
-  } else {
-    who = 'Ven y escriben aquí: Jonathan y el manager de la casa. Los empleados no la ven.';
-  }
-
   const showSteps = manageSteps || steps.length > 0;
   const showNotes = addNotes || notes.length > 0 || steps.length === 0;
 
@@ -1101,7 +1064,6 @@ export function HouseCustomCardPanel({
         {!card.target_user_id && card.visible_to_employees && (
           <p className="hcc-summary-visible">👀 {readOnly ? 'Puedes leer y agregar notas' : 'Visible para empleados de la casa'}</p>
         )}
-        <p className="hcc-summary-who">{who}</p>
       </div>
 
       {canManage && (
