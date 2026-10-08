@@ -25,6 +25,13 @@ import {
   upsertReminderById,
   type ReminderFrequency,
 } from '../utils/reminderRecurrence';
+import {
+  HouseCustomCardPanel,
+  HouseCustomCardTiles,
+  customCardModalKey,
+  parseCustomCardModalKey,
+  useHouseCustomCards,
+} from './HouseCustomCards';
 
 // Tarjeta personalizada para tareas asignadas
 const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resolveAssignmentIdForTask, assignmentIdMap }: { 
@@ -1367,8 +1374,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
     if (employeeHouseIdx >= 0) return employeeHouseIdx;
     return 0;
   });
-  // Última casa que el dueño estaba viendo. El índice no sirve: Armenia queda
-  // primera al ordenar por nombre y un refresh la volvía a elegir.
+  // Última casa que el dueño estaba viendo. El índice no sirve: al ordenar por
+  // nombre la primera casa cambia y un refresh la volvía a elegir.
   const selectedHouseStorageKey = `limpieza360_selected_house:${String((user as any)?.id || user?.username || 'anon').trim().toLowerCase()}`;
   const houseChoiceReady = useRef(false);
 
@@ -1437,6 +1444,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
   // Si es empleado o manager (no jonathan), solo puede ver su casa y no puede cambiarla
   const allowedHouseIdx = isRestrictedUser ? (employeeHouseIdx >= 0 ? employeeHouseIdx : 0) : selectedHouseIdx;
   const selectedHouseName = houses[allowedHouseIdx]?.name || user.house || '';
+
+  // Tarjetas personalizadas por casa (Notas, etc.). Manager: su casa de perfil. Jonathan: la casa elegida.
+  const customCardsHouse = isRestrictedUser
+    ? String(user.house || '').trim()
+    : String(houses[allowedHouseIdx]?.houseName || houses[allowedHouseIdx]?.name || '').trim();
+  const customCards = useHouseCustomCards(customCardsHouse, user as any);
+  const customCardsEmployees = users
+    .filter(u => String(u.role || '').trim().toLowerCase() === 'empleado' && u.id != null)
+    .filter(u => normalizeHouseName(u.house) === normalizeHouseName(customCardsHouse))
+    .map(u => ({ id: String(u.id), username: String(u.username || '') }))
+    .sort((a, b) => a.username.localeCompare(b.username, 'es'));
+  const openCustomCardKey = parseCustomCardModalKey(selectedModalCard);
+  const openCustomCard = openCustomCardKey
+    ? customCards.cards.find(c => c.id === openCustomCardKey.cardId) || null
+    : null;
   const assignableEmployees = users
     .filter(u => u.role === 'empleado')
     .filter(u => {
@@ -3336,6 +3358,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               </button>
               );
             })}
+            {customCards.enabled && customCardsHouse && customCards.loaded && (
+              <HouseCustomCardTiles
+                key={customCardsHouse}
+                house={customCardsHouse}
+                user={user as any}
+                cards={customCards.cards}
+                counts={customCards.counts}
+                employees={customCardsEmployees}
+                authUid={customCards.authUid}
+                onOpen={(card) => setSelectedModalCard(customCardModalKey(card.id))}
+                onCreated={customCards.reload}
+              />
+            )}
           </div>
           <p className="dashboard-home-desc">Haz clic en una tarjeta para ver el módulo correspondiente.</p>
         </>
@@ -3791,11 +3826,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                 {selectedModalCard === 'tasks' && '📋 Asignar Tareas'}
                 {selectedModalCard === 'extraTasks' && '🟦 Tareas Extra'}
                 {selectedModalCard === 'completedJobs' && '✅ Trabajos Completados'}
+                {openCustomCardKey && (openCustomCard
+                  ? `${openCustomCard.icon || '📝'} ${openCustomCard.title}${openCustomCard.target_user_id && openCustomCard.target_name ? ` · ${openCustomCard.target_name}` : ''}`
+                  : 'Tarjeta')}
               </h2>
               <button className="modal-close" onClick={() => setSelectedModalCard(null)}>✕</button>
             </div>
             
             <div className="modal-body">
+              {openCustomCardKey && openCustomCard && (
+                <HouseCustomCardPanel
+                  key={openCustomCard.id}
+                  card={openCustomCard}
+                  user={user as any}
+                  authUid={customCards.authUid}
+                  entriesVersion={customCards.entriesVersion}
+                  photo={openCustomCardKey.photo}
+                  onOpenPhoto={(entryId, index) => setSelectedModalCard(customCardModalKey(openCustomCard.id, { entryId, index }))}
+                  onClosePhoto={goBackInApp}
+                  onCardDeleted={() => {
+                    customCards.reload();
+                    setSelectedModalCard(null);
+                  }}
+                  onCardChanged={customCards.reload}
+                />
+              )}
+              {openCustomCardKey && !openCustomCard && (
+                <p className="modal-body-empty">
+                  {customCards.loaded || !customCards.enabled
+                    ? 'Esta tarjeta ya no existe o no tienes acceso.'
+                    : 'Cargando tarjeta…'}
+                </p>
+              )}
               {selectedModalCard === 'calendar' && (
                 <>
                   {/* Formulario de asignación */}
