@@ -8,7 +8,7 @@ import { RealtimeNotificationsManager } from './RealtimeNotification';
 import './RealtimeNotification.css';
 
 import Tasks from './Tasks';
-import { archiveCalendarAssignment, shouldArchiveAssignment } from '../utils/archiveCompletedAssignment';
+import { moveCalendarAssignmentToCompleted } from '../utils/archiveCompletedAssignment';
 import { canCloseExtraTask, closeExtraTaskByAdmin, confirmExtraTaskByEmployee } from '../utils/completeExtraTask';
 import { canDeleteCompletedJob, deleteCompletedJob, isCompletedWithinRetention } from '../utils/deleteCompletedJob';
 import { closeCalendarAssignment, employeeConfirmation, syncPendingEmployeeConfirmations } from '../utils/calendarWork';
@@ -688,19 +688,19 @@ const AssignedTasksCard = ({ user, onNavigateToInventory, onTaskCompleted, resol
     if (!task?.id) return;
     const typeLabel = task.type || 'tarea';
     const employeeLabel = task.employee ? ` de ${task.employee}` : '';
-    if (!confirm(`¿Eliminar esta asignación ${typeLabel}${employeeLabel}?`)) return;
+    if (!confirm(`¿Pasar este trabajo a Trabajos completados?\n\n${typeLabel}${employeeLabel}\n\nNo se borra: queda en Trabajos completados y desde ahí se puede eliminar.`)) return;
 
     try {
       setLoading(true);
       const resolvedId = await resolveAssignmentIdForTask(task);
       const target = { ...task, id: resolvedId || task.id };
-      const archive = await shouldArchiveAssignment(target);
-      const ok = archive
-        ? await archiveCalendarAssignment(target, user.username)
-        : await realtimeService.deleteCalendarAssignmentCascade(String(target.id));
-      if (ok) {
-        setAssignedTasks(prev => prev.filter(t => t.id !== task.id));
+      const ok = await moveCalendarAssignmentToCompleted(target, user.username);
+      if (!ok) {
+        alert('No se pudo pasar el trabajo a Trabajos completados.');
+        return;
       }
+      setAssignedTasks(prev => prev.filter(t => t.id !== task.id));
+      if (onTaskCompleted) onTaskCompleted(String(task.id), String(target.id));
     } finally {
       setLoading(false);
     }
@@ -2635,21 +2635,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
               type="button"
               className="job-card-btn is-danger"
               onClick={async () => {
-                if (!confirm(`¿Eliminar la asignación de ${assignment.employee}?`)) return;
-                const archive = await shouldArchiveAssignment(assignment);
-                const deleted = archive
-                  ? await archiveCalendarAssignment(assignment, user.username)
-                  : await realtimeService.deleteCalendarAssignmentCascade(String(assignment.id));
-                if (deleted) {
-                  setCalendarAssignments(prev => archive
-                    ? prev.map((a: any) => a.id === assignment.id ? { ...a, completed: true, completed_at: a.completed_at || new Date().toISOString(), completed_by: a.completed_by || user.username } : a)
-                    : prev.filter((a: any) => a.id !== assignment.id));
-                  setSyncedChecklists(prev => {
-                    const next = new Map(prev);
-                    next.delete(String(assignment.id));
-                    return next;
-                  });
+                if (!confirm(`¿Pasar este trabajo a Trabajos completados?\n\n${jobTypeLabel(assignment.type)} — ${assignment.employee}\n\nNo se borra: queda en Trabajos completados y desde ahí se puede eliminar.`)) return;
+                const moved = await moveCalendarAssignmentToCompleted(assignment, user.username);
+                if (!moved) {
+                  alert('No se pudo pasar el trabajo a Trabajos completados.');
+                  return;
                 }
+                const now = new Date().toISOString();
+                setCalendarAssignments(prev => prev.map((a: any) => a.id === assignment.id ? { ...a, completed: true, completed_at: now, completed_by: user.username } : a));
+                setSyncedChecklists(prev => {
+                  const next = new Map(prev);
+                  next.delete(String(assignment.id));
+                  return next;
+                });
               }}
             >
               Eliminar
@@ -6128,18 +6126,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, users, addUser, editUser, d
                         <div className="progress-fill" style={{width: `${progress}%`}}></div>
                       </div>
                       
-                      {/* Botón para eliminar asignación cuando esté completa (solo manager/owner) */}
+                      {/* Eliminar: pasa el trabajo a Trabajos completados, no lo borra (solo manager/owner) */}
                       {(user.role === 'manager' || user.role === 'owner') && progress === 100 && (
                         <div style={{marginBottom: '2rem', textAlign: 'center'}}>
                           <button 
                             className="dashboard-btn danger"
                             style={{fontSize: '1rem', padding: '0.75rem 2rem'}}
                             onClick={async () => {
-                              if (confirm(`¿Eliminar esta asignación completada de ${assignment.employee}? Esto también eliminará el inventario verificado.`)) {
-                                console.log('🗑️ Eliminando asignación:', selectedAssignmentForInventory);
-                                await realtimeService.deleteCalendarAssignment(selectedAssignmentForInventory);
-                                setSelectedAssignmentForInventory(null);
+                              if (!confirm(`¿Pasar este trabajo a Trabajos completados?\n\n${assignment.type || 'Trabajo'} — ${assignment.employee}\n\nNo se borra: queda en Trabajos completados y desde ahí se puede eliminar.`)) return;
+                              const moved = await moveCalendarAssignmentToCompleted(assignment, user.username);
+                              if (!moved) {
+                                alert('No se pudo pasar el trabajo a Trabajos completados.');
+                                return;
                               }
+                              const now = new Date().toISOString();
+                              setCalendarAssignments(prev => prev.map((a: any) => a.id === assignment.id ? { ...a, completed: true, completed_at: now, completed_by: user.username } : a));
+                              setSelectedAssignmentForInventory(null);
                             }}
                           >
                             ✅ Inventario Verificado - Eliminar Asignación
