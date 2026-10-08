@@ -108,3 +108,32 @@ export async function archiveCalendarAssignment(assignment: any, closedBy: strin
   await resetHouseInventoryStatus(assignment.house);
   return true;
 }
+
+/**
+ * Botón Eliminar de un trabajo activo: NO borra. Lo pasa a Trabajos completados
+ * (completed=true, completed_at = ahora, completed_by = quien lo pasó), así empieza el reloj
+ * de 6 meses. Solo cambia la fila del trabajo: no toca el checklist base de la casa
+ * (checklist), inventory_template ni inventory, y no cambia notes, así que no dispara el
+ * aviso push de "trabajo terminado" (ese aviso solo sale cuando el empleado confirma).
+ * El borrado definitivo se hace desde Trabajos completados.
+ */
+export async function moveCalendarAssignmentToCompleted(assignment: any, closedBy: string): Promise<boolean> {
+  if (!supabase || !assignment?.id) return false;
+  const now = new Date().toISOString();
+  const { data, error } = await (supabase as any)
+    .from('calendar_assignments')
+    .update({
+      completed: true,
+      completed_at: assignment.completed && assignment.completed_at ? assignment.completed_at : now,
+      completed_by: closedBy || assignment.completed_by || null,
+      updated_at: now,
+    })
+    .eq('id', assignment.id)
+    .select('id');
+
+  if (error) {
+    console.error('No se pudo pasar el trabajo a Trabajos completados', error);
+    return false;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
