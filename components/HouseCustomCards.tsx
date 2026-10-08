@@ -3,7 +3,7 @@
 // con pasos de instrucciones (numerados) y notas, con fotos, videos y enlaces.
 // Solo Jonathan crea / renombra / borra tarjetas, para toda la casa o para un empleado de la casa,
 // y decide si una tarjeta de casa es visible para los empleados (solo lectura).
-// Jonathan y el manager manejan pasos y notas; el empleado destino agrega notas y edita las suyas.
+// Jonathan y el manager manejan pasos y notas; los empleados que ven la tarjeta solo agregan notas.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './HouseCustomCards.css';
@@ -99,10 +99,10 @@ export type HouseEmployeeOption = { id: string; username: string };
 
 /** Quién ve la tarjeta, en palabras. */
 function audienceLabel(card: HouseCustomCard, viewerIsTarget: boolean, readOnly: boolean): string {
-  if (readOnly) return 'Solo lectura';
+  if (readOnly) return 'Puedes leer y agregar notas';
   if (!card.target_user_id) {
     return card.visible_to_employees
-      ? 'Jonathan, el manager y los empleados de la casa (solo lectura)'
+      ? 'Jonathan, el manager y los empleados de la casa (ellos solo agregan notas)'
       : 'Jonathan y el manager de la casa';
   }
   if (viewerIsTarget) return 'Tarjeta para ti · la ven Jonathan y el manager';
@@ -340,14 +340,13 @@ export function HouseCustomCardTiles({
                 <legend className="hcc-label">¿Para quién es?</legend>
                 <label className={`hcc-scope-option${scope === 'house' ? ' on' : ''}`}>
                   <input type="radio" name="hcc-scope" checked={scope === 'house'} onChange={() => setScope('house')} />
-                  <span>🏠 Toda la casa <small>(Jonathan y el manager{visible ? ', y los empleados leen' : ''})</small></span>
+                  <span>🏠 Toda la casa <small>(Jonathan y el manager{visible ? '; los empleados leen y agregan notas' : ''})</small></span>
                 </label>
-                <label className={`hcc-scope-option${scope === 'employee' ? ' on' : ''}${employees.length === 0 ? ' is-disabled' : ''}`}>
+                <label className={`hcc-scope-option${scope === 'employee' ? ' on' : ''}`}>
                   <input
                     type="radio"
                     name="hcc-scope"
                     checked={scope === 'employee'}
-                    disabled={employees.length === 0}
                     onChange={() => setScope('employee')}
                   />
                   <span>👤 Un empleado <small>(él, el manager y Jonathan)</small></span>
@@ -357,12 +356,14 @@ export function HouseCustomCardTiles({
                     <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
                     <span>
                       👀 Visible para empleados de la casa
-                      <small> Todos los empleados de {house} la pueden leer, pero no cambiar.</small>
+                      <small> Todos los empleados de {house} la pueden leer y agregar notas, pero no cambiar ni borrar nada.</small>
                     </span>
                   </label>
                 )}
-                {employees.length === 0 && (
-                  <p className="hcc-hint">Esta casa no tiene empleados todavía.</p>
+                {scope === 'employee' && employees.length === 0 && (
+                  <p className="hcc-warning" role="status">
+                    Esta casa no tiene empleados todavía. Agrega un empleado a {house} en “Usuarios” o elige “Toda la casa”.
+                  </p>
                 )}
                 {scope === 'employee' && employees.length > 0 && (
                   <>
@@ -627,6 +628,7 @@ function EntryForm({
   photoUrls,
   onSaved,
   onCancel,
+  notice,
 }: {
   card: HouseCustomCard;
   kind: HouseCardEntryKind;
@@ -635,6 +637,8 @@ function EntryForm({
   photoUrls: Record<string, string>;
   onSaved: (entry: HouseCardEntry) => void;
   onCancel: () => void;
+  /** Aviso arriba de "Guardar" (ej. a empleados: la nota no se puede editar después). */
+  notice?: string | null;
 }) {
   const isStep = kind === 'instruccion';
   const idBase = entry ? `hcc-edit-${entry.id}` : `hcc-new-${kind}`;
@@ -758,6 +762,7 @@ function EntryForm({
       <span className="hcc-label">Enlace de video (YouTube, Vimeo, Drive…)</span>
       <LinkEditor links={links} setLinks={setLinks} draft={linkDraft} setDraft={setLinkDraft} disabled={saving} />
 
+      {notice && <p className="hcc-warning">{notice}</p>}
       {error && <p className="hcc-error" role="alert">{error}</p>}
       {progress && <p className="hcc-hint" aria-live="polite">{progress}</p>}
       <div className="hcc-actions">
@@ -1073,12 +1078,12 @@ export function HouseCustomCardPanel({
   let who: string;
   if (card.target_user_id) {
     who = viewerIsTarget
-      ? 'La ven Jonathan, el manager de la casa y tú. Puedes leer los pasos, agregar notas y editar o borrar tus notas.'
-      : `La ven Jonathan, el manager de la casa y ${card.target_name || 'el empleado'}. Ningún otro empleado la ve.`;
+      ? 'La ven Jonathan, el manager de la casa y tú. Puedes leer los pasos y agregar notas.'
+      : `La ven Jonathan, el manager de la casa y ${card.target_name || 'el empleado'}. ${card.target_name || 'El empleado'} puede leer y agregar notas, pero no editar ni borrar. Ningún otro empleado la ve.`;
   } else if (readOnly) {
-    who = 'Tarjeta de la casa. Puedes leerla; solo Jonathan y el manager la cambian.';
+    who = 'Tarjeta de la casa. Puedes leer los pasos y agregar notas. Solo Jonathan y el manager cambian o borran.';
   } else if (card.visible_to_employees) {
-    who = 'Jonathan y el manager escriben aquí. Los empleados de la casa la pueden leer (solo lectura).';
+    who = 'Jonathan y el manager manejan todo aquí. Los empleados de la casa la leen y pueden agregar notas, pero no editar ni borrar.';
   } else {
     who = 'Ven y escriben aquí: Jonathan y el manager de la casa. Los empleados no la ven.';
   }
@@ -1094,7 +1099,7 @@ export function HouseCustomCardPanel({
           <p className="hcc-summary-target">👤 {viewerIsTarget ? 'Tarjeta para ti' : `Para: ${card.target_name || 'empleado'}`}</p>
         )}
         {!card.target_user_id && card.visible_to_employees && (
-          <p className="hcc-summary-visible">👀 {readOnly ? 'Solo lectura' : 'Visible para empleados de la casa'}</p>
+          <p className="hcc-summary-visible">👀 {readOnly ? 'Puedes leer y agregar notas' : 'Visible para empleados de la casa'}</p>
         )}
         <p className="hcc-summary-who">{who}</p>
       </div>
@@ -1131,7 +1136,7 @@ export function HouseCustomCardPanel({
                 <input type="checkbox" checked={renameVisible} onChange={(e) => setRenameVisible(e.target.checked)} />
                 <span>
                   👀 Visible para empleados de la casa
-                  <small> Solo lectura para ellos.</small>
+                  <small> Ellos solo leen y agregan notas.</small>
                 </span>
               </label>
             )}
@@ -1218,7 +1223,14 @@ export function HouseCustomCardPanel({
           </div>
           {addNotes && (
             adding === 'nota' ? (
-              <EntryForm card={card} kind="nota" photoUrls={photoUrls} onSaved={onSaved} onCancel={() => setAdding(null)} />
+              <EntryForm
+                card={card}
+                kind="nota"
+                photoUrls={photoUrls}
+                onSaved={onSaved}
+                onCancel={() => setAdding(null)}
+                notice={manageSteps ? null : 'Después de guardar, tu nota no se puede editar ni borrar. Si te equivocas, avísale al manager.'}
+              />
             ) : (
               <button type="button" className="hcc-btn hcc-add-entry" onClick={() => { setEditingId(null); setAdding('nota'); }}>
                 + Agregar nota
