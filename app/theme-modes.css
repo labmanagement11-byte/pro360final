@@ -693,3 +693,42 @@ html[data-theme="dark"] .completed-job-delete {
 html[data-theme="dark"] .completed-job-delete:hover {
   background: #991b1b !important;
 }
+
+/* Recordatorios: "Ya lo hice" y "Hecho por" en modo oscuro.
+   Más específico que .subcard.reminder-urgent :is(p, div, ...) para no heredar el rojo. */
+html[data-theme="dark"] .reminder-done-block,
+html[data-theme="dark"] .subcard.reminder-urgent .reminder-done-block {
+  background: transparent !important;
+}
+
+html[data-theme="dark"] .reminder-done-by,
+html[data-theme="dark"] .subcard.reminder-urgent .reminder-done-by {
+  background: #064e3b !important;
+  border-color: #10b981 !important;
+  color: #d1fae5 !important;
+}
+
+html[data-theme="dark"] .reminder-done-btn,
+html[data-theme="dark"] .subcard.reminder-urgent .reminder-done-btn {
+  background: #22c55e !important;
+  color: #052e16 !important;
+  -webkit-text-fill-color: #052e16;
+}
+
+html[data-theme="dark"] .reminder-done-hint,
+html[data-theme="dark"] .subcard.reminder-urgent .reminder-done-hint {
+  background: transparent !important;
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .reminder-done-error,
+html[data-theme="dark"] .subcard.reminder-urgent .reminder-done-error {
+  background: transparent !important;
+  color: #fca5a5 !important;
+}
+
+html[data-theme="dark"] .reminder-freq-pill,
+html[data-theme="dark"] .subcard.reminder-urgent .reminder-freq-pill {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+}

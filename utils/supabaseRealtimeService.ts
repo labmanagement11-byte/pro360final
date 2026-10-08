@@ -1851,6 +1851,9 @@ export async function createReminder(reminder: any) {
       account: reminder.account || '',
       invoice_number: reminder.invoiceNumber || reminder.invoice_number || null,
       frequency: reminder.frequency || 'once',
+      interval_days: reminder.frequency === 'custom' && Number(reminder.interval_days ?? reminder.intervalDays) > 0
+        ? Math.round(Number(reminder.interval_days ?? reminder.intervalDays))
+        : null,
       amount: reminder.amount !== undefined && reminder.amount !== null && reminder.amount !== ''
         ? parseFloat(reminder.amount)
         : null,
@@ -1924,6 +1927,10 @@ export async function updateReminder(reminderId: string, updates: any) {
       payload.invoice_number = updates.invoiceNumber ?? updates.invoice_number;
     }
     if (updates.frequency !== undefined) payload.frequency = updates.frequency;
+    if (updates.interval_days !== undefined || updates.intervalDays !== undefined) {
+      const n = Number(updates.interval_days ?? updates.intervalDays);
+      payload.interval_days = Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    }
     if (updates.amount !== undefined) {
       payload.amount = updates.amount === '' || updates.amount === null
         ? null
@@ -1974,13 +1981,49 @@ export async function deleteReminder(reminderId: string) {
   }
 }
 
+/**
+ * "Ya lo hice": llama a mark_reminder_done (revisa en la base que sea Jonathan/dueño o el
+ * manager de esa casa). Si el recordatorio se repite, el próximo vencimiento queda en
+ * hoy (Colombia) + intervalo y deja de estar vencido; si es de única vez queda hecho.
+ * Guarda quién y cuándo (last_done_by / last_done_at).
+ */
+export async function markReminderDone(
+  reminderId: string,
+): Promise<{ ok: true; row: any } | { ok: false; error: string }> {
+  if (!reminderId) return { ok: false, error: 'No se encontró el recordatorio' };
+  try {
+    const supabase: any = getSupabaseClient();
+    const { data, error } = await supabase.rpc('mark_reminder_done', { p_id: reminderId });
+    if (error) {
+      console.error('❌ Error marcando recordatorio como hecho:', error);
+      const code = String(error?.code || '');
+      if (code === '42501') return { ok: false, error: 'Solo Jonathan o el manager de la casa pueden marcarlo' };
+      if (code === 'P0002') return { ok: false, error: 'El recordatorio ya no existe' };
+      return { ok: false, error: 'No se pudo guardar. Intenta de nuevo.' };
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.id) return { ok: false, error: 'No se pudo guardar. Intenta de nuevo.' };
+    return { ok: true, row: mapReminderRow(row) };
+  } catch (error) {
+    console.error('Exception marking reminder done:', error);
+    return { ok: false, error: 'No se pudo guardar. Intenta de nuevo.' };
+  }
+}
+
+let reminderChannelSeq = 0;
+
 export function subscribeToReminders(house: string = 'EPIC D1', callback: (data: any) => void) {
   try {
     console.log('🔔 [Realtime Service] Iniciando suscripción a reminders para house:', house);
     const supabase = getSupabaseClient();
     const filter = house && house !== '*' ? { filter: `house=eq.${house}` } : {};
+    // Topic único por suscripción: supabase.channel() devuelve el canal existente si el
+    // topic se repite, y removeChannel() es asíncrono. Al volver a correr el efecto
+    // (StrictMode o cambio de casas) el mismo canal acumulaba dos callbacks y cada
+    // INSERT llegaba dos veces.
+    reminderChannelSeq += 1;
     const channel = supabase
-      .channel(`reminders-changes-${house}`)
+      .channel(`reminders-changes-${house}-${Date.now()}-${reminderChannelSeq}`)
       .on(
         'postgres_changes',
         {

@@ -4715,3 +4715,73 @@ body,
     white-space: normal;
   }
 }
+
+/* ===== Recordatorios: "Ya lo hice" (una sola columna, sin elementos flotantes) ===== */
+.reminder-freq-pill {
+  margin-left: auto;
+  background: #3b82f6;
+  color: #ffffff;
+  padding: 0.25rem 0.6rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reminder-done-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.reminder-done-by {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.reminder-done-btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.reminder-done-btn:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.reminder-done-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.reminder-done-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.reminder-done-error {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.subcard.reminder-subcard:hover {
+  transform: none;
+}
