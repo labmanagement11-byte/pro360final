@@ -6,12 +6,13 @@
 // Dos tipos de tarjeta: de casa (target_user_id null) o de UN empleado de esa casa.
 // Una tarjeta de casa puede ser "visible para empleados de la casa" (solo lectura para ellos).
 // Dos tipos de entrada: 'instruccion' (pasos numerados, ordenados por position) y 'nota'.
-// Permisos (iguales a la base, ver supabase/migrations/*_tarjetas_personalizadas_casa.sql):
+// Permisos (iguales a la base, ver supabase/migrations/*_tarjetas_*.sql):
 //   - Crear / renombrar / borrar tarjetas y cambiar la visibilidad: solo Jonathan (dueño).
-//   - Jonathan y el manager de la casa: ven todas las tarjetas de la casa y manejan pasos y notas.
-//   - Empleado destino de una tarjeta de empleado: lee los pasos, agrega notas y edita / borra
-//     solo sus notas.
-//   - Empleados de la casa en una tarjeta de casa visible: solo leen.
+//   - Jonathan y el manager de la casa: ven todas las tarjetas de la casa y crean, editan, borran
+//     y ordenan todo (pasos y notas, fotos, videos, enlaces).
+//   - Empleado destino de una tarjeta de empleado y empleados de la casa en una tarjeta de casa
+//     visible: leen todo y SOLO AGREGAN notas (con fotos, videos o enlaces). No editan ni borran
+//     nada, ni siquiera sus propias notas.
 // La base decide por profiles.id (auth.uid()); el nombre (employeeScope) solo es respaldo visual.
 
 import { getSupabaseClient } from './supabaseClient';
@@ -128,7 +129,7 @@ export function isCardTarget(
   return nameBelongsToEmployee(card.target_name, user || null);
 }
 
-/** Empleado de la casa que ve una tarjeta de casa marcada como visible (solo lectura). */
+/** Empleado de la casa que ve una tarjeta de casa marcada como visible (lee y agrega notas). */
 export function isReadOnlyViewer(user: HouseActor | null | undefined, card: CardAudience): boolean {
   if (card.target_user_id || !card.visible_to_employees) return false;
   return !canUseHouseCards(user, card.house) && isEmployeeOfHouse(user, card.house);
@@ -143,21 +144,20 @@ export function canManageSteps(user: HouseActor | null | undefined, card: CardAu
   return canUseHouseCards(user, card.house);
 }
 
-/** Agregar notas: Jonathan, el manager y el empleado destino. Empleados que solo leen, no. */
+/** Agregar notas: todos los que ven la tarjeta (Jonathan, manager, empleado destino y empleados
+ *  de la casa si la tarjeta es visible). */
 export function canAddNote(user: HouseActor | null | undefined, card: CardAudience, authUid?: string | null): boolean {
-  return canUseHouseCards(user, card.house) || isCardTarget(user, card, authUid);
+  return canViewCard(user, card, authUid);
 }
 
-/** Jonathan y el manager: cualquier entrada. Empleado destino: solo las notas que él escribió. */
+/** Editar / borrar pasos y notas: solo Jonathan y el manager. Los empleados nunca (ni sus notas). */
 export function canEditEntry(
   user: HouseActor | null | undefined,
   card: CardAudience,
-  entry: Pick<HouseCardEntry, 'created_by'> & { kind?: HouseCardEntryKind | null },
-  authUid?: string | null
+  _entry?: Pick<HouseCardEntry, 'created_by'> & { kind?: HouseCardEntryKind | null },
+  _authUid?: string | null
 ): boolean {
-  if (canUseHouseCards(user, card.house)) return true;
-  if ((entry.kind || 'nota') !== 'nota') return false;
-  return Boolean(authUid) && isCardTarget(user, card, authUid) && entry.created_by === authUid;
+  return canUseHouseCards(user, card.house);
 }
 
 /** auth.uid() de la sesión actual (el objeto user de la app no trae el id). */

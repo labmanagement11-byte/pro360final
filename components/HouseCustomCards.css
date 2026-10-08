@@ -23,6 +23,15 @@
 .dashboard-card.hcc-add-tile.is-open:hover {
   transform: none;
 }
+/* .dashboard-card::before (Dashboard.css) es una capa absoluta encima de toda la tarjeta.
+   En el formulario abierto tapaba los radios, el select y los íconos y no dejaba elegir. */
+.dashboard-card.hcc-add-tile::before {
+  display: none;
+}
+.dashboard-card.hcc-add-tile .hcc-add-form {
+  position: relative;
+  z-index: 1;
+}
 
 .hcc-add-form {
   display: flex;
@@ -364,6 +373,16 @@
   margin: 0;
   font-size: 0.82rem;
   color: #64748b;
+}
+.hcc-warning {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1.5px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  font-weight: 600;
+  font-size: 0.92rem;
 }
 .hcc-error {
   margin: 0;

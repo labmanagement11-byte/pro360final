@@ -889,3 +889,8 @@ html[data-theme="dark"] .hcc-file-item {
 html[data-theme="dark"] .hcc-file-name {
   color: #f8fafc;
 }
+html[data-theme="dark"] .hcc-warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #fbbf24;
+  color: #fde68a;
+}
